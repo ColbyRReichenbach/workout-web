@@ -1,0 +1,128 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-primary: var(--primary);
+  --color-border: var(--border);
+  --color-card: var(--card);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+}
+
+:root {
+  --radius: 1.5rem;
+  /* More rounded for "Pulse" */
+  --background: #f5f2ed;
+  /* Tanish Background */
+  --foreground: #1c1917;
+  /* Dark Stone */
+  --card: rgba(255, 254, 252, 0.7);
+  /* Glassy White */
+  --card-foreground: #1c1917;
+  --primary: #ef4444;
+  /* Pulse Red */
+  --primary-foreground: #ffffff;
+  --muted: #e7e5e4;
+  --muted-foreground: #78716c;
+  --border: rgba(0, 0, 0, 0.05);
+}
+
+/* Dark mode for accessibility or system switchers, but we'll default to Tan */
+.dark-mode-optional {
+  --background: #09090b;
+  --foreground: #fafafa;
+  --card: rgba(24, 24, 27, 0.8);
+  --primary: #ef4444;
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .font-serif {
+    font-family: var(--font-serif), serif;
+  }
+
+  /* Pulse Border Beam Effect */
+  .pulse-border-beam {
+    position: relative;
+    border-radius: inherit;
+  }
+
+  .pulse-border-beam::after {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    padding: 2px;
+    border-radius: inherit;
+    background: conic-gradient(from 0deg at 50% 50%,
+        transparent 0%,
+        transparent 70%,
+        var(--primary) 85%,
+        transparent 100%);
+    -webkit-mask:
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    mask:
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+    animation: pulse-spin 4s linear infinite;
+  }
+
+  @keyframes pulse-spin {
+    from {
+      transform: rotate(0deg);
+    }
+
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  /* Custom Scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #d6d3d1;
+    border-radius: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #a8a29e;
+  }
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    transition: background-color 0.5s ease;
+  }
+}
