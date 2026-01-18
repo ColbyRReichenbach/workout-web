@@ -8,9 +8,20 @@ import { loginDemoUser, loginWithOAuth, signInWithEmail, signUpWithEmail, resetP
  * NanoParticles Component - Heartbeat-Synced Burst Edition
  * Particles burst outward with each heartbeat, not continuously.
  */
+interface Particle {
+    x: number;
+    y: number;
+    vx: number;
+    vy: number;
+    life: number;
+    opacity: number;
+    size: number;
+    color: string;
+}
+
 const NanoParticles = ({ intensity: targetIntensity, heartDuration }: { intensity: number, heartDuration: string }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const particles = useRef<any[]>([]);
+    const particles = useRef<Particle[]>([]);
     const requestRef = useRef<number>(0);
     const lastBeatTime = useRef<number>(0);
     const secondBeatFired = useRef<boolean>(false);
@@ -39,7 +50,7 @@ const NanoParticles = ({ intensity: targetIntensity, heartDuration }: { intensit
         };
 
         const createBurstParticles = (count: number, currentInt: number) => {
-            const newParticles = [];
+            const newParticles: Particle[] = [];
             for (let i = 0; i < count; i++) {
                 const angle = Math.random() * Math.PI * 2;
                 const dist = 30 + Math.random() * 35;
@@ -73,8 +84,6 @@ const NanoParticles = ({ intensity: targetIntensity, heartDuration }: { intensit
             // Check if it's time for a beat burst
             // The heartbeat animation has 2 pulses per cycle (at 15% and 45%)
             const timeSinceLastBeat = time - lastBeatTime.current;
-            const firstBeatTime = beatInterval * 0.15;
-            const secondBeatTime = beatInterval * 0.45;
 
             // Trigger burst at first beat of cycle
             if (timeSinceLastBeat >= beatInterval) {

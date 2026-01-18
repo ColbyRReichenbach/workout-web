@@ -75,22 +75,22 @@ export async function saveUserSettings(settings: Partial<UserSettings>): Promise
     const supabase = createClient();
     const userId = await getCurrentUserId();
 
-    // Don't allow modifying demo account settings in production
-    if (userId === DEMO_USER_ID) {
-        // Just return success but don't actually save
-        return { success: true };
-    }
+    // Allow demo user to update settings for local testing (they share the demo profile)
+
+    // Only include fields that are actually provided (not undefined)
+    const updateData: Record<string, unknown> = {};
+    if (settings.ai_name !== undefined) updateData.ai_name = settings.ai_name;
+    if (settings.ai_personality !== undefined) updateData.ai_personality = settings.ai_personality;
+    if (settings.units !== undefined) updateData.units = settings.units;
+    if (settings.theme !== undefined) updateData.theme = settings.theme;
+    if (settings.notifications_enabled !== undefined) updateData.notifications_enabled = settings.notifications_enabled;
+    if (settings.data_privacy !== undefined) updateData.data_privacy = settings.data_privacy;
+
+    console.log('[saveUserSettings] Updating for user:', userId, 'with:', updateData);
 
     const { error } = await supabase
         .from('profiles')
-        .update({
-            ai_name: settings.ai_name,
-            ai_personality: settings.ai_personality,
-            units: settings.units,
-            theme: settings.theme,
-            notifications_enabled: settings.notifications_enabled,
-            data_privacy: settings.data_privacy,
-        })
+        .update(updateData)
         .eq('id', userId);
 
     if (error) {

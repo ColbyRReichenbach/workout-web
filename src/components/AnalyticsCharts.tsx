@@ -1,7 +1,9 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { useState, useMemo } from "react";
+import { useState, useMemo, memo } from "react";
+import { useSettings } from "@/context/SettingsContext";
+import { getUnitLabel } from "@/lib/conversions";
 
 interface ChartPoint {
     x: number;
@@ -17,6 +19,7 @@ interface MultiChartProps {
     color?: string;
     secondaryColor?: string;
     height?: number;
+    // Units are now handled via context, but we keep props for explicit overrides if needed
     units?: string;
     secondaryUnits?: string;
     title?: string;
@@ -25,16 +28,20 @@ interface MultiChartProps {
 /**
  * Premium Area Chart with optional secondary correlation line
  */
-export function PremiumAreaChart({
+export const PremiumAreaChart = memo(function PremiumAreaChart({
     data,
     secondaryData,
     height = 250,
     color = "#ef4444",
     secondaryColor = "#1c1917",
-    units = "",
+    units: propUnits = "",
     secondaryUnits = ""
 }: MultiChartProps) {
     const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+    const { units: systemUnits } = useSettings();
+
+    // Determine effective unit label (prop override > context derived)
+    const displayUnits = propUnits || (getUnitLabel(systemUnits, 'weight') === 'kg' ? ' kg' : ' lbs');
 
     const { points, secondaryPoints } = useMemo(() => {
         if (data.length === 0) return { points: [], secondaryPoints: [] };
@@ -65,7 +72,7 @@ export function PremiumAreaChart({
         return { points: pts, secondaryPoints: sPts };
     }, [data, secondaryData]);
 
-    if (data.length === 0) return <div className="h-full flex items-center justify-center text-stone-400 italic">No biometric depth available</div>;
+    if (data.length === 0) return <div className="h-full flex items-center justify-center text-muted-foreground italic">No biometric depth available</div>;
 
     const mainD = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x},${p.y}`).join(' ');
     const secondaryD = secondaryPoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x},${p.y}`).join(' ');
@@ -81,8 +88,8 @@ export function PremiumAreaChart({
         // Calculate smart positioning
         let translateX = '-50%';
         let translateY = '-120%'; // Default: above the point
-        let left = `${xPercent}%`;
-        let top = `${yPercent}%`;
+        const left = `${xPercent}%`;
+        const top = `${yPercent}%`;
 
         // If near top edge, show below
         if (yPercent < 25) {
@@ -106,7 +113,7 @@ export function PremiumAreaChart({
     };
 
     return (
-        <div className="w-full relative h-full group/chart overflow-visible" style={{ height: `${height}px` }}>
+        <div className="w-full relative h-full group/chart overflow-visible" style={{ height: `${height}px`, willChange: 'transform' }}>
             <svg viewBox="-2 -2 104 104" preserveAspectRatio="none" className="w-full h-full" style={{ overflow: 'visible' }}>
                 <defs>
                     <linearGradient id={`areaGradient-${color.replace('#', '')}`} x1="0" y1="0" x2="0" y2="1">
@@ -117,7 +124,7 @@ export function PremiumAreaChart({
 
                 {/* Grid Lines */}
                 {[8, 29, 50, 71, 92].map(v => (
-                    <line key={v} x1="4" y1={v} x2="96" y2={v} stroke="currentColor" className="text-stone-100" strokeWidth="0.1" />
+                    <line key={v} x1="4" y1={v} x2="96" y2={v} stroke="currentColor" className="text-border" strokeWidth="0.1" />
                 ))}
 
                 {/* Secondary Line (Correlation) */}
@@ -125,7 +132,7 @@ export function PremiumAreaChart({
                     <motion.path
                         initial={{ pathLength: 0, opacity: 0 }}
                         animate={{ pathLength: 1, opacity: 0.3 }}
-                        transition={{ duration: 2 }}
+                        transition={{ duration: 1.5 }}
                         d={secondaryD}
                         fill="none"
                         stroke={secondaryColor}
@@ -145,7 +152,7 @@ export function PremiumAreaChart({
                 <motion.path
                     initial={{ pathLength: 0 }}
                     animate={{ pathLength: 1 }}
-                    transition={{ duration: 1.5, ease: "circOut" }}
+                    transition={{ duration: 1, ease: "circOut" }}
                     d={mainD}
                     fill="none"
                     stroke={color}
@@ -191,6 +198,7 @@ export function PremiumAreaChart({
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.95 }}
+                        transition={{ duration: 0.15 }}
                         className="absolute z-50 bg-stone-900 text-white shadow-2xl p-4 rounded-2xl pointer-events-none min-w-[120px]"
                         style={getTooltipStyle()}
                     >
@@ -200,7 +208,7 @@ export function PremiumAreaChart({
                         <div className="space-y-1">
                             <div className="flex items-center gap-3">
                                 <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-                                <span className="text-lg font-serif">{Math.round(points[hoveredIndex].val)}{units}</span>
+                                <span className="text-lg font-serif">{Math.round(points[hoveredIndex].val)}{displayUnits}</span>
                             </div>
                             {secondaryPoints[hoveredIndex] && (
                                 <div className="flex items-center gap-3 opacity-60">
@@ -214,13 +222,16 @@ export function PremiumAreaChart({
             </AnimatePresence>
         </div>
     );
-}
+});
 
 /**
  * Progression Bar Chart
  */
-export function ProgressionBarChart({ data, height = 300, color = "bg-primary" }: MultiChartProps) {
+export const ProgressionBarChart = memo(function ProgressionBarChart({ data, height = 300, color = "bg-primary", units = "", secondaryUnits = "" }: MultiChartProps) {
     const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+    const { units: systemUnits } = useSettings();
+    const displayUnits = units || getUnitLabel(systemUnits, 'weight');
+
     const max = Math.max(...data, 1);
     const totalBars = data.length;
 
@@ -259,7 +270,7 @@ export function ProgressionBarChart({ data, height = 300, color = "bg-primary" }
                         <motion.div
                             initial={{ height: 0 }}
                             animate={{ height: `${heightPct}%` }}
-                            transition={{ duration: 0.8, delay: i * 0.01, ease: "circOut" }}
+                            transition={{ duration: 0.8, delay: i * 0.005, ease: "circOut" }}
                             className={`w-full rounded-t-[2px] ${color} transition-all duration-300 relative`}
                             style={{
                                 opacity: hoveredIndex === null ? 0.6 : hoveredIndex === i ? 1 : 0.3,
@@ -272,10 +283,11 @@ export function ProgressionBarChart({ data, height = 300, color = "bg-primary" }
                                     initial={{ opacity: 0, scale: 0.95 }}
                                     animate={{ opacity: 1, scale: 1 }}
                                     exit={{ opacity: 0, scale: 0.95 }}
+                                    transition={{ duration: 0.15 }}
                                     className={`absolute ${tooltipPos} bg-stone-900 text-white p-4 rounded-2xl shadow-2xl whitespace-nowrap z-50 pointer-events-none`}
                                 >
                                     <div className="text-[9px] font-bold text-stone-500 uppercase tracking-widest mb-2">Week {i + 1}</div>
-                                    <div className="text-lg font-serif">{val.toLocaleString()} lbs</div>
+                                    <div className="text-lg font-serif">{val.toLocaleString()} {displayUnits}</div>
                                 </motion.div>
                             )}
                         </AnimatePresence>
@@ -284,13 +296,13 @@ export function ProgressionBarChart({ data, height = 300, color = "bg-primary" }
             })}
         </div>
     );
-}
+});
 
 
 /**
  * Structural Load Heatmap (Phase 1)
  */
-export function StructuralHeatmap({ data, readiness }: { data: boolean[], readiness: number[] }) {
+export const StructuralHeatmap = memo(function StructuralHeatmap({ data, readiness }: { data: boolean[], readiness: number[] }) {
     const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
     return (
@@ -303,11 +315,14 @@ export function StructuralHeatmap({ data, readiness }: { data: boolean[], readin
                 return (
                     <motion.div
                         key={i}
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: i * 0.01 }}
-                        className={`aspect-square rounded-lg relative cursor-pointer ${active ? 'bg-primary' : 'bg-stone-100'}`}
-                        style={{ opacity: active ? Math.max(0.3, readinessVal / 100) : 1 }}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: i * 0.005, duration: 0.3 }}
+                        className={`aspect-square rounded-lg relative cursor-pointer ${active ? 'bg-primary' : 'bg-muted'}`}
+                        style={{
+                            opacity: active ? Math.max(0.3, readinessVal / 100) : 1,
+                            willChange: 'opacity, transform'
+                        }}
                         onMouseEnter={() => setHoveredIndex(i)}
                         onMouseLeave={() => setHoveredIndex(null)}
                     >
@@ -318,12 +333,13 @@ export function StructuralHeatmap({ data, readiness }: { data: boolean[], readin
                                     initial={{ opacity: 0, scale: 0.95 }}
                                     animate={{ opacity: 1, scale: 1 }}
                                     exit={{ opacity: 0, scale: 0.95 }}
-                                    className={`absolute z-50 bg-stone-900 text-white p-3 rounded-xl shadow-2xl whitespace-nowrap pointer-events-none ${col < 2 ? 'left-0' : col > 4 ? 'right-0' : 'left-1/2 -translate-x-1/2'
+                                    transition={{ duration: 0.15 }}
+                                    className={`absolute z-50 bg-foreground text-background p-3 rounded-xl shadow-2xl whitespace-nowrap pointer-events-none ${col < 2 ? 'left-0' : col > 4 ? 'right-0' : 'left-1/2 -translate-x-1/2'
                                         } ${row === 0 ? 'top-full mt-2' : 'bottom-full mb-2'}`}
                                 >
-                                    <div className="text-[9px] font-bold text-stone-500 uppercase tracking-widest mb-1">Day {i + 1}</div>
+                                    <div className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Day {i + 1}</div>
                                     <div className="flex items-center gap-2">
-                                        <span className={`w-2 h-2 rounded-full ${active ? 'bg-primary' : 'bg-stone-400'}`} />
+                                        <span className={`w-2 h-2 rounded-full ${active ? 'bg-primary' : 'bg-muted-foreground'}`} />
                                         <span className="text-sm font-serif">{active ? 'Active' : 'Rest'}</span>
                                     </div>
                                     <div className="flex items-center gap-2 mt-1">
@@ -338,25 +354,28 @@ export function StructuralHeatmap({ data, readiness }: { data: boolean[], readin
             })}
         </div>
     );
-}
+});
 
 /**
  * PR Proximity Chart (Phase 3)
  */
-export function PRProximityChart({ current, target, label }: { current: number, target: number, label: string }) {
+export const PRProximityChart = memo(function PRProximityChart({ current, target, label, units: propUnits }: { current: number, target: number, label: string, units?: string }) {
+    const { units: systemUnits } = useSettings();
+    const displayUnits = propUnits || getUnitLabel(systemUnits, 'weight');
     const progress = Math.min((current / target) * 100, 100);
     return (
         <div className="space-y-3 w-full">
             <div className="flex justify-between items-end">
-                <span className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">{label}</span>
-                <span className="text-sm font-serif text-stone-900">{current} / {target} lb</span>
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{label}</span>
+                <span className="text-sm font-serif text-foreground">{current} / {target} {displayUnits}</span>
             </div>
-            <div className="h-4 bg-stone-100 rounded-full overflow-hidden relative">
+            <div className="h-4 bg-muted rounded-full overflow-hidden relative">
                 <motion.div
                     initial={{ width: 0 }}
                     animate={{ width: `${progress}%` }}
-                    transition={{ duration: 1.5, ease: "circOut" }}
+                    transition={{ duration: 1, ease: "circOut" }}
                     className="h-full bg-primary relative"
+                    style={{ willChange: 'width' }}
                 >
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent to-white/20 animate-pulse" />
                 </motion.div>
@@ -366,28 +385,30 @@ export function PRProximityChart({ current, target, label }: { current: number, 
             </div>
         </div>
     );
-}
+});
 
 /**
  * Recovery Index Chart
  */
-export function RecoveryIndexChart({ stress, recovery, height = 250 }: { stress: number[], recovery: number[], height?: number }) {
+export const RecoveryIndexChart = memo(function RecoveryIndexChart({ stress, recovery, height = 250 }: { stress: number[], recovery: number[], height?: number }) {
     const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
     const maxStress = Math.max(...stress, 1);
     const maxRecovery = Math.max(...recovery, 1);
 
     // Add padding (4-96 for x, 8-92 for y)
-    const stressPoints = stress.map((s, i) => ({
-        x: 4 + (i / Math.max(stress.length - 1, 1)) * 92,
-        y: 8 + (1 - s / maxStress) * 84,
-        val: s
-    }));
-    const recPoints = recovery.map((r, i) => ({
-        x: 4 + (i / Math.max(recovery.length - 1, 1)) * 92,
-        y: 8 + (1 - r / maxRecovery) * 84,
-        val: r
-    }));
+    const { stressPoints, recPoints } = useMemo(() => ({
+        stressPoints: stress.map((s, i) => ({
+            x: 4 + (i / Math.max(stress.length - 1, 1)) * 92,
+            y: 8 + (1 - s / maxStress) * 84,
+            val: s
+        })),
+        recPoints: recovery.map((r, i) => ({
+            x: 4 + (i / Math.max(recovery.length - 1, 1)) * 92,
+            y: 8 + (1 - r / maxRecovery) * 84,
+            val: r
+        }))
+    }), [stress, recovery, maxStress, maxRecovery]);
 
     const stressD = stressPoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x},${p.y}`).join(' ');
     const recD = recPoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x},${p.y}`).join(' ');
@@ -414,14 +435,14 @@ export function RecoveryIndexChart({ stress, recovery, height = 250 }: { stress:
     };
 
     return (
-        <div className="relative w-full overflow-visible" style={{ height: `${height}px` }}>
+        <div className="relative w-full overflow-visible" style={{ height: `${height}px`, willChange: 'transform' }}>
             <svg viewBox="-2 -2 104 104" preserveAspectRatio="none" className="w-full h-full" style={{ overflow: 'visible' }}>
                 {/* Recovery fill */}
                 <path d={`M ${recPoints[0]?.x || 4},92 ${recD} L ${recPoints[recPoints.length - 1]?.x || 96},92 Z`} fill="#0ea5e9" fillOpacity="0.1" />
                 <motion.path
                     initial={{ pathLength: 0 }}
                     animate={{ pathLength: 1 }}
-                    transition={{ duration: 1.5 }}
+                    transition={{ duration: 1 }}
                     d={recD}
                     fill="none"
                     stroke="#0ea5e9"
@@ -434,7 +455,7 @@ export function RecoveryIndexChart({ stress, recovery, height = 250 }: { stress:
                 <motion.path
                     initial={{ pathLength: 0 }}
                     animate={{ pathLength: 1 }}
-                    transition={{ duration: 1.5 }}
+                    transition={{ duration: 1 }}
                     d={stressD}
                     fill="none"
                     stroke="#ef4444"
@@ -478,6 +499,7 @@ export function RecoveryIndexChart({ stress, recovery, height = 250 }: { stress:
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.95 }}
+                        transition={{ duration: 0.15 }}
                         className="absolute z-50 bg-stone-900 text-white p-4 rounded-2xl shadow-2xl pointer-events-none min-w-[140px]"
                         style={getTooltipStyle()}
                     >
@@ -505,26 +527,28 @@ export function RecoveryIndexChart({ stress, recovery, height = 250 }: { stress:
             </AnimatePresence>
         </div>
     );
-}
+});
 
 /**
  * Power Density Scatter with Tooltips
  */
-export function PowerDensityChart({ data, height = 250 }: { data: { x: number, y: number }[], height?: number }) {
+export const PowerDensityChart = memo(function PowerDensityChart({ data, height = 250 }: { data: { x: number, y: number }[], height?: number }) {
     const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
     if (data.length === 0) return null;
-    const maxX = Math.max(...data.map(d => d.x), 1);
-    const maxY = Math.max(...data.map(d => d.y), 1);
+    const { maxX, maxY } = useMemo(() => ({
+        maxX: Math.max(...data.map(d => d.x), 1),
+        maxY: Math.max(...data.map(d => d.y), 1)
+    }), [data]);
 
     return (
-        <div className="relative w-full overflow-visible" style={{ height: `${height}px` }}>
+        <div className="relative w-full overflow-visible" style={{ height: `${height}px`, willChange: 'transform' }}>
             <svg viewBox="-2 -2 104 104" preserveAspectRatio="none" className="w-full h-full" style={{ overflow: 'visible' }}>
                 {/* Trend line */}
                 <motion.line
                     initial={{ pathLength: 0 }}
                     animate={{ pathLength: 1 }}
-                    transition={{ duration: 1.5 }}
+                    transition={{ duration: 1 }}
                     x1="0" y1="90" x2="100" y2="10"
                     stroke="#ef4444" strokeWidth="0.5" strokeDasharray="2,2" strokeOpacity="0.3"
                 />
@@ -538,7 +562,7 @@ export function PowerDensityChart({ data, height = 250 }: { data: { x: number, y
                             opacity: hoveredIndex === null ? 0.6 : hoveredIndex === i ? 1 : 0.2,
                             r: hoveredIndex === i ? 2 : 1
                         }}
-                        transition={{ duration: 0.3, delay: i * 0.02 }}
+                        transition={{ duration: 0.2, delay: i * 0.01 }}
                         cx={(d.x / maxX) * 100}
                         cy={100 - (d.y / maxY) * 100}
                         fill="#ef4444"
@@ -556,6 +580,7 @@ export function PowerDensityChart({ data, height = 250 }: { data: { x: number, y
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.9 }}
+                        transition={{ duration: 0.15 }}
                         className="absolute z-50 bg-stone-900 border border-stone-800 p-3 rounded-xl shadow-2xl pointer-events-none"
                         style={{
                             left: `${(data[hoveredIndex].x / maxX) * 100}%`,
@@ -570,4 +595,4 @@ export function PowerDensityChart({ data, height = 250 }: { data: { x: number, y
             </AnimatePresence>
         </div>
     );
-}
+});

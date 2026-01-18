@@ -9,7 +9,7 @@
  * - HTTP security headers
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { BOUNDS } from '@/lib/validation'
 
 // ============================================
@@ -169,7 +169,7 @@ describe('Authentication Security', () => {
 
 describe('Authorization Security', () => {
     describe('Role-Based Access Control', () => {
-        const DEMO_USER_ID = '00000000-0000-0000-0000-000000000001'
+
 
         type Permission = 'read:own' | 'write:own' | 'read:demo' | 'admin'
         type Role = 'guest' | 'authenticated' | 'demo'

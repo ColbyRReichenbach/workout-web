@@ -1,7 +1,7 @@
 "use client";
 import { motion, AnimatePresence } from "framer-motion";
 import { Star } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 
 interface PrCelebrationProps {
     show: boolean;

@@ -1,33 +1,49 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle, Save, Plus, Trash2, Timer, Zap, Activity } from "lucide-react";
+import { CheckCircle, Save, Plus, Timer, Activity } from "lucide-react";
 import { WorkoutSegment } from "@/lib/types";
 
 interface LogProps {
     segment: WorkoutSegment;
     idx: number;
-    onLog: (segment: WorkoutSegment, idx: number, data: any) => void;
+    onLog: (segment: WorkoutSegment, idx: number, data: Record<string, unknown>) => void;
+    calculatedWeight?: number;
 }
 
-export function LogStrengthSets({ segment, idx, onLog }: LogProps) {
+import { useSettings } from "@/context/SettingsContext";
+import { getUnitLabel, toDisplayWeight, toStorageWeight } from "@/lib/conversions";
+
+export function LogStrengthSets({ segment, idx, onLog, calculatedWeight }: LogProps) {
+    const { units } = useSettings();
     const defaultSets = segment.target?.sets || 3;
+
+    // Use calculatedWeight if provided (from percent_1rm), otherwise fallback to weight_fixed
+    const initialWeight = calculatedWeight ?? segment.target?.weight_fixed;
+    const displayWeight = initialWeight ? toDisplayWeight(initialWeight, units) : "";
+
     const [sets, setSets] = useState(
         Array.from({ length: defaultSets }, () => ({
-            weight: segment.target?.weight_fixed || "",
+            weight: displayWeight || "",
             reps: segment.target?.reps || ""
         }))
     );
     const [saved, setSaved] = useState(false);
 
-    const updateSet = (setIdx: number, field: string, value: any) => {
+    const updateSet = (setIdx: number, field: 'weight' | 'reps', value: number | string) => {
         const newSets = [...sets];
-        (newSets[setIdx] as any)[field] = value;
+        newSets[setIdx] = { ...newSets[setIdx], [field]: value };
         setSets(newSets);
     };
 
     const handleSave = () => {
-        onLog(segment, idx, { sets });
+        // Convert display weights back to storage units (lbs)
+        const setsToLog = sets.map(s => ({
+            ...s,
+            weight: toStorageWeight(s.weight, units)
+        }));
+
+        onLog(segment, idx, { sets: setsToLog });
         setSaved(true);
     };
 
@@ -40,20 +56,20 @@ export function LogStrengthSets({ segment, idx, onLog }: LogProps) {
         );
     }
 
-    const inputInner = "bg-stone-50 border border-black/[0.03] rounded-xl px-2 py-3 text-lg font-serif focus:bg-white focus:ring-4 focus:ring-primary/5 outline-none text-center text-stone-900 shadow-inner w-full";
+    const inputInner = "bg-card border border-border rounded-xl px-2 py-3 text-lg font-serif focus:bg-background focus:ring-4 focus:ring-primary/5 outline-none text-center text-foreground shadow-inner w-full placeholder:text-muted-foreground";
 
     return (
         <div className="space-y-4 w-full">
             <div className="grid grid-cols-[30px_1fr_1fr] gap-4 px-2">
                 <div />
-                <label className="text-[10px] text-stone-400 uppercase font-bold text-center">Load (lb)</label>
-                <label className="text-[10px] text-stone-400 uppercase font-bold text-center">Reps</label>
+                <label className="text-[10px] text-muted-foreground uppercase font-bold text-center">Load ({getUnitLabel(units, 'weight')})</label>
+                <label className="text-[10px] text-muted-foreground uppercase font-bold text-center">Reps</label>
             </div>
 
             <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
                 {sets.map((set, sIdx) => (
                     <div key={sIdx} className="grid grid-cols-[30px_1fr_1fr] gap-4 items-center">
-                        <span className="text-[10px] font-bold text-stone-300 font-mono">S{sIdx + 1}</span>
+                        <span className="text-[10px] font-bold text-muted-foreground font-mono">S{sIdx + 1}</span>
                         <input
                             type="number"
                             placeholder="0"
@@ -75,13 +91,13 @@ export function LogStrengthSets({ segment, idx, onLog }: LogProps) {
             <div className="flex gap-3 pt-2 font-sans font-medium">
                 <button
                     onClick={() => setSets([...sets, { weight: sets[sets.length - 1]?.weight || "", reps: "" }])}
-                    className="flex-1 py-3 rounded-2xl bg-stone-100 text-stone-500 hover:bg-stone-200 transition-colors duration-150 flex items-center justify-center gap-2 text-xs"
+                    className="flex-1 py-3 rounded-2xl bg-muted text-muted-foreground hover:bg-muted/80 transition-colors duration-150 flex items-center justify-center gap-2 text-xs"
                 >
                     <Plus size={14} /> Add Set
                 </button>
                 <button
                     onClick={handleSave}
-                    className="flex-[2] py-3 rounded-2xl bg-primary text-white flex items-center justify-center transition-transform duration-150 shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] gap-2 text-xs font-bold uppercase tracking-widest"
+                    className="flex-[2] py-3 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center transition-transform duration-150 shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] gap-2 text-xs font-bold uppercase tracking-widest"
                 >
                     <Save size={14} /> Index Performance
                 </button>
@@ -111,13 +127,13 @@ export function LogMetcon({ segment, idx, onLog }: LogProps) {
         );
     }
 
-    const inputInner = "bg-stone-50 border border-black/[0.03] rounded-xl px-2 py-3 text-lg font-serif focus:bg-white focus:ring-4 focus:ring-primary/5 outline-none text-center text-stone-900 shadow-inner w-full";
+    const inputInner = "bg-card border border-border rounded-xl px-2 py-3 text-lg font-serif focus:bg-background focus:ring-4 focus:ring-primary/5 outline-none text-center text-foreground shadow-inner w-full placeholder:text-muted-foreground";
 
     return (
         <div className="space-y-6 w-full">
             <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                    <label className="text-[10px] text-stone-400 uppercase font-bold block text-center">Rounds</label>
+                    <label className="text-[10px] text-muted-foreground uppercase font-bold block text-center">Rounds</label>
                     <input
                         type="number"
                         placeholder="0"
@@ -127,7 +143,7 @@ export function LogMetcon({ segment, idx, onLog }: LogProps) {
                     />
                 </div>
                 <div className="space-y-1.5">
-                    <label className="text-[10px] text-stone-400 uppercase font-bold block text-center">Add. Reps</label>
+                    <label className="text-[10px] text-muted-foreground uppercase font-bold block text-center">Add. Reps</label>
                     <input
                         type="number"
                         placeholder="0"
@@ -137,7 +153,7 @@ export function LogMetcon({ segment, idx, onLog }: LogProps) {
                     />
                 </div>
                 <div className="space-y-1.5">
-                    <label className="text-[10px] text-stone-400 uppercase font-bold block text-center flex items-center justify-center gap-1">
+                    <label className="text-[10px] text-muted-foreground uppercase font-bold block text-center flex items-center justify-center gap-1">
                         <Timer size={10} /> Time (min)
                     </label>
                     <input
@@ -149,7 +165,7 @@ export function LogMetcon({ segment, idx, onLog }: LogProps) {
                     />
                 </div>
                 <div className="space-y-1.5">
-                    <label className="text-[10px] text-stone-400 uppercase font-bold block text-center flex items-center justify-center gap-1">
+                    <label className="text-[10px] text-muted-foreground uppercase font-bold block text-center flex items-center justify-center gap-1">
                         <Activity size={10} /> Avg HR
                     </label>
                     <input
@@ -164,7 +180,7 @@ export function LogMetcon({ segment, idx, onLog }: LogProps) {
 
             <button
                 onClick={handleSave}
-                className="w-full py-4 rounded-2xl bg-primary text-white flex items-center justify-center transition-transform duration-150 shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] gap-2 text-xs font-bold uppercase tracking-widest"
+                className="w-full py-4 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center transition-transform duration-150 shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] gap-2 text-xs font-bold uppercase tracking-widest"
             >
                 <Save size={16} /> Log Metcon Results
             </button>
@@ -173,6 +189,7 @@ export function LogMetcon({ segment, idx, onLog }: LogProps) {
 }
 
 export function LogCardioBasic({ segment, idx, onLog }: LogProps) {
+    const { units } = useSettings();
     const [distance, setDistance] = useState("");
     const [duration, setDuration] = useState(segment.target?.duration_min || "");
     const [hr, setHr] = useState("");
@@ -192,13 +209,13 @@ export function LogCardioBasic({ segment, idx, onLog }: LogProps) {
         );
     }
 
-    const inputInner = "bg-stone-50 border border-black/[0.03] rounded-xl px-2 py-3 text-lg font-serif focus:bg-white focus:ring-4 focus:ring-primary/5 outline-none text-center text-stone-900 shadow-inner w-full";
+    const inputInner = "bg-card border border-border rounded-xl px-2 py-3 text-lg font-serif focus:bg-background focus:ring-4 focus:ring-primary/5 outline-none text-center text-foreground shadow-inner w-full placeholder:text-muted-foreground";
 
     return (
         <div className="space-y-4 w-full md:min-w-[300px]">
             <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-1.5">
-                    <label className="text-[10px] text-stone-400 uppercase font-bold block text-center">Miles</label>
+                    <label className="text-[10px] text-muted-foreground uppercase font-bold block text-center">{getUnitLabel(units, 'distance').toUpperCase()}</label>
                     <input
                         type="number"
                         step="0.1"
@@ -209,7 +226,7 @@ export function LogCardioBasic({ segment, idx, onLog }: LogProps) {
                     />
                 </div>
                 <div className="space-y-1.5">
-                    <label className="text-[10px] text-stone-400 uppercase font-bold block text-center">Mins</label>
+                    <label className="text-[10px] text-muted-foreground uppercase font-bold block text-center">Mins</label>
                     <input
                         type="number"
                         placeholder="0"
@@ -219,7 +236,7 @@ export function LogCardioBasic({ segment, idx, onLog }: LogProps) {
                     />
                 </div>
                 <div className="space-y-1.5">
-                    <label className="text-[10px] text-stone-400 uppercase font-bold block text-center">Avg HR</label>
+                    <label className="text-[10px] text-muted-foreground uppercase font-bold block text-center">Avg HR</label>
                     <input
                         type="number"
                         placeholder="0"
@@ -231,7 +248,7 @@ export function LogCardioBasic({ segment, idx, onLog }: LogProps) {
             </div>
             <button
                 onClick={handleSave}
-                className="w-full py-4 rounded-2xl bg-primary text-white flex items-center justify-center transition-transform duration-150 shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] gap-2 text-xs font-bold uppercase tracking-widest"
+                className="w-full py-4 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center transition-transform duration-150 shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] gap-2 text-xs font-bold uppercase tracking-widest"
             >
                 <Save size={16} /> Sync Cardio Performance
             </button>

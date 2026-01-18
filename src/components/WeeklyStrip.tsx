@@ -2,7 +2,6 @@
 
 import { motion } from "framer-motion";
 import { Check } from "lucide-react";
-import { useState } from "react";
 
 type DayStatus = "pending" | "completed" | "missed" | "active";
 

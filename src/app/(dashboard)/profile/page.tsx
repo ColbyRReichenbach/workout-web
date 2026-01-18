@@ -2,12 +2,22 @@
 
 import { motion } from "framer-motion";
 import { createClient } from "@/utils/supabase/client";
+import { toDisplayWeight, toStorageWeight, normalizeUnit, getUnitLabel } from "@/lib/conversions";
 import { useEffect, useState } from "react";
-import { Check, Dumbbell, Scale, Activity, Zap, User, Target, TrendingUp, HeartPulse } from "lucide-react";
+import { Check, Scale, Activity, Zap, User, Target, TrendingUp, HeartPulse } from "lucide-react";
 import { TiltCard } from "@/components/TiltCard";
 import { logout } from "@/app/actions/auth";
+import { useSettings } from "@/context/SettingsContext";
 
-const PHASE_RANGES = {
+import { UserProfile } from "@/lib/types";
+
+interface PhaseRange {
+    min: number;
+    max: number;
+    label: string;
+}
+
+const PHASE_RANGES: Record<number, PhaseRange> = {
     1: { min: 1, max: 8, label: "Structural Integrity" },
     2: { min: 9, max: 20, label: "Strength & Threshold" },
     3: { min: 21, max: 32, label: "Peak Power" },
@@ -15,10 +25,23 @@ const PHASE_RANGES = {
     5: { min: 37, max: 52, label: "Recalibration" }
 };
 
+interface ProfileFormState {
+    weight_lbs: string;
+    squat_max: string;
+    bench_max: string;
+    deadlift_max: string;
+    mile_time: string;
+    k5_time: string;
+    sprint_400m: string;
+    current_week: number;
+    current_phase: number;
+}
+
 export default function ProfilePage() {
+    const { units } = useSettings();
     const [loading, setLoading] = useState(true);
-    const [profile, setProfile] = useState<any>(null);
-    const [form, setForm] = useState({
+    const [profile, setProfile] = useState<UserProfile | null>(null);
+    const [form, setForm] = useState<ProfileFormState>({
         weight_lbs: "",
         squat_max: "",
         bench_max: "",
@@ -32,15 +55,16 @@ export default function ProfilePage() {
 
     const supabase = createClient();
 
-    // Effect to keep week in range when phase changes
-    useEffect(() => {
-        const range = (PHASE_RANGES as any)[form.current_phase];
+    const handlePhaseChange = (phase: number) => {
+        const range = PHASE_RANGES[phase];
+        let newWeek = form.current_week;
         if (range) {
-            if (form.current_week < range.min || form.current_week > range.max) {
-                setForm(prev => ({ ...prev, current_week: range.min }));
+            if (newWeek < range.min || newWeek > range.max) {
+                newWeek = range.min;
             }
         }
-    }, [form.current_phase]);
+        setForm({ ...form, current_phase: phase, current_week: newWeek });
+    };
 
     // Helpers
     const secondsToTime = (seconds: number | null) => {
@@ -56,34 +80,47 @@ export default function ProfilePage() {
         return (m * 60) + (s || 0);
     };
 
+    // Fetch Profile
     useEffect(() => {
         async function fetchProfile() {
-            const { data, error } = await supabase
-                .from("profiles")
-                .select("*")
-                .single();
+            const { data: { user } } = await supabase.auth.getUser();
+            let query = supabase.from("profiles").select("*");
+
+            if (user) {
+                query = query.eq('id', user.id);
+            } else {
+                query = query.eq('id', '00000000-0000-0000-0000-000000000001');
+            }
+
+            const { data } = await query.single();
 
             if (data) {
-                const isMetric = data.units === 'metric';
-                const lbToKg = (lbs: number | null) => isMetric && lbs ? Math.round(lbs / 2.20462) : lbs;
-
                 setProfile(data);
-                setForm({
-                    weight_lbs: lbToKg(data.weight_lbs)?.toString() || "",
-                    squat_max: lbToKg(data.squat_max)?.toString() || "",
-                    bench_max: lbToKg(data.bench_max)?.toString() || "",
-                    deadlift_max: lbToKg(data.deadlift_max)?.toString() || "",
-                    mile_time: secondsToTime(data.mile_time_sec),
-                    k5_time: secondsToTime(data.k5_time_sec),
-                    sprint_400m: secondsToTime(data.sprint_400m_sec),
-                    current_week: data.current_week || 1,
-                    current_phase: data.current_phase || 1,
-                });
+                // Initial form set will happen via the dependency on 'profile' and 'units' below
             }
             setLoading(false);
         }
         fetchProfile();
     }, []);
+
+    // Sync Form with Profile and Units
+    useEffect(() => {
+        if (profile) {
+            setForm(prev => ({
+                ...prev,
+                weight_lbs: toDisplayWeight(profile.weight_lbs, units)?.toString() || "",
+                squat_max: toDisplayWeight(profile.squat_max, units)?.toString() || "",
+                bench_max: toDisplayWeight(profile.bench_max, units)?.toString() || "",
+                deadlift_max: toDisplayWeight(profile.deadlift_max, units)?.toString() || "",
+                mile_time: secondsToTime(profile.mile_time_sec),
+                k5_time: secondsToTime(profile.k5_time_sec),
+                sprint_400m: secondsToTime(profile.sprint_400m_sec),
+                current_week: profile.current_week || 1,
+                current_phase: profile.current_phase || 1,
+            }));
+        }
+    }, [profile, units]);
+
 
     const handleSubmit = async () => {
         if (!profile?.id) {
@@ -93,15 +130,12 @@ export default function ProfilePage() {
 
         setLoading(true);
 
-        const isMetric = profile?.units === 'metric';
-        const lbToKg = (lbs: number | null) => isMetric && lbs ? Math.round(lbs / 2.20462) : lbs;
-        const kgToLb = (kg: number | null) => isMetric && kg ? Math.round(kg * 2.20462) : kg;
-
         const updateData = {
-            weight_lbs: kgToLb(parseFloat(form.weight_lbs)) || null,
-            squat_max: kgToLb(parseFloat(form.squat_max)) || null,
-            bench_max: kgToLb(parseFloat(form.bench_max)) || null,
-            deadlift_max: kgToLb(parseFloat(form.deadlift_max)) || null,
+            weight_lbs: toStorageWeight(form.weight_lbs, units) || null,
+            squat_max: toStorageWeight(form.squat_max, units) || null,
+            bench_max: toStorageWeight(form.bench_max, units) || null,
+            deadlift_max: toStorageWeight(form.deadlift_max, units) || null,
+            deadlift_max: toStorageWeight(form.deadlift_max, units) || null,
             mile_time_sec: form.mile_time ? timeToSeconds(form.mile_time) : null,
             k5_time_sec: form.k5_time ? timeToSeconds(form.k5_time) : null,
             sprint_400m_sec: form.sprint_400m ? timeToSeconds(form.sprint_400m) : null,
@@ -119,37 +153,23 @@ export default function ProfilePage() {
             alert(`Save failed: ${error.message}`);
         } else {
             alert("Synchronization complete.");
-            const { data } = await supabase.from("profiles").select("*").single();
-            if (data) {
-                const isMetric = data.units === 'metric';
-                const lbToKg = (lbs: number | null) => isMetric && lbs ? Math.round(lbs / 2.20462) : lbs;
-
-                setProfile(data);
-                setForm({
-                    weight_lbs: lbToKg(data.weight_lbs)?.toString() || "",
-                    squat_max: lbToKg(data.squat_max)?.toString() || "",
-                    bench_max: lbToKg(data.bench_max)?.toString() || "",
-                    deadlift_max: lbToKg(data.deadlift_max)?.toString() || "",
-                    mile_time: secondsToTime(data.mile_time_sec),
-                    k5_time: secondsToTime(data.k5_time_sec),
-                    sprint_400m: secondsToTime(data.sprint_400m_sec),
-                    current_week: data.current_week || 1,
-                    current_phase: data.current_phase || 1,
-                });
-            }
+            // Re-fetch to confirm consistency
+            const { data } = await supabase.from("profiles").select("*").eq('id', profile.id).single();
+            if (data) setProfile(data);
         }
+
         setLoading(false);
     }
 
     if (loading && !profile) {
         return (
             <div className="flex h-[60vh] items-center justify-center">
-                <div className="text-stone-400 font-serif animate-pulse text-xl">Calibrating Pulse Data...</div>
+                <div className="text-muted-foreground font-serif animate-pulse text-xl">Calibrating Pulse Data...</div>
             </div>
         );
     }
 
-    const inputClasses = "w-full bg-stone-50 border border-black/[0.03] rounded-3xl px-6 py-5 text-2xl font-serif focus:outline-none focus:ring-4 focus:ring-primary/5 transition-all placeholder:text-stone-300 text-stone-900";
+    const inputClasses = "w-full bg-muted/30 border border-border rounded-3xl px-6 pt-8 pb-2 text-2xl font-serif focus:outline-none focus:ring-4 focus:ring-primary/5 transition-all placeholder:text-muted-foreground/30 text-foreground";
 
     return (
         <div className="max-w-7xl mx-auto space-y-16">
@@ -157,8 +177,8 @@ export default function ProfilePage() {
             <header className="flex flex-col md:flex-row md:items-end justify-between gap-10">
                 <div className="space-y-4">
                     <span className="text-primary font-bold tracking-[0.3em] text-[10px] uppercase block">Personnel Baseline</span>
-                    <h1 className="font-serif text-6xl md:text-8xl text-stone-900 leading-[0.9]">Athlete Data</h1>
-                    <p className="text-stone-500 text-xl font-light italic max-w-xl">
+                    <h1 className="font-serif text-6xl md:text-8xl text-foreground leading-[0.9]">Athlete Data</h1>
+                    <p className="text-muted-foreground text-xl font-light italic max-w-xl">
                         Your physical metrics drive the adaptive weighting engine. Keep these updated for accurate pulse targets.
                     </p>
                 </div>
@@ -166,7 +186,7 @@ export default function ProfilePage() {
                 <div className="flex gap-4">
                     <button
                         onClick={() => logout()}
-                        className="bg-stone-100 text-stone-500 font-bold text-lg px-8 py-6 rounded-full hover:bg-stone-200 transition-all"
+                        className="bg-muted text-muted-foreground font-bold text-lg px-8 py-6 rounded-full hover:bg-muted/80 transition-all"
                     >
                         Sign Out
                     </button>
@@ -175,7 +195,7 @@ export default function ProfilePage() {
                         whileTap={{ scale: 0.95 }}
                         onClick={handleSubmit}
                         disabled={loading}
-                        className="bg-primary text-white font-bold text-lg px-12 py-6 rounded-full shadow-2xl shadow-primary/20 hover:shadow-primary/40 transition-all flex items-center gap-4 disabled:opacity-50"
+                        className="bg-primary text-primary-foreground font-bold text-lg px-12 py-6 rounded-full shadow-2xl shadow-primary/20 hover:shadow-primary/40 transition-all flex items-center gap-4 disabled:opacity-50"
                     >
                         {loading ? "Syncing..." : <><Check size={24} strokeWidth={3} /> Sync Baseline</>}
                     </motion.button>
@@ -186,7 +206,7 @@ export default function ProfilePage() {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 auto-rows-auto">
 
                 {/* 1. Identity & Weight (Medium) */}
-                <TiltCard className="lg:col-span-4 rounded-[40px] p-10 flex flex-col justify-between group overflow-hidden" glowColor="shadow-red-500/5">
+                <TiltCard className="lg:col-span-4 rounded-[40px] p-10 flex flex-col justify-between group overflow-hidden bg-card border-border" glowColor="shadow-red-500/5">
                     <div className="absolute -right-12 -top-12 opacity-[0.02] group-hover:opacity-[0.05] transition-opacity pointer-events-none text-primary">
                         <User size={300} strokeWidth={1} />
                     </div>
@@ -195,14 +215,14 @@ export default function ProfilePage() {
                         <div className="w-16 h-16 rounded-3xl bg-primary/5 flex items-center justify-center text-primary mb-8 transition-transform group-hover:scale-110">
                             <Scale size={32} />
                         </div>
-                        <h2 className="text-3xl font-serif text-stone-900 mb-2">Biometrics</h2>
-                        <p className="text-stone-400 text-sm font-light">Physical displacement data.</p>
+                        <h2 className="text-3xl font-serif text-foreground mb-2">Biometrics</h2>
+                        <p className="text-muted-foreground text-sm font-light">Physical displacement data.</p>
                     </div>
 
                     <div className="mt-12 space-y-6 relative z-10">
                         <div className="relative group/field">
-                            <label className="text-[10px] font-bold text-stone-400 uppercase tracking-widest absolute -top-2 left-6 bg-white px-2 z-10 transition-colors group-hover/field:text-primary">
-                                Bodyweight ({profile?.units === 'metric' ? 'kg' : 'lb'})
+                            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest absolute top-3 left-6 transition-colors group-hover/field:text-primary">
+                                Bodyweight ({getUnitLabel(units, 'weight')})
                             </label>
                             <input
                                 type="number"
@@ -211,19 +231,19 @@ export default function ProfilePage() {
                                 className={inputClasses}
                                 placeholder="0"
                             />
-                            <span className="absolute right-6 top-1/2 -translate-y-1/2 text-stone-300 font-serif text-lg italic">
-                                {profile?.units === 'metric' ? 'kg' : 'lb'}
+                            <span className="absolute right-6 top-1/2 -translate-y-1/2 text-muted-foreground/50 font-serif text-lg italic">
+                                {getUnitLabel(units, 'weight')}
                             </span>
                         </div>
-                        <div className="p-6 rounded-3xl bg-stone-50 border border-black/[0.01] flex items-center justify-between">
-                            <span className="text-stone-400 text-[10px] font-bold uppercase tracking-widest">Height Spectrum</span>
-                            <span className="text-stone-900 font-serif text-2xl italic">{profile?.height || "6'1\""}</span>
+                        <div className="p-6 rounded-3xl bg-muted/30 border border-border flex items-center justify-between">
+                            <span className="text-muted-foreground text-[10px] font-bold uppercase tracking-widest">Height Spectrum</span>
+                            <span className="text-foreground font-serif text-2xl italic">{profile?.height || "6'1\""}</span>
                         </div>
                     </div>
                 </TiltCard>
 
                 {/* 2. Program Tracking (Medium) */}
-                <TiltCard className="lg:col-span-4 rounded-[40px] p-10 flex flex-col group overflow-hidden" glowColor="shadow-primary/10">
+                <TiltCard className="lg:col-span-4 rounded-[40px] p-10 flex flex-col group overflow-hidden bg-card border-border" glowColor="shadow-primary/10">
                     <div className="absolute -right-12 -bottom-12 opacity-[0.02] group-hover:opacity-[0.05] transition-opacity pointer-events-none text-primary">
                         <Activity size={300} strokeWidth={1} />
                     </div>
@@ -232,23 +252,23 @@ export default function ProfilePage() {
                         <div className="w-16 h-16 rounded-3xl bg-primary/5 flex items-center justify-center text-primary mb-8 transition-transform group-hover:scale-110">
                             <Target size={32} />
                         </div>
-                        <h2 className="text-3xl font-serif text-stone-900 mb-2">Program Sync</h2>
-                        <p className="text-stone-400 text-sm font-light">Align the interface with your master plan.</p>
+                        <h2 className="text-3xl font-serif text-foreground mb-2">Program Sync</h2>
+                        <p className="text-muted-foreground text-sm font-light">Align the interface with your master plan.</p>
                     </div>
 
                     <div className="mt-12 space-y-8 relative z-10">
                         <div className="space-y-4">
-                            <label className="text-[10px] font-bold text-stone-300 uppercase tracking-widest px-2">
-                                {(PHASE_RANGES as any)[form.current_phase]?.label}
+                            <label className="text-[10px] font-bold text-muted-foreground/70 uppercase tracking-widest px-2">
+                                {PHASE_RANGES[form.current_phase]?.label}
                             </label>
                             <div className="grid grid-cols-5 gap-2">
                                 {[1, 2, 3, 4, 5].map((p) => (
                                     <button
                                         key={p}
-                                        onClick={() => setForm({ ...form, current_phase: p })}
+                                        onClick={() => handlePhaseChange(p)}
                                         className={`py-3 rounded-2xl border text-sm font-bold transition-all ${form.current_phase === p
-                                            ? "bg-primary border-primary text-white shadow-xl shadow-primary/20"
-                                            : "bg-white border-black/5 text-stone-400 hover:border-black/20"
+                                            ? "bg-primary border-primary text-primary-foreground shadow-xl shadow-primary/20"
+                                            : "bg-card border-border text-muted-foreground hover:border-foreground/20"
                                             }`}
                                     >
                                         P{p}
@@ -259,27 +279,27 @@ export default function ProfilePage() {
 
                         <div className="space-y-4">
                             <div className="flex justify-between items-center px-2">
-                                <label className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">Active Week</label>
-                                <span className="text-stone-900 font-serif text-xl italic">Week {form.current_week}</span>
+                                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Active Week</label>
+                                <span className="text-foreground font-serif text-xl italic">Week {form.current_week}</span>
                             </div>
                             <input
                                 type="range"
-                                min={(PHASE_RANGES as any)[form.current_phase]?.min || 1}
-                                max={(PHASE_RANGES as any)[form.current_phase]?.max || 52}
+                                min={PHASE_RANGES[form.current_phase]?.min || 1}
+                                max={PHASE_RANGES[form.current_phase]?.max || 52}
                                 value={form.current_week}
                                 onChange={(e) => setForm({ ...form, current_week: parseInt(e.target.value) })}
-                                className="w-full accent-primary h-2 bg-stone-100 rounded-lg appearance-none cursor-pointer"
+                                className="w-full accent-primary h-2 bg-muted rounded-lg appearance-none cursor-pointer"
                             />
                             <div className="flex justify-between px-2">
-                                <span className="text-[10px] font-bold text-stone-300 uppercase tracking-widest">Start: {(PHASE_RANGES as any)[form.current_phase]?.min}</span>
-                                <span className="text-[10px] font-bold text-stone-300 uppercase tracking-widest">End: {(PHASE_RANGES as any)[form.current_phase]?.max}</span>
+                                <span className="text-[10px] font-bold text-muted-foreground/70 uppercase tracking-widest">Start: {PHASE_RANGES[form.current_phase]?.min}</span>
+                                <span className="text-[10px] font-bold text-muted-foreground/70 uppercase tracking-widest">End: {PHASE_RANGES[form.current_phase]?.max}</span>
                             </div>
                         </div>
                     </div>
                 </TiltCard>
 
                 {/* 3. Strength Matrix (Large) */}
-                <TiltCard className="lg:col-span-4 rounded-[40px] p-10 flex flex-col group" glowColor="shadow-primary/10">
+                <TiltCard className="lg:col-span-4 rounded-[40px] p-10 flex flex-col group overflow-hidden bg-card border-border" glowColor="shadow-primary/10">
                     <div className="absolute -right-12 -bottom-12 opacity-[0.02] group-hover:opacity-[0.05] transition-opacity pointer-events-none text-primary">
                         <HeartPulse size={400} strokeWidth={1} />
                     </div>
@@ -289,7 +309,7 @@ export default function ProfilePage() {
                             <div className="w-16 h-16 rounded-3xl bg-primary/5 flex items-center justify-center text-primary mb-8 transition-transform group-hover:scale-110">
                                 <TrendingUp size={32} />
                             </div>
-                            <h2 className="text-3xl font-serif text-stone-900 mb-2">Power Benchmarks</h2>
+                            <h2 className="text-3xl font-serif text-foreground mb-2">Power Benchmarks</h2>
                         </div>
 
                         <div className="space-y-6">
@@ -299,18 +319,18 @@ export default function ProfilePage() {
                                 { label: "Deadlift", key: "deadlift_max" },
                             ].map((field) => (
                                 <div key={field.key} className="relative group/field">
-                                    <label className="text-[10px] font-bold text-stone-400 uppercase tracking-widest absolute -top-2 left-6 bg-white px-2 z-10 transition-colors group-hover/field:text-primary">
-                                        {field.label} ({profile?.units === 'metric' ? 'kg' : 'lb'})
+                                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest absolute top-3 left-6 transition-colors group-hover/field:text-primary">
+                                        {field.label} ({getUnitLabel(units, 'weight')})
                                     </label>
                                     <input
                                         type="number"
-                                        value={(form as any)[field.key]}
+                                        value={form[field.key as keyof ProfileFormState]}
                                         onChange={(e) => setForm({ ...form, [field.key]: e.target.value })}
                                         className={inputClasses}
                                         placeholder="0"
                                     />
-                                    <span className="absolute right-6 top-1/2 -translate-y-1/2 text-stone-300 font-serif text-lg italic">
-                                        {profile?.units === 'metric' ? 'kg' : 'lb'}
+                                    <span className="absolute right-6 top-1/2 -translate-y-1/2 text-muted-foreground/50 font-serif text-lg italic">
+                                        {getUnitLabel(units, 'weight')}
                                     </span>
                                 </div>
                             ))}
@@ -319,7 +339,7 @@ export default function ProfilePage() {
                 </TiltCard>
 
                 {/* 4. Endurance Benchmarks (Extra Wide) */}
-                <TiltCard className="lg:col-span-12 rounded-[40px] p-10 flex flex-col md:flex-row md:items-center justify-between group overflow-hidden" glowColor="shadow-primary/5">
+                <TiltCard className="lg:col-span-12 rounded-[40px] p-10 flex flex-col md:flex-row md:items-center justify-between group overflow-hidden bg-card border-border" glowColor="shadow-primary/5">
                     <div className="absolute right-1/4 -top-20 opacity-[0.02] group-hover:opacity-[0.05] transition-opacity pointer-events-none text-primary">
                         <Activity size={300} strokeWidth={1} />
                     </div>
@@ -329,9 +349,9 @@ export default function ProfilePage() {
                             <div className="w-14 h-14 rounded-2xl bg-primary/5 flex items-center justify-center text-primary transition-transform group-hover:rotate-12">
                                 <Zap size={28} />
                             </div>
-                            <h2 className="text-3xl font-serif text-stone-900">Endurance Pulse</h2>
+                            <h2 className="text-3xl font-serif text-foreground">Endurance Pulse</h2>
                         </div>
-                        <p className="text-stone-400 text-sm font-light italic">Quantifying your heart's efficiency.</p>
+                        <p className="text-muted-foreground text-sm font-light italic">Quantifying your heart&apos;s efficiency.</p>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8 flex-1">
@@ -341,11 +361,11 @@ export default function ProfilePage() {
                             { label: "400m Dash", key: "sprint_400m" },
                         ].map((field) => (
                             <div key={field.key} className="relative group/field">
-                                <label className="text-[10px] font-bold text-stone-400 uppercase tracking-widest absolute -top-2 left-6 bg-white px-2 z-10 transition-colors group-hover/field:text-primary">{field.label}</label>
+                                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest absolute top-3 left-6 transition-colors group-hover/field:text-primary">{field.label}</label>
                                 <input
                                     type="text"
                                     placeholder="mm:ss"
-                                    value={(form as any)[field.key]}
+                                    value={form[field.key as keyof ProfileFormState]}
                                     onChange={(e) => setForm({ ...form, [field.key]: e.target.value })}
                                     className={inputClasses}
                                 />
@@ -357,7 +377,7 @@ export default function ProfilePage() {
             </div>
 
             {/* Footer Inspiration */}
-            <p className="text-center text-stone-300 text-xs font-light mt-12 mb-8 lowercase tracking-[0.2em]">
+            <p className="text-center text-muted-foreground text-xs font-light mt-12 mb-8 lowercase tracking-[0.2em]">
                 Pulse Architecture v2.0 &bull; Private Athlete Terminal
             </p>
         </div>

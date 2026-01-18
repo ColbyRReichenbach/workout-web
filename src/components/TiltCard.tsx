@@ -1,6 +1,5 @@
 "use client";
 
-import { motion } from "framer-motion";
 import { memo } from "react";
 
 interface TiltCardProps {
@@ -11,13 +10,14 @@ interface TiltCardProps {
 
 export const TiltCard = memo(function TiltCard({ children, className, glowColor = "shadow-primary/10" }: TiltCardProps) {
     return (
-        <motion.div
-            whileHover={{ scale: 1.02 }}
-            transition={{ type: "spring", stiffness: 400, damping: 25 }}
+        <div
             className={`
-                relative bg-white/90 border border-black/[0.03]
+                relative bg-card border border-border
                 shadow-sm hover:shadow-xl ${glowColor}
-                hover:border-black/10
+                hover:border-foreground/10
+                transition-all duration-300 ease-[cubic-bezier(0.23,1,0.32,1)]
+                hover:scale-[1.02]
+                active:scale-[0.98]
                 will-change-transform
                 ${className}
             `}
@@ -29,6 +29,6 @@ export const TiltCard = memo(function TiltCard({ children, className, glowColor 
             <div className="relative z-10 h-full">
                 {children}
             </div>
-        </motion.div>
+        </div>
     );
 });

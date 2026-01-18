@@ -3,6 +3,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Moon, Heart, Brain, Zap, TrendingUp, TrendingDown, Minus, AlertCircle } from "lucide-react";
 import { PremiumAreaChart } from "./AnalyticsCharts";
+import { useEffect } from "react";
 
 interface SleepData {
     date: string;
@@ -24,9 +25,27 @@ interface SleepAnalysisModalProps {
     sleepData: SleepData[];
 }
 
+const TrendIcon = ({ value }: { value: number }) => {
+    if (value > 3) return <TrendingUp size={14} className="text-green-500" />;
+    if (value < -3) return <TrendingDown size={14} className="text-red-500" />;
+    return <Minus size={14} className="text-muted-foreground" />;
+};
+
 export function SleepAnalysisModal({ isOpen, onClose, sleepData }: SleepAnalysisModalProps) {
     // Get last 30 days of sleep data
     const recentSleep = sleepData.slice(-30);
+
+    // Prevent background scroll when modal is open
+    useEffect(() => {
+        if (isOpen) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = 'unset';
+        }
+        return () => {
+            document.body.style.overflow = 'unset';
+        };
+    }, [isOpen]);
 
     // Calculate averages
     const avg = (arr: number[]) => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
@@ -66,13 +85,6 @@ export function SleepAnalysisModal({ isOpen, onClose, sleepData }: SleepAnalysis
         return `${h}h ${m}m`;
     };
 
-    // Get trend icon
-    const TrendIcon = ({ value }: { value: number }) => {
-        if (value > 3) return <TrendingUp size={14} className="text-green-500" />;
-        if (value < -3) return <TrendingDown size={14} className="text-red-500" />;
-        return <Minus size={14} className="text-stone-400" />;
-    };
-
     // Sleep architecture percentages
     const totalSleepMins = avgDeep + avgRem + avgCore;
     const deepPct = totalSleepMins > 0 ? (avgDeep / totalSleepMins) * 100 : 0;
@@ -89,7 +101,7 @@ export function SleepAnalysisModal({ isOpen, onClose, sleepData }: SleepAnalysis
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={onClose}
-                        className="fixed inset-0 bg-stone-950/80 backdrop-blur-sm z-50"
+                        className="fixed inset-0 bg-background/80 backdrop-blur-sm z-[200]"
                     />
 
                     {/* Modal */}
@@ -97,22 +109,22 @@ export function SleepAnalysisModal({ isOpen, onClose, sleepData }: SleepAnalysis
                         initial={{ opacity: 0, scale: 0.95, y: 20 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                        className="fixed inset-4 md:inset-10 lg:inset-20 bg-white rounded-[48px] z-50 overflow-hidden shadow-2xl flex flex-col"
+                        className="fixed inset-x-4 top-24 bottom-4 md:inset-x-10 md:top-32 md:bottom-10 lg:inset-x-20 lg:top-40 lg:bottom-20 bg-card rounded-[48px] z-[200] overflow-hidden shadow-2xl flex flex-col border border-border"
                     >
                         {/* Header */}
-                        <div className="flex items-center justify-between p-8 md:p-12 border-b border-stone-100">
+                        <div className="flex items-center justify-between p-8 md:p-12 border-b border-border">
                             <div className="flex items-center gap-6">
                                 <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 flex items-center justify-center text-indigo-500">
                                     <Moon size={32} />
                                 </div>
                                 <div>
-                                    <h2 className="text-4xl font-serif text-stone-900">Sleep Depth Analysis</h2>
-                                    <p className="text-stone-400 text-sm font-light italic mt-1">30-Day Biometric Sleep Intelligence</p>
+                                    <h2 className="text-4xl font-serif text-foreground">Sleep Depth Analysis</h2>
+                                    <p className="text-muted-foreground text-sm font-light italic mt-1">30-Day Biometric Sleep Intelligence</p>
                                 </div>
                             </div>
                             <button
                                 onClick={onClose}
-                                className="w-12 h-12 rounded-2xl bg-stone-100 flex items-center justify-center text-stone-400 hover:bg-stone-200 hover:text-stone-600 transition-all"
+                                className="w-12 h-12 rounded-2xl bg-muted flex items-center justify-center text-muted-foreground hover:bg-muted/80 hover:text-foreground transition-all"
                             >
                                 <X size={24} />
                             </button>
@@ -125,8 +137,8 @@ export function SleepAnalysisModal({ isOpen, onClose, sleepData }: SleepAnalysis
                             <section className="grid grid-cols-1 lg:grid-cols-2 gap-12">
                                 <div className="space-y-8">
                                     <div>
-                                        <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-4">Sleep Architecture</h3>
-                                        <p className="text-stone-500 text-sm font-light leading-relaxed">
+                                        <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-4">Sleep Architecture</h3>
+                                        <p className="text-muted-foreground text-sm font-light leading-relaxed">
                                             Your sleep is composed of distinct phases. Deep sleep is crucial for physical recovery,
                                             REM for cognitive restoration, and Core (light) sleep for memory consolidation.
                                         </p>
@@ -154,15 +166,15 @@ export function SleepAnalysisModal({ isOpen, onClose, sleepData }: SleepAnalysis
                                                 <div key={stage.label} className="space-y-2">
                                                     <div className="flex justify-between items-center">
                                                         <div className="flex items-center gap-3">
-                                                            <stage.icon size={16} className="text-stone-400" />
-                                                            <span className="text-sm font-medium text-stone-700">{stage.label}</span>
+                                                            <stage.icon size={16} className="text-muted-foreground" />
+                                                            <span className="text-sm font-medium text-foreground">{stage.label}</span>
                                                         </div>
                                                         <div className="flex items-center gap-2">
-                                                            <span className="text-lg font-serif text-stone-900">{formatDuration(stage.value)}</span>
-                                                            <span className="text-[10px] text-stone-400">({stage.pct.toFixed(0)}%)</span>
+                                                            <span className="text-lg font-serif text-foreground">{formatDuration(stage.value)}</span>
+                                                            <span className="text-[10px] text-muted-foreground">({stage.pct.toFixed(0)}%)</span>
                                                         </div>
                                                     </div>
-                                                    <div className="h-3 bg-stone-100 rounded-full overflow-hidden relative">
+                                                    <div className="h-3 bg-muted rounded-full overflow-hidden relative">
                                                         <motion.div
                                                             initial={{ width: 0 }}
                                                             animate={{ width: `${Math.min(100, (stage.value / stage.target) * 100)}%` }}
@@ -170,7 +182,7 @@ export function SleepAnalysisModal({ isOpen, onClose, sleepData }: SleepAnalysis
                                                             className={`h-full ${stage.color} rounded-full`}
                                                         />
                                                     </div>
-                                                    <div className="flex justify-between text-[9px] text-stone-400">
+                                                    <div className="flex justify-between text-[9px] text-muted-foreground">
                                                         <span>0</span>
                                                         <span>Target: {formatDuration(stage.target)}</span>
                                                     </div>
@@ -183,14 +195,14 @@ export function SleepAnalysisModal({ isOpen, onClose, sleepData }: SleepAnalysis
                                 {/* Biometric Cards - Only show what we track */}
                                 <div className="grid grid-cols-2 gap-4">
                                     {/* HRV Card */}
-                                    <div className="bg-rose-50 rounded-3xl p-6 space-y-4">
+                                    <div className="bg-rose-500/10 rounded-3xl p-6 space-y-4">
                                         <div className="flex items-center justify-between">
                                             <Heart size={20} className="text-rose-500" />
                                             <TrendIcon value={hrvTrend} />
                                         </div>
                                         <div>
-                                            <p className="text-2xl font-serif text-stone-900">{avgHrv > 0 ? `${Math.round(avgHrv)} ms` : "—"}</p>
-                                            <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mt-1">HRV</p>
+                                            <p className="text-2xl font-serif text-foreground">{avgHrv > 0 ? `${Math.round(avgHrv)} ms` : "—"}</p>
+                                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">HRV</p>
                                         </div>
                                         <div className={`text-[9px] font-bold uppercase tracking-widest ${avgHrv >= 50 ? 'text-green-500' : avgHrv >= 35 ? 'text-amber-500' : 'text-rose-500'}`}>
                                             {avgHrv >= 50 ? "Optimal" : avgHrv >= 35 ? "Normal" : avgHrv > 0 ? "Recovery" : "Awaiting Data"}
@@ -198,14 +210,14 @@ export function SleepAnalysisModal({ isOpen, onClose, sleepData }: SleepAnalysis
                                     </div>
 
                                     {/* Resting HR Card */}
-                                    <div className="bg-red-50 rounded-3xl p-6 space-y-4">
+                                    <div className="bg-red-500/10 rounded-3xl p-6 space-y-4">
                                         <div className="flex items-center justify-between">
                                             <Heart size={20} className="text-red-500" />
                                             <TrendIcon value={-calcTrend('resting_hr')} />
                                         </div>
                                         <div>
-                                            <p className="text-2xl font-serif text-stone-900">{avgRestingHr > 0 ? `${Math.round(avgRestingHr)} bpm` : "—"}</p>
-                                            <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mt-1">Resting HR</p>
+                                            <p className="text-2xl font-serif text-foreground">{avgRestingHr > 0 ? `${Math.round(avgRestingHr)} bpm` : "—"}</p>
+                                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">Resting HR</p>
                                         </div>
                                         <div className={`text-[9px] font-bold uppercase tracking-widest ${avgRestingHr > 0 && avgRestingHr < 55 ? 'text-green-500' : avgRestingHr < 65 ? 'text-amber-500' : 'text-red-500'}`}>
                                             {avgRestingHr > 0 && avgRestingHr < 55 ? "Athletic" : avgRestingHr > 0 && avgRestingHr < 65 ? "Normal" : avgRestingHr > 0 ? "Elevated" : "Awaiting Data"}
@@ -213,14 +225,14 @@ export function SleepAnalysisModal({ isOpen, onClose, sleepData }: SleepAnalysis
                                     </div>
 
                                     {/* Total Sleep Card */}
-                                    <div className="bg-indigo-50 rounded-3xl p-6 space-y-4">
+                                    <div className="bg-indigo-500/10 rounded-3xl p-6 space-y-4">
                                         <div className="flex items-center justify-between">
                                             <Moon size={20} className="text-indigo-500" />
                                             <TrendIcon value={durationTrend} />
                                         </div>
                                         <div>
-                                            <p className="text-2xl font-serif text-stone-900">{formatDuration(avgTotal)}</p>
-                                            <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mt-1">Avg Duration</p>
+                                            <p className="text-2xl font-serif text-foreground">{formatDuration(avgTotal)}</p>
+                                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">Avg Duration</p>
                                         </div>
                                         <div className={`text-[9px] font-bold uppercase tracking-widest ${avgTotal >= 420 && avgTotal <= 540 ? 'text-green-500' : avgTotal >= 360 ? 'text-amber-500' : 'text-red-500'}`}>
                                             {avgTotal >= 420 && avgTotal <= 540 ? "Optimal" : avgTotal >= 360 ? "Adequate" : avgTotal > 0 ? "Low" : "Awaiting Data"}
@@ -228,14 +240,14 @@ export function SleepAnalysisModal({ isOpen, onClose, sleepData }: SleepAnalysis
                                     </div>
 
                                     {/* Consistency Card */}
-                                    <div className="bg-stone-50 rounded-3xl p-6 space-y-4">
+                                    <div className="bg-muted rounded-3xl p-6 space-y-4">
                                         <div className="flex items-center justify-between">
-                                            <Moon size={20} className="text-stone-500" />
-                                            <Minus size={14} className="text-stone-400" />
+                                            <Moon size={20} className="text-muted-foreground" />
+                                            <Minus size={14} className="text-muted-foreground" />
                                         </div>
                                         <div>
-                                            <p className="text-2xl font-serif text-stone-900">{recentSleep.length}</p>
-                                            <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mt-1">Nights Tracked</p>
+                                            <p className="text-2xl font-serif text-foreground">{recentSleep.length}</p>
+                                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">Nights Tracked</p>
                                         </div>
                                         <div className={`text-[9px] font-bold uppercase tracking-widest ${recentSleep.length >= 25 ? 'text-green-500' : recentSleep.length >= 14 ? 'text-amber-500' : 'text-stone-400'}`}>
                                             {recentSleep.length >= 25 ? "Consistent" : recentSleep.length >= 14 ? "Building" : "Keep Tracking"}
@@ -248,17 +260,17 @@ export function SleepAnalysisModal({ isOpen, onClose, sleepData }: SleepAnalysis
                             <section className="space-y-6">
                                 <div className="flex items-center justify-between">
                                     <div>
-                                        <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-1">HRV Trend</h3>
-                                        <p className="text-stone-500 text-xs font-light">Higher HRV indicates better recovery capacity</p>
+                                        <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">HRV Trend</h3>
+                                        <p className="text-muted-foreground text-xs font-light">Higher HRV indicates better recovery capacity</p>
                                     </div>
-                                    <div className="flex items-center gap-2 bg-stone-50 px-4 py-2 rounded-full">
-                                        <span className="text-[10px] font-bold text-stone-400 uppercase">7-Day Trend:</span>
-                                        <span className={`text-sm font-serif ${hrvTrend > 0 ? 'text-green-500' : hrvTrend < 0 ? 'text-red-500' : 'text-stone-400'}`}>
+                                    <div className="flex items-center gap-2 bg-muted px-4 py-2 rounded-full">
+                                        <span className="text-[10px] font-bold text-muted-foreground uppercase">7-Day Trend:</span>
+                                        <span className={`text-sm font-serif ${hrvTrend > 0 ? 'text-green-500' : hrvTrend < 0 ? 'text-red-500' : 'text-muted-foreground'}`}>
                                             {hrvTrend > 0 ? '+' : ''}{hrvTrend.toFixed(1)}%
                                         </span>
                                     </div>
                                 </div>
-                                <div className="bg-stone-50 rounded-[32px] p-8 border border-stone-100">
+                                <div className="bg-muted/30 rounded-[32px] p-8 border border-border">
                                     <PremiumAreaChart
                                         data={recentSleep.map(s => Number(s.hrv_ms) || 0)}
                                         color="#6366f1"
@@ -272,14 +284,14 @@ export function SleepAnalysisModal({ isOpen, onClose, sleepData }: SleepAnalysis
                             <section className="space-y-6">
                                 <div className="flex items-center justify-between">
                                     <div>
-                                        <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-1">Sleep Duration Trend</h3>
-                                        <p className="text-stone-500 text-xs font-light">Tracking total sleep time consistency</p>
+                                        <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Sleep Duration Trend</h3>
+                                        <p className="text-muted-foreground text-xs font-light">Tracking total sleep time consistency</p>
                                     </div>
-                                    <div className="bg-stone-50 px-4 py-2 rounded-full">
-                                        <span className="text-sm font-serif text-stone-900">Avg: {formatDuration(avgTotal)}</span>
+                                    <div className="bg-muted px-4 py-2 rounded-full">
+                                        <span className="text-sm font-serif text-foreground">Avg: {formatDuration(avgTotal)}</span>
                                     </div>
                                 </div>
-                                <div className="bg-stone-50 rounded-[32px] p-8 border border-stone-100">
+                                <div className="bg-muted/30 rounded-[32px] p-8 border border-border">
                                     <PremiumAreaChart
                                         data={recentSleep.map(s => (s.asleep_minutes || 0) / 60)}
                                         color="#78716c"
@@ -292,7 +304,7 @@ export function SleepAnalysisModal({ isOpen, onClose, sleepData }: SleepAnalysis
                             {/* Insights - Only show relevant ones */}
                             <section className="bg-indigo-500/5 rounded-[32px] p-8 border border-indigo-500/10">
                                 <h3 className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mb-4">Sleep Intelligence Summary</h3>
-                                <div className="space-y-4 text-stone-600 text-sm leading-relaxed">
+                                <div className="space-y-4 text-muted-foreground text-sm leading-relaxed">
                                     {avgHrv > 0 && avgHrv < 40 && (
                                         <p>⚠️ <strong>HRV is indicating stress accumulation.</strong> Consider a deload week or additional recovery modalities.</p>
                                     )}
@@ -303,7 +315,7 @@ export function SleepAnalysisModal({ isOpen, onClose, sleepData }: SleepAnalysis
                                         <p>✅ <strong>Sleep duration is optimal (7-9 hours).</strong> Maintain this consistency for peak performance.</p>
                                     )}
                                     {avgTotal > 0 && avgTotal < 420 && (
-                                        <p>⚠️ <strong>You're sleeping less than 7 hours on average.</strong> This may impair strength gains and cognitive function.</p>
+                                        <p>⚠️ <strong>You&apos;re sleeping less than 7 hours on average.</strong> This may impair strength gains and cognitive function.</p>
                                     )}
                                     {avgRestingHr > 0 && avgRestingHr < 55 && (
                                         <p>✅ <strong>Resting heart rate is in the athletic zone.</strong> Strong cardiovascular adaptation evident.</p>

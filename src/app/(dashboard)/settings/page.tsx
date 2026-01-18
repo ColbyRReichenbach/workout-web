@@ -2,17 +2,24 @@
 
 import { createClient } from "@/utils/supabase/client";
 import { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Check, Bell, Moon, Globe, Bot, Shield, Sliders, ChevronRight, HeartPulse } from "lucide-react";
+import { motion } from "framer-motion";
+import { Bell, Moon, Globe, Bot, Shield, Sliders, HeartPulse } from "lucide-react";
 import { TiltCard } from "@/components/TiltCard";
+import { normalizeUnit } from "@/lib/conversions";
+import { useSettings } from "@/context/SettingsContext";
+
+interface PreferenceState {
+    aiName: string;
+    aiPersonality: string;
+    notifications: boolean;
+    dataPrivacy: string;
+}
 
 export default function SettingsPage() {
-    const [loading, setLoading] = useState(true);
-    const [preferences, setPreferences] = useState({
+    const { units, theme, setUnits, setTheme } = useSettings();
+    const [preferences, setPreferences] = useState<PreferenceState>({
         aiName: "ECHO-P1",
         aiPersonality: "Stoic",
-        units: "imperial",
-        theme: "Pulse Light",
         notifications: true,
         dataPrivacy: "Private"
     });
@@ -21,45 +28,94 @@ export default function SettingsPage() {
 
     useEffect(() => {
         async function fetchSettings() {
-            const { data } = await supabase.from('profiles').select('*').single();
+            const { data: { user } } = await supabase.auth.getUser();
+
+            let query = supabase.from('profiles').select('*');
+            if (user) {
+                query = query.eq('id', user.id);
+            } else {
+                query = query.eq('id', '00000000-0000-0000-0000-000000000001');
+            }
+
+            const { data } = await query.single();
             if (data) {
                 setPreferences({
                     aiName: data.ai_name || "ECHO-P1",
                     aiPersonality: data.ai_personality || "Stoic",
-                    units: data.units || "imperial",
-                    theme: data.theme || "Pulse Light",
                     notifications: data.notifications_enabled ?? true,
                     dataPrivacy: data.data_privacy || "Private"
                 });
             }
-            setLoading(false);
         }
         fetchSettings();
     }, []);
 
-    const updateDB = async (newPrefs: any) => {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+    const updateDB = async (newPrefs: PreferenceState) => {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            const userId = user?.id || '00000000-0000-0000-0000-000000000001';
 
-        await supabase.from('profiles').update({
-            ai_name: newPrefs.aiName,
-            ai_personality: newPrefs.aiPersonality,
-            units: newPrefs.units,
-            theme: newPrefs.theme,
-            notifications_enabled: newPrefs.notifications,
-            data_privacy: newPrefs.dataPrivacy
-        }).eq('id', user.id);
+            const { error } = await supabase.from('profiles').update({
+                ai_name: newPrefs.aiName,
+                ai_personality: newPrefs.aiPersonality,
+                notifications_enabled: newPrefs.notifications,
+                data_privacy: newPrefs.dataPrivacy
+            }).eq('id', userId);
+
+            if (error) {
+                console.error("Error updating preferences:", error);
+            }
+        } catch (err) {
+            console.error("Unexpected update error:", err);
+        }
     };
 
-    const handleToggle = async (key: keyof typeof preferences) => {
-        const newVal = !preferences[key];
-        const newPrefs = { ...preferences, [key]: newVal };
-        setPreferences(newPrefs);
-        await updateDB(newPrefs);
+    // Direct DB update for units (same pattern that works for AI settings)
+    const updateUnitsDB = async (newUnits: string) => {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            const userId = user?.id || '00000000-0000-0000-0000-000000000001';
+
+            console.log('[Settings] Updating units to:', newUnits, 'for user:', userId);
+
+            const { error } = await supabase.from('profiles').update({
+                units: newUnits
+            }).eq('id', userId);
+
+            if (error) {
+                console.error("Error updating units:", error);
+            } else {
+                console.log('[Settings] Units saved successfully');
+            }
+        } catch (err) {
+            console.error("Unexpected units update error:", err);
+        }
     };
 
-    const handleSelect = async (key: keyof typeof preferences, value: any) => {
-        const newPrefs = { ...preferences, [key]: value };
+    // Direct DB update for theme (same pattern that works for AI settings)
+    const updateThemeDB = async (newTheme: string) => {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            const userId = user?.id || '00000000-0000-0000-0000-000000000001';
+
+            console.log('[Settings] Updating theme to:', newTheme, 'for user:', userId);
+
+            const { error } = await supabase.from('profiles').update({
+                theme: newTheme
+            }).eq('id', userId);
+
+            if (error) {
+                console.error("Error updating theme:", error);
+            } else {
+                console.log('[Settings] Theme saved successfully');
+            }
+        } catch (err) {
+            console.error("Unexpected theme update error:", err);
+        }
+    };
+
+    const handleSelect = async (key: keyof PreferenceState, value: string | boolean) => {
+        const newPrefs = { ...preferences, [key]: value } as PreferenceState;
         setPreferences(newPrefs);
         await updateDB(newPrefs);
     };
@@ -72,16 +128,14 @@ export default function SettingsPage() {
 
     const [activeCategory, setActiveCategory] = useState('system');
 
-
-
     return (
         <div className="max-w-7xl mx-auto space-y-16">
             {/* Header */}
             <header className="flex flex-col md:flex-row md:items-end justify-between gap-10">
                 <div className="space-y-4">
                     <span className="text-primary font-bold tracking-[0.3em] text-[10px] uppercase block">Global Overrides</span>
-                    <h1 className="font-serif text-6xl md:text-8xl text-stone-900 leading-[0.9]">Gear</h1>
-                    <p className="text-stone-500 text-xl font-light italic max-w-xl">
+                    <h1 className="font-serif text-6xl md:text-8xl text-foreground leading-[0.9]">Gear</h1>
+                    <p className="text-muted-foreground text-xl font-light italic max-w-xl">
                         Optimize the interface and AI parameters to match your training environment.
                     </p>
                 </div>
@@ -96,8 +150,8 @@ export default function SettingsPage() {
                             key={cat.id}
                             onClick={() => setActiveCategory(cat.id)}
                             className={`w-full flex items-center gap-4 px-8 py-6 rounded-[28px] transition-all border ${activeCategory === cat.id
-                                ? "bg-white border-black/5 text-stone-900 shadow-xl shadow-black/5"
-                                : "bg-transparent border-transparent text-stone-400 hover:text-stone-600 hover:bg-black/5"
+                                ? "bg-card border-border text-foreground shadow-xl shadow-black/5"
+                                : "bg-transparent border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/10"
                                 }`}
                         >
                             <cat.icon size={22} className={activeCategory === cat.id ? "text-primary" : ""} />
@@ -111,7 +165,7 @@ export default function SettingsPage() {
 
                 {/* Settings Panel (Right) */}
                 <div className="lg:col-span-9">
-                    <TiltCard className="rounded-[40px] p-12 min-h-[600px] group overflow-hidden" glowColor="shadow-primary/5">
+                    <TiltCard className="rounded-[40px] p-12 min-h-[600px] group overflow-hidden bg-card border-border" glowColor="shadow-primary/5">
 
                         <div className="absolute -right-20 -bottom-20 opacity-[0.02] group-hover:opacity-[0.04] transition-opacity pointer-events-none text-primary">
                             <Sliders size={400} strokeWidth={1} />
@@ -125,54 +179,80 @@ export default function SettingsPage() {
                                     animate={{ opacity: 1, x: 0 }}
                                     className="space-y-10"
                                 >
-                                    <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-[0.3em] mb-4">Environment Options</h3>
+                                    <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.3em] mb-4">Environment Options</h3>
 
-                                    {[
-                                        { label: "Visual Spectrum", val: preferences.theme, icon: Moon, color: "text-red-500", bg: "bg-red-500/5", key: 'theme' as const },
-                                        { label: "Measurement Rhythm", val: preferences.units, icon: Globe, color: "text-orange-500", bg: "bg-orange-500/5", key: 'units' as const }
-                                    ].map((s) => (
-                                        <div
-                                            key={s.label}
-                                            onClick={() => {
-                                                if (s.key === 'units') {
-                                                    handleSelect('units', preferences.units === 'imperial' ? 'metric' : 'imperial');
-                                                }
-                                            }}
-                                            className="flex justify-between items-center group/item cursor-pointer p-6 -m-6 rounded-3xl transition-colors hover:bg-stone-50"
-                                        >
-                                            <div className="flex items-center gap-6">
-                                                <div className={`w-14 h-14 rounded-2xl ${s.bg} flex items-center justify-center ${s.color}`}><s.icon size={28} /></div>
-                                                <div>
-                                                    <h3 className="text-2xl font-serif text-stone-900">{s.label}</h3>
-                                                    <p className="text-stone-400 text-sm font-light italic">
-                                                        {s.key === 'units' ? `Currently using ${preferences.units} baselines.` : "Standard protocol defaults."}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center gap-3 text-stone-400">
-                                                <span className="text-sm font-mono tracking-tight uppercase">{s.val}</span>
-                                                <ChevronRight size={20} />
-                                            </div>
-                                        </div>
-                                    ))}
-
-                                    <div className="flex justify-between items-center p-6 -m-6 rounded-3xl transition-colors hover:bg-stone-50">
+                                    {/* Visual Spectrum (Theme) */}
+                                    <div className="flex justify-between items-center py-4 rounded-3xl transition-colors hover:bg-muted/30 pr-4">
                                         <div className="flex items-center gap-6">
-                                            <div className="w-14 h-14 rounded-2xl bg-amber-500/5 flex items-center justify-center text-amber-500"><Bell size={28} /></div>
+                                            <div className="w-14 h-14 rounded-2xl bg-red-500/10 flex items-center justify-center text-red-500"><Moon size={28} /></div>
                                             <div>
-                                                <h3 className="text-2xl font-serif text-stone-900">Synchronized Alerts</h3>
-                                                <p className="text-stone-400 text-sm font-light italic">Real-time pulse notifications.</p>
+                                                <h3 className="text-2xl font-serif text-foreground">Visual Spectrum</h3>
+                                                <p className="text-muted-foreground text-sm font-light italic">Standard protocol defaults.</p>
                                             </div>
                                         </div>
-                                        <button
-                                            onClick={() => handleToggle('notifications')}
-                                            className={`w-16 h-9 rounded-full transition-all relative border border-black/5 ${preferences.notifications ? 'bg-primary' : 'bg-stone-200'}`}
-                                        >
-                                            <motion.div
-                                                animate={{ x: preferences.notifications ? 30 : 4 }}
-                                                className="w-7 h-7 rounded-full bg-white transition-all shadow-xl absolute top-0.5"
-                                            />
-                                        </button>
+                                        <div className="flex bg-muted rounded-full p-1 border border-border">
+                                            {['Light', 'Dark'].map((mode) => (
+                                                <button
+                                                    key={mode}
+                                                    onClick={() => { setTheme(`Pulse ${mode}`); updateThemeDB(`Pulse ${mode}`); }}
+                                                    className={`px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all ${theme === `Pulse ${mode}`
+                                                        ? "bg-background text-foreground shadow-sm"
+                                                        : "text-muted-foreground hover:text-foreground"
+                                                        }`}
+                                                >
+                                                    {mode}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Measurement Rhythm (Units) */}
+                                    <div className="flex justify-between items-center py-4 rounded-3xl transition-colors hover:bg-muted/30 pr-4">
+                                        <div className="flex items-center gap-6">
+                                            <div className="w-14 h-14 rounded-2xl bg-orange-500/10 flex items-center justify-center text-orange-500"><Globe size={28} /></div>
+                                            <div>
+                                                <h3 className="text-2xl font-serif text-foreground">Measurement Rhythm</h3>
+                                                <p className="text-muted-foreground text-sm font-light italic">Currently using {units} baselines.</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex bg-muted rounded-full p-1 border border-border">
+                                            {['Imperial', 'Metric'].map((unit) => (
+                                                <button
+                                                    key={unit}
+                                                    onClick={() => { setUnits(normalizeUnit(unit)); updateUnitsDB(normalizeUnit(unit)); }}
+                                                    className={`px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all ${units === normalizeUnit(unit)
+                                                        ? "bg-background text-foreground shadow-sm"
+                                                        : "text-muted-foreground hover:text-foreground"
+                                                        }`}
+                                                >
+                                                    {unit}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="flex justify-between items-center py-4 rounded-3xl transition-colors hover:bg-muted/30 pr-4">
+                                        <div className="flex items-center gap-6">
+                                            <div className="w-14 h-14 rounded-2xl bg-amber-500/10 flex items-center justify-center text-amber-500"><Bell size={28} /></div>
+                                            <div>
+                                                <h3 className="text-2xl font-serif text-foreground">Synchronized Alerts</h3>
+                                                <p className="text-muted-foreground text-sm font-light italic">Real-time pulse notifications.</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex bg-muted rounded-full p-1 border border-border">
+                                            {['Off', 'On'].map((state) => (
+                                                <button
+                                                    key={state}
+                                                    onClick={() => handleSelect('notifications', state === 'On')}
+                                                    className={`px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all ${(state === 'On' && preferences.notifications) || (state === 'Off' && !preferences.notifications)
+                                                        ? "bg-background text-foreground shadow-sm"
+                                                        : "text-muted-foreground hover:text-foreground"
+                                                        }`}
+                                                >
+                                                    {state}
+                                                </button>
+                                            ))}
+                                        </div>
                                     </div>
                                 </motion.div>
                             )}
@@ -183,38 +263,38 @@ export default function SettingsPage() {
                                     animate={{ opacity: 1, x: 0 }}
                                     className="space-y-12"
                                 >
-                                    <div className="bg-stone-50 rounded-[32px] p-10 flex gap-10 items-center border border-black/[0.01]">
-                                        <div className="w-24 h-24 rounded-3xl bg-primary/5 flex items-center justify-center text-primary border border-primary/10 transition-transform hover:rotate-6">
+                                    <div className="bg-muted/30 rounded-[32px] p-10 flex gap-10 items-center border border-border">
+                                        <div className="w-24 h-24 rounded-3xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20 transition-transform hover:rotate-6">
                                             <HeartPulse size={48} />
                                         </div>
                                         <div>
-                                            <h4 className="text-stone-900 font-serif text-4xl italic">Echo Core P.1</h4>
-                                            <p className="text-stone-400 font-light mt-1 uppercase tracking-widest text-[10px]">Active Training Agent</p>
+                                            <h4 className="text-foreground font-serif text-4xl italic">Echo Core P.1</h4>
+                                            <p className="text-muted-foreground font-light mt-1 uppercase tracking-widest text-[10px]">Active Training Agent</p>
                                         </div>
                                     </div>
 
                                     <div className="space-y-10">
                                         <div className="relative group/field">
-                                            <label className="text-[10px] font-bold text-stone-400 uppercase tracking-widest absolute -top-2 left-6 bg-white px-2 z-10 transition-colors group-hover:text-primary">Agent ID</label>
+                                            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest absolute -top-2 left-6 bg-card px-2 z-10 transition-colors group-hover:text-primary">Agent ID</label>
                                             <input
                                                 type="text"
                                                 value={preferences.aiName}
                                                 onChange={(e) => setPreferences({ ...preferences, aiName: e.target.value })}
                                                 onBlur={() => updateDB(preferences)}
-                                                className="w-full bg-stone-50 border border-black/[0.02] rounded-3xl px-6 py-5 text-2xl font-serif text-stone-900 focus:outline-none focus:ring-4 focus:ring-primary/5"
+                                                className="w-full bg-card border border-border rounded-3xl px-6 py-5 text-2xl font-serif text-foreground focus:outline-none focus:ring-4 focus:ring-primary/5"
                                             />
                                         </div>
 
                                         <div className="space-y-6">
-                                            <label className="text-[10px] font-bold text-stone-400 uppercase tracking-widest px-6">Cognitive Mode</label>
+                                            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-6">Cognitive Mode</label>
                                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                                 {['Motivational', 'Stoic', 'Clinical', 'Direct'].map(p => (
                                                     <button
                                                         key={p}
                                                         onClick={() => handleSelect('aiPersonality', p)}
                                                         className={`py-4 rounded-2xl text-[10px] font-bold uppercase tracking-[0.2em] transition-all border ${preferences.aiPersonality === p
-                                                            ? "bg-primary border-primary text-white shadow-2xl shadow-primary/30"
-                                                            : "bg-white border-black/5 text-stone-400 hover:border-black/20"
+                                                            ? "bg-primary border-primary text-primary-foreground shadow-2xl shadow-primary/30"
+                                                            : "bg-card border-border text-muted-foreground hover:border-foreground/20"
                                                             }`}
                                                     >
                                                         {p}
@@ -233,23 +313,23 @@ export default function SettingsPage() {
                                     className="space-y-12"
                                 >
                                     <div className="space-y-8">
-                                        <div className="flex items-center gap-6 text-stone-900 mb-10">
+                                        <div className="flex items-center gap-6 text-foreground mb-10">
                                             <Shield className="text-emerald-500" size={32} />
                                             <h3 className="text-4xl font-serif italic">Privacy Protocol</h3>
                                         </div>
 
-                                        <div className="p-10 bg-emerald-500/5 rounded-[40px] border border-emerald-500/5">
-                                            <p className="text-stone-500 text-lg font-light leading-relaxed italic">
+                                        <div className="p-10 bg-emerald-500/5 rounded-[40px] border border-emerald-500/10">
+                                            <p className="text-muted-foreground text-lg font-light leading-relaxed italic">
                                                 Your biometric spectrum is encrypted at rest. Data is strictly utilized for the Pulse training algorithm and is never broadcasted to external entities.
                                             </p>
                                         </div>
 
                                         <div className="space-y-4 pt-6">
                                             {['HealthKit Sync', 'Agent Data Review', 'Biometric Lock'].map(item => (
-                                                <div key={item} className="flex justify-between items-center p-6 bg-stone-50/50 rounded-3xl hover:bg-stone-50 transition-all cursor-pointer group">
-                                                    <span className="text-stone-700 font-serif text-xl">{item}</span>
-                                                    <div className="w-12 h-7 bg-stone-200 rounded-full relative transition-colors group-hover:bg-stone-300">
-                                                        <div className="w-5 h-5 bg-white rounded-full absolute top-1 left-1 shadow-sm" />
+                                                <div key={item} className="flex justify-between items-center p-6 bg-muted/20 rounded-3xl hover:bg-muted/40 transition-all cursor-pointer group">
+                                                    <span className="text-foreground font-serif text-xl">{item}</span>
+                                                    <div className="w-12 h-7 bg-muted rounded-full relative transition-colors group-hover:bg-muted-foreground/30">
+                                                        <div className="w-5 h-5 bg-background rounded-full absolute top-1 left-1 shadow-sm" />
                                                     </div>
                                                 </div>
                                             ))}

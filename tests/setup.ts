@@ -44,7 +44,7 @@ process.env.NEXT_PUBLIC_SITE_URL = 'http://localhost:3000'
 
 // Global test utilities
 declare global {
-    // eslint-disable-next-line no-var
+     
     var testUtils: {
         mockUser: () => { id: string; email: string }
         mockProfile: () => Record<string, unknown>

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowRight, Ruler, Weight, Activity, Heart, ChevronRight, User, Globe, Bot, Dumbbell, Sparkles, CheckCircle2 } from "lucide-react";
+import { Ruler, Weight, Activity, ChevronRight, User, Globe, Bot, Dumbbell, Sparkles, CheckCircle2 } from "lucide-react";
 import { updateOnboardingData } from "@/app/actions/user";
 import { logout } from "@/app/actions/auth";
 
@@ -54,7 +54,7 @@ export default function OnboardingPage() {
         checkGuest();
     }, []);
 
-    const totalSteps = 5;
+
 
     return (
         <div className="min-h-screen bg-[#F5F5F4] flex flex-col items-center justify-center p-6 text-stone-900 font-sans relative overflow-hidden">
@@ -194,12 +194,12 @@ export default function OnboardingPage() {
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-4">
-                                    {['imperial', 'metric'].map((mode) => (
+                                    {(['imperial', 'metric'] as const).map((mode) => (
                                         <button
                                             key={mode}
                                             type="button"
                                             disabled={isGuest}
-                                            onClick={() => setUnits(mode as any)}
+                                            onClick={() => setUnits(mode)}
                                             className={`
                                                 relative p-10 rounded-[32px] border transition-all flex flex-col items-center gap-4 text-center
                                                 ${units === mode
