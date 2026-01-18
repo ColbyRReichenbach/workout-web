@@ -22,7 +22,7 @@ export default function AiCoach() {
         <div className="flex flex-col h-full p-4">
             {/* Header / Teaser */}
             <div className="flex items-center gap-4 mb-8">
-                <div className="h-12 w-12 rounded-2xl bg-primary flex items-center justify-center shadow-2xl shadow-primary/20 transition-transform hover:scale-110">
+                <div className="h-12 w-12 rounded-2xl bg-primary flex items-center justify-center shadow-2xl shadow-primary/20 transition-transform duration-200 hover:scale-105">
                     <HeartPulse size={24} className="text-white" />
                 </div>
                 <div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { memo } from "react";
 
 interface TiltCardProps {
     children: React.ReactNode;
@@ -8,27 +9,26 @@ interface TiltCardProps {
     glowColor?: string;
 }
 
-export function TiltCard({ children, className, glowColor = "shadow-primary/10" }: TiltCardProps) {
+export const TiltCard = memo(function TiltCard({ children, className, glowColor = "shadow-primary/10" }: TiltCardProps) {
     return (
         <motion.div
-            style={{
-                transformStyle: "preserve-3d",
-            }}
-            whileHover={{ y: -4, scale: 1.01 }}
+            whileHover={{ scale: 1.02 }}
+            transition={{ type: "spring", stiffness: 400, damping: 25 }}
             className={`
-                relative transition-all duration-300 ease-out
-                bg-white/70 backdrop-blur-xl border border-black/[0.03]
-                hover:shadow-[0_20px_40px_rgba(0,0,0,0.04)] ${glowColor}
+                relative bg-white/90 border border-black/[0.03]
+                shadow-sm hover:shadow-xl ${glowColor}
                 hover:border-black/10
+                will-change-transform
                 ${className}
             `}
+            style={{
+                transform: 'translateZ(0)',
+                backfaceVisibility: 'hidden'
+            }}
         >
-            {/* Subtle Pulse Accent on Hover */}
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-primary/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-
             <div className="relative z-10 h-full">
                 {children}
             </div>
         </motion.div>
     );
-}
+});

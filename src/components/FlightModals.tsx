@@ -23,7 +23,7 @@ export function PreFlightModal({ isOpen, onClose, onReady }: PreFlightProps) {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 bg-stone-900/10 backdrop-blur-xl z-[200]"
+                        className="fixed inset-0 bg-stone-900/20 backdrop-blur-sm z-[200]"
                     />
                 </Dialog.Overlay>
                 <Dialog.Content asChild>
@@ -78,7 +78,7 @@ export function PreFlightModal({ isOpen, onClose, onReady }: PreFlightProps) {
                                             key={level}
                                             onClick={() => setSoreness(level as any)}
                                             className={`
-                                                py-4 rounded-2xl border text-[10px] font-bold uppercase tracking-widest transition-all
+                                                py-4 rounded-2xl border text-[10px] font-bold uppercase tracking-widest transition-colors duration-150
                                                 ${soreness === level
                                                     ? "bg-primary border-primary text-white shadow-2xl shadow-primary/20"
                                                     : "bg-stone-50 border-transparent text-stone-400 hover:bg-stone-100"}
@@ -93,7 +93,7 @@ export function PreFlightModal({ isOpen, onClose, onReady }: PreFlightProps) {
                             {/* 3. Submit */}
                             <button
                                 onClick={() => onReady({ sleep, soreness })}
-                                className="w-full py-6 rounded-[24px] bg-stone-900 text-white font-bold text-lg hover:scale-[1.02] active:scale-[0.98] transition-all shadow-2xl hover:bg-primary shadow-black/10"
+                                className="w-full py-6 rounded-[24px] bg-stone-900 text-white font-bold text-lg hover:scale-[1.02] active:scale-[0.98] transition-transform duration-150 shadow-2xl hover:bg-primary shadow-black/10"
                             >
                                 Initiate Session
                             </button>
@@ -134,7 +134,7 @@ export function PostFlightModal({ isOpen, onClose, onFinish }: PostFlightProps) 
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 bg-stone-900/20 backdrop-blur-xl z-[200]"
+                        className="fixed inset-0 bg-stone-900/30 backdrop-blur-sm z-[200]"
                     />
                 </Dialog.Overlay>
                 <Dialog.Content asChild>
@@ -178,7 +178,7 @@ export function PostFlightModal({ isOpen, onClose, onFinish }: PostFlightProps) 
                                         <button
                                             key={tag}
                                             onClick={() => toggleTag(tag)}
-                                            className={`px-5 py-2.5 rounded-2xl text-[10px] font-bold uppercase tracking-widest border transition-all ${selectedTags.includes(tag)
+                                            className={`px-5 py-2.5 rounded-2xl text-[10px] font-bold uppercase tracking-widest border transition-colors duration-150 ${selectedTags.includes(tag)
                                                 ? "bg-primary text-white border-primary shadow-xl shadow-primary/20"
                                                 : "bg-white text-stone-400 border-black/5 hover:border-black/20"
                                                 }`}
@@ -200,7 +200,7 @@ export function PostFlightModal({ isOpen, onClose, onFinish }: PostFlightProps) 
                             {/* 4. Complete button */}
                             <button
                                 onClick={() => onFinish({ rpe, tags: selectedTags, notes })}
-                                className="w-full py-6 rounded-[24px] bg-primary text-white font-bold text-lg hover:bg-stone-900 transition-all shadow-2xl shadow-primary/20"
+                                className="w-full py-6 rounded-[24px] bg-primary text-white font-bold text-lg hover:bg-stone-900 transition-colors duration-150 shadow-2xl shadow-primary/20"
                             >
                                 Synchronize Log
                             </button>

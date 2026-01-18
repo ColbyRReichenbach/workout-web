@@ -75,13 +75,13 @@ export function LogStrengthSets({ segment, idx, onLog }: LogProps) {
             <div className="flex gap-3 pt-2 font-sans font-medium">
                 <button
                     onClick={() => setSets([...sets, { weight: sets[sets.length - 1]?.weight || "", reps: "" }])}
-                    className="flex-1 py-3 rounded-2xl bg-stone-100 text-stone-500 hover:bg-stone-200 transition-all flex items-center justify-center gap-2 text-xs"
+                    className="flex-1 py-3 rounded-2xl bg-stone-100 text-stone-500 hover:bg-stone-200 transition-colors duration-150 flex items-center justify-center gap-2 text-xs"
                 >
                     <Plus size={14} /> Add Set
                 </button>
                 <button
                     onClick={handleSave}
-                    className="flex-[2] py-3 rounded-2xl bg-primary text-white flex items-center justify-center transition-all shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] gap-2 text-xs font-bold uppercase tracking-widest"
+                    className="flex-[2] py-3 rounded-2xl bg-primary text-white flex items-center justify-center transition-transform duration-150 shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] gap-2 text-xs font-bold uppercase tracking-widest"
                 >
                     <Save size={14} /> Index Performance
                 </button>
@@ -164,7 +164,7 @@ export function LogMetcon({ segment, idx, onLog }: LogProps) {
 
             <button
                 onClick={handleSave}
-                className="w-full py-4 rounded-2xl bg-primary text-white flex items-center justify-center transition-all shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] gap-2 text-xs font-bold uppercase tracking-widest"
+                className="w-full py-4 rounded-2xl bg-primary text-white flex items-center justify-center transition-transform duration-150 shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] gap-2 text-xs font-bold uppercase tracking-widest"
             >
                 <Save size={16} /> Log Metcon Results
             </button>
@@ -231,7 +231,7 @@ export function LogCardioBasic({ segment, idx, onLog }: LogProps) {
             </div>
             <button
                 onClick={handleSave}
-                className="w-full py-4 rounded-2xl bg-primary text-white flex items-center justify-center transition-all shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] gap-2 text-xs font-bold uppercase tracking-widest"
+                className="w-full py-4 rounded-2xl bg-primary text-white flex items-center justify-center transition-transform duration-150 shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] gap-2 text-xs font-bold uppercase tracking-widest"
             >
                 <Save size={16} /> Sync Cardio Performance
             </button>

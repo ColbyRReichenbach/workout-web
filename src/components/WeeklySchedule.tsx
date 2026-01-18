@@ -1,9 +1,10 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { X, CheckCircle, Dumbbell, Clock, Flame, HeartPulse, Target, Activity } from "lucide-react";
-import { useState, useEffect } from "react";
+import { X, CheckCircle, Dumbbell, Clock, Flame, HeartPulse, Target, Activity, Zap, TrendingUp, Flower2, Footprints, Moon } from "lucide-react";
+import { useState, useEffect, memo, useMemo } from "react";
 import { createClient } from "@/utils/supabase/client";
+import { TiltCard } from "./TiltCard";
 
 interface DayCardProps {
     day: { day: string; title: string; type: string };
@@ -11,94 +12,122 @@ interface DayCardProps {
     isToday: boolean;
     isDone: boolean;
     isPast: boolean;
+    phase?: number;
     onClick: () => void;
 }
 
-export function DayCard({ day, index, isToday, isDone, isPast, onClick }: DayCardProps) {
-    const typeStyles: Record<string, { bg: string, text: string, shadow: string, tint: string }> = {
-        "Strength": { bg: "bg-red-500/5", text: "text-red-600", shadow: "group-hover:shadow-red-500/20", tint: "bg-red-500/10" },
-        "Hypertrophy": { bg: "bg-orange-500/5", text: "text-orange-600", shadow: "group-hover:shadow-orange-500/20", tint: "bg-orange-500/10" },
-        "Cardio": { bg: "bg-emerald-500/5", text: "text-emerald-600", shadow: "group-hover:shadow-emerald-500/20", tint: "bg-emerald-500/10" },
-        "Recovery": { bg: "bg-stone-500/5", text: "text-stone-600", shadow: "group-hover:shadow-stone-500/20", tint: "bg-stone-500/10" },
-        "Power": { bg: "bg-rose-500/5", text: "text-rose-600", shadow: "group-hover:shadow-rose-500/20", tint: "bg-rose-500/10" },
-        "Endurance": { bg: "bg-sky-500/5", text: "text-sky-600", shadow: "group-hover:shadow-sky-500/20", tint: "bg-sky-500/10" },
-        "Rest": { bg: "bg-stone-100/30", text: "text-stone-400", shadow: "group-hover:shadow-stone-900/5", tint: "bg-stone-200/50" },
+export const DayCard = memo(function DayCard({ day, index, isToday, isDone, isPast, phase = 1, onClick }: DayCardProps) {
+    const typeStyles: Record<string, { bg: string, text: string, shadow: string, tint: string, icon: any }> = {
+        "Strength": { bg: "bg-red-500/5", text: "text-red-600", shadow: "shadow-red-500/10", tint: "bg-red-500/10", icon: Dumbbell },
+        "Hypertrophy": { bg: "bg-orange-500/5", text: "text-orange-600", shadow: "shadow-orange-500/10", tint: "bg-orange-500/10", icon: TrendingUp },
+        "Cardio": { bg: "bg-emerald-500/5", text: "text-emerald-600", shadow: "shadow-emerald-500/10", tint: "bg-emerald-500/10", icon: Footprints },
+        "Recovery": { bg: "bg-blue-500/5", text: "text-blue-600", shadow: "shadow-blue-500/10", tint: "bg-blue-500/10", icon: Flower2 },
+        "Power": { bg: "bg-rose-500/5", text: "text-rose-600", shadow: "shadow-rose-500/10", tint: "bg-rose-500/10", icon: Zap },
+        "Endurance": { bg: "bg-sky-500/5", text: "text-sky-600", shadow: "shadow-sky-500/10", tint: "bg-sky-500/10", icon: Target },
+        "Rest": { bg: "bg-stone-100/30", text: "text-stone-400", shadow: "shadow-stone-900/5", tint: "bg-stone-200/50", icon: Moon },
     };
 
     const style = typeStyles[day.type] || typeStyles["Strength"];
 
+    // Keyword-aware and Phase-aware icon override for max accuracy
+    const getRepresentativeIcon = () => {
+        const title = day.title.toLowerCase();
+        const dayName = day.day.toLowerCase();
+        const type = day.type.toLowerCase();
+
+        // Hardcoded Global Overrides
+        if (dayName === 'sunday' || type === 'rest' || title.includes('rest')) return Moon;
+
+        // Phase-Aware Hardcoded Logic
+        if (phase === 1) {
+            if (dayName === 'thursday') return Flower2; // Active Mobility
+            if (dayName === 'saturday') return Footprints; // Ruck
+        }
+
+        if (phase === 2) {
+            if (dayName === 'tuesday' || dayName === 'saturday') return Footprints; // Track Speed / Simulation
+            if (dayName === 'thursday') return Flower2; // Active Flush (Yoga/Swim vibe)
+        }
+
+        // Semantic Fallback
+        if (title.includes('run') || title.includes('sprint') || title.includes('jog') || title.includes('ruck')) return Footprints;
+        if (title.includes('yoga') || title.includes('stretch') || title.includes('mobility') || title.includes('flow')) return Flower2;
+        if (title.includes('rest') || title.includes('sleep') || title.includes('recovery day')) return Moon;
+        if (title.includes('swim')) return Activity;
+
+        return style.icon;
+    };
+
+    const Icon = getRepresentativeIcon();
+
     return (
-        <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.05 }}
-            onClick={onClick}
-            whileHover={{ y: -8, scale: 1.02 }}
+        <TiltCard
+            glowColor={style.shadow}
             className={`
-                relative p-8 rounded-[40px] border cursor-pointer
-                bg-white/80 backdrop-blur-2xl border-black/[0.03]
-                transition-all duration-500 cubic-bezier(0.4, 0, 0.2, 1)
-                hover:border-black/10 hover:shadow-2xl ${style.shadow}
+                relative p-8 rounded-[48px] cursor-pointer overflow-hidden group
                 ${isToday ? "ring-2 ring-primary/20 ring-offset-4" : ""}
                 ${isDone ? "opacity-100" : isPast ? "opacity-60" : ""}
-                group overflow-hidden
             `}
         >
-            {/* Dynamic Type Tint - Active on Hover */}
-            <div className={`absolute inset-0 ${style.bg} opacity-0 group-hover:opacity-100 transition-opacity duration-500`} />
+            <div onClick={onClick}>
+                {/* Background Icon Watermark */}
+                <div className={`absolute -right-8 -bottom-8 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity duration-300 pointer-events-none ${style.text}`} style={{ willChange: 'opacity' }}>
+                    <Icon size={160} strokeWidth={1} />
+                </div>
 
-            {/* Content */}
-            <div className="relative z-10">
-                <div className="flex justify-between items-start mb-6">
-                    <div>
-                        <div className="flex items-center gap-2 mb-2">
-                            <span className={`text-[10px] font-bold uppercase tracking-[0.3em] ${isToday ? "text-primary" : "text-stone-400"}`}>
-                                {day.day}
-                            </span>
-                            {isToday && <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />}
+                {/* Content */}
+                <div className="relative z-10">
+                    <div className="flex justify-between items-start mb-6">
+                        <div>
+                            <div className="flex items-center gap-2 mb-2">
+                                <span className={`text-[10px] font-bold uppercase tracking-[0.3em] ${isToday ? "text-primary" : "text-stone-400"}`}>
+                                    {day.day}
+                                </span>
+                                {isToday && <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />}
+                            </div>
+                            <h4 className="font-serif text-3xl text-stone-900 leading-tight">
+                                {day.title}
+                            </h4>
                         </div>
-                        <h4 className="font-serif text-3xl text-stone-900 leading-tight">
-                            {day.title}
-                        </h4>
+
+                        {isDone ? (
+                            <div className="h-14 w-14 rounded-[20px] bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20 group-hover:bg-emerald-500 group-hover:text-white transition-colors duration-200">
+                                <CheckCircle size={28} />
+                            </div>
+                        ) : isPast ? (
+                            <div className="h-14 w-14 rounded-[20px] bg-red-500/5 flex items-center justify-center border border-red-500/10 group-hover:bg-red-500 group-hover:text-white transition-colors duration-200">
+                                <X size={24} />
+                            </div>
+                        ) : (
+                            <div className={`h-14 w-14 rounded-2xl flex items-center justify-center transition-transform duration-200 group-hover:scale-105 ${isToday ? "bg-primary/10 border border-primary/20 text-primary shadow-lg shadow-primary/10" : "bg-white border border-black/[0.03] text-stone-300 shadow-sm"
+                                }`}>
+                                <Icon size={26} className={isToday ? "animate-[pulse_2s_infinite]" : ""} />
+                            </div>
+                        )}
                     </div>
 
-                    {isDone ? (
-                        <div className="h-14 w-14 rounded-[20px] bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20 group-hover:bg-emerald-500 group-hover:text-white transition-all duration-300">
-                            <CheckCircle size={28} />
-                        </div>
-                    ) : isPast ? (
-                        <div className="h-14 w-14 rounded-[20px] bg-red-500/5 flex items-center justify-center border border-red-500/10 group-hover:bg-red-500 group-hover:text-white transition-all duration-300">
-                            <X size={24} />
-                        </div>
-                    ) : (
-                        <div className={`h-14 w-14 rounded-[20px] flex items-center justify-center transition-all duration-300 ${isToday ? "bg-primary/10 border border-primary/20 text-primary" : "bg-stone-50 border border-black/[0.03] text-stone-300"
-                            }`}>
-                            <HeartPulse size={26} className={isToday ? "animate-[pulse_2s_infinite]" : ""} />
-                        </div>
-                    )}
-                </div>
-
-                <div className="flex items-center gap-4">
-                    <span className={`px-4 py-1.5 ${style.tint} ${style.text} rounded-full text-[10px] font-bold uppercase tracking-widest`}>
-                        {day.type} Protocol
-                    </span>
-                    {isDone && (
-                        <span className="text-emerald-500 text-[10px] font-bold uppercase tracking-widest flex items-center gap-1">
-                            <div className="w-1 h-1 rounded-full bg-emerald-500" /> Synchronized
+                    <div className="flex items-center gap-4">
+                        <span className={`px-4 py-1.5 ${style.tint} ${style.text} rounded-full text-[10px] font-bold uppercase tracking-widest`}>
+                            {day.type} Protocol
                         </span>
-                    )}
+                        {isDone && (
+                            <span className="text-emerald-500 text-[10px] font-bold uppercase tracking-widest flex items-center gap-1">
+                                <div className="w-1 h-1 rounded-full bg-emerald-500" /> Synchronized
+                            </span>
+                        )}
+                    </div>
+                </div>
+
+                {/* Hover visual cue */}
+                <div className="absolute bottom-6 right-8 translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-[transform,opacity] duration-200">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-stone-400 flex items-center gap-2">
+                        Access Protocol <div className="w-6 h-[1px] bg-stone-200" />
+                    </span>
                 </div>
             </div>
-
-            {/* Hover visual cue */}
-            <div className="absolute bottom-6 right-8 translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-stone-400 flex items-center gap-2">
-                    Access Protocol <div className="w-4 h-[1px] bg-stone-300" />
-                </span>
-            </div>
-        </motion.div>
+        </TiltCard>
     );
-}
+});
 
 interface DayDetailModalProps {
     isOpen: boolean;
@@ -169,14 +198,14 @@ export function DayDetailModal({ isOpen, onClose, day, isDone, isToday, logs }: 
 
                     {/* Modal */}
                     <motion.div
-                        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                        initial={{ opacity: 0, scale: 0.9, y: 40 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                        className="fixed left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] z-[210] w-[95vw] max-w-[640px] max-h-[90vh] flex flex-col"
+                        exit={{ opacity: 0, scale: 0.9, y: 40 }}
+                        className="fixed left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] z-[210] w-[95vw] max-w-[680px] max-h-[90vh] flex flex-col"
                     >
-                        <div className="bg-white border border-black/5 rounded-[40px] shadow-2xl relative overflow-hidden flex flex-col max-h-full">
+                        <div className="glass-card border-white/40 rounded-[48px] shadow-[0_40px_80px_-20px_rgba(0,0,0,0.2)] relative overflow-hidden flex flex-col max-h-full">
                             {/* Decorative Background Pulsar */}
-                            <div className="absolute -right-20 -top-20 w-64 h-64 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
+                            <div className="absolute -right-20 -top-20 w-80 h-80 bg-primary/5 rounded-full blur-[100px] pointer-events-none animate-pulse" />
 
                             {/* Header */}
                             <div className="p-10 pb-4 relative z-10 flex justify-between items-start">
@@ -305,7 +334,7 @@ export function DayDetailModal({ isOpen, onClose, day, isDone, isToday, logs }: 
                                             {isToday && (
                                                 <button
                                                     onClick={() => window.location.href = "/workout"}
-                                                    className="w-full py-8 rounded-[32px] bg-primary text-white font-bold text-2xl transition-all shadow-2xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] hover:shadow-primary/30 flex items-center justify-center gap-4"
+                                                    className="w-full py-8 rounded-[36px] bg-primary text-white font-bold text-2xl transition-all btn-pro shadow-[0_20px_40px_-10px_rgba(239,68,68,0.3)] hover:shadow-[0_25px_50px_-12px_rgba(239,68,68,0.5)] flex items-center justify-center gap-4"
                                                 >
                                                     Initiate Pulse Protocol
                                                     <Target size={24} />

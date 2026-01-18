@@ -113,6 +113,116 @@
   ::-webkit-scrollbar-thumb:hover {
     background: #a8a29e;
   }
+
+  /* Apple-Pro Design System */
+  .glass-pro {
+    background: rgba(255, 255, 255, 0.5);
+    backdrop-filter: blur(12px) saturate(150%);
+    -webkit-backdrop-filter: blur(12px) saturate(150%);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.3),
+      0 10px 30px -10px rgba(0, 0, 0, 0.05);
+  }
+
+  .glass-card {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(12px) saturate(130%);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    box-shadow:
+      0 20px 40px -15px rgba(0, 0, 0, 0.03),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+  }
+
+  .btn-pro {
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+      box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    transform-origin: center;
+    will-change: transform;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+  }
+
+  .btn-pro:hover {
+    transform: scale(1.02) translateZ(0);
+    box-shadow: 0 12px 24px -10px var(--primary-glow);
+  }
+
+  .btn-pro:active {
+    transform: scale(0.98) translateZ(0);
+  }
+
+  .magnetic-scale {
+    transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    will-change: transform;
+    backface-visibility: hidden;
+  }
+
+  .magnetic-scale:hover {
+    transform: scale(1.03) translateZ(0);
+  }
+
+  /* Scanline Pulse Animation */
+  @keyframes scan-line-sweep {
+    0% {
+      transform: translateY(-100%);
+      opacity: 0;
+    }
+
+    3% {
+      opacity: 1;
+    }
+
+    27% {
+      opacity: 1;
+    }
+
+    30% {
+      transform: translateY(100vh);
+      opacity: 0;
+    }
+
+    100% {
+      transform: translateY(100vh);
+      opacity: 0;
+    }
+  }
+
+  .scan-line {
+    animation: scan-line-sweep 10s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    will-change: transform;
+  }
+
+  /* Sub-millisecond Diagnostic Flicker */
+  @keyframes biometric-flicker {
+
+    0%,
+    100% {
+      opacity: 0.02;
+    }
+
+    50% {
+      opacity: 0.08;
+    }
+
+    98% {
+      opacity: 0.02;
+    }
+
+    99% {
+      opacity: 0.15;
+    }
+  }
+
+  .animate-biometric-flicker {
+    animation: biometric-flicker 0.1s steps(2) infinite;
+  }
+
+  /* Carbon Fibre Pattern Utility */
+  .bg-carbon-fibre {
+    background-image: url("https://www.transparenttextures.com/patterns/carbon-fibre.png");
+    opacity: 0.03;
+  }
 }
 
 @layer base {

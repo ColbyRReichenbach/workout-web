@@ -47,23 +47,23 @@ export function Navbar() {
             )}
         >
             <div className={cn(
-                "max-w-7xl mx-auto rounded-3xl border transition-all duration-300 flex items-center justify-between px-6 py-3 relative z-10",
+                "max-w-7xl mx-auto rounded-[32px] transition-all duration-500 flex items-center justify-between px-6 py-3 relative z-10 glass-pro",
                 scrolled
-                    ? "bg-white/70 backdrop-blur-xl border-black/5 shadow-xl shadow-black/5"
-                    : "bg-white/40 backdrop-blur-md border-transparent shadow-none"
+                    ? "border-black/10 shadow-[0_20px_40px_-20px_rgba(0,0,0,0.1)]"
+                    : "border-white/20 shadow-none bg-white/30"
             )}>
                 {/* Logo */}
-                <Link href="/" className="flex items-center gap-3 group relative z-20">
-                    <div className="w-10 h-10 rounded-2xl bg-primary flex items-center justify-center text-white shadow-lg shadow-primary/20 group-hover:scale-110 transition-transform">
+                <Link href="/" className="flex items-center gap-3 group relative z-20 magnetic-scale">
+                    <div className="w-10 h-10 rounded-2xl bg-primary flex items-center justify-center text-white shadow-lg shadow-primary/20 group-hover:shadow-primary/40 transition-all">
                         <HeartPulse size={24} />
                     </div>
-                    <span className="font-serif text-2xl font-bold tracking-tight text-foreground">
+                    <span className="font-serif text-2xl font-bold tracking-tighter text-stone-900 group-hover:text-primary transition-colors">
                         Pulse
                     </span>
                 </Link>
 
                 {/* Desktop Nav */}
-                <nav className="hidden md:flex items-center gap-1 relative z-20">
+                <nav className="hidden md:flex items-center gap-2 relative z-20">
                     {navigation.map((item) => {
                         const isActive = pathname === item.href;
                         return (
@@ -71,20 +71,20 @@ export function Navbar() {
                                 key={item.name}
                                 href={item.href}
                                 className={cn(
-                                    "relative px-4 py-2 text-sm font-medium rounded-xl transition-all flex items-center gap-2",
+                                    "relative px-5 py-2.5 text-[13px] font-bold uppercase tracking-widest rounded-2xl transition-all flex items-center gap-2 group",
                                     isActive
                                         ? "text-primary"
-                                        : "text-muted-foreground hover:text-foreground hover:bg-black/5"
+                                        : "text-stone-500 hover:text-stone-900 hover:bg-black/5"
                                 )}
                             >
                                 {isActive && (
                                     <motion.div
                                         layoutId="nav-pill"
-                                        className="absolute inset-0 bg-primary/10 rounded-xl"
-                                        transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                                        className="absolute inset-0 bg-primary/5 rounded-2xl border border-primary/10"
+                                        transition={{ type: "spring", bounce: 0.25, duration: 0.5 }}
                                     />
                                 )}
-                                <item.icon size={16} />
+                                <item.icon size={15} className={cn("transition-transform group-hover:scale-110", isActive && "text-primary")} />
                                 <span className="relative z-10">{item.name}</span>
                             </Link>
                         );
@@ -92,23 +92,23 @@ export function Navbar() {
                 </nav>
 
                 {/* Profile Avatar (Mini) */}
-                <div className="flex items-center gap-3 border-l border-black/5 pl-4 md:pl-6 ml-1 md:ml-2 relative z-20">
+                <div className="flex items-center gap-3 border-l border-black/[0.03] pl-4 md:pl-6 ml-1 md:ml-2 relative z-20">
                     <Link href="/profile" className={cn(
-                        "w-8 h-8 md:w-10 md:h-10 rounded-full border-2 transition-all flex items-center justify-center hover:scale-110 active:scale-90 group relative z-30",
+                        "w-10 h-10 rounded-full border-2 transition-all flex items-center justify-center btn-pro group relative z-30 shadow-sm",
                         isProfileActive
                             ? "border-primary bg-primary text-white shadow-lg shadow-primary/20"
-                            : "border-white bg-stone-100 text-stone-400 hover:bg-stone-200 hover:text-stone-600"
+                            : "border-white/50 bg-white/50 text-stone-400 hover:text-stone-600 hover:border-white shadow-sm"
                     )}>
-                        <User size={isProfileActive ? 18 : 16} strokeWidth={2.5} className="relative z-10 transition-transform group-hover:scale-110" />
+                        <User size={isProfileActive ? 18 : 16} strokeWidth={2.5} className="relative z-10" />
                     </Link>
                 </div>
 
                 {/* Mobile Toggle */}
                 <button
                     onClick={() => setIsMenuOpen(!isMenuOpen)}
-                    className="md:hidden p-2 ml-1 rounded-xl bg-black/5 hover:bg-black/10 transition-all relative z-20"
+                    className="md:hidden p-3 ml-1 rounded-2xl bg-black/5 hover:bg-black/10 transition-all relative z-20"
                 >
-                    {isMenuOpen ? <X size={20} /> : <Menu size={20} />}
+                    {isMenuOpen ? <X size={20} className="text-stone-900" /> : <Menu size={20} className="text-stone-900" />}
                 </button>
             </div>
 

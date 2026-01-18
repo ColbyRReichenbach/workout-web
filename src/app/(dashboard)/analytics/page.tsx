@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Activity, Moon, Zap, Target, Shield, Flame } from "lucide-react";
 import { getAnalyticsData } from "./actions";
@@ -493,7 +493,7 @@ export default function AnalyticsPage() {
                     <span className="text-[10px] font-bold text-stone-300 uppercase tracking-widest">Background Architecture</span>
                     <h2 className="text-4xl font-serif text-stone-900 tracking-tight">Macro-Cycle Progression</h2>
                 </div>
-                <div className="bg-stone-50/30 rounded-[64px] p-16 border border-stone-100">
+                <div className="bg-white rounded-[64px] p-16 border border-stone-100 shadow-sm">
                     <div className="flex justify-between items-end mb-12">
                         <div className="flex gap-12">
                             <div>

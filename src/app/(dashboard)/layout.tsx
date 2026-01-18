@@ -5,8 +5,17 @@ export default function DashboardLayout({
 }) {
     return (
         <div className="flex-1 flex flex-col relative w-full">
-            {/* Viewport Pulse Border - Only for Dashboard pages */}
-            <div className="fixed inset-4 border border-black/5 rounded-[40px] pointer-events-none z-[100] pulse-border-beam opacity-40"></div>
+            {/* Scanline Pulse Diagnostic Overlay - Background Layer */}
+            <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+                {/* Sweeping Laser Bar - Calibrated to Pulse Red (#ef4444) */}
+                <div className="absolute top-0 left-0 w-full h-[2px] bg-[#ef4444]/40 shadow-[0_0_24px_rgba(239,68,68,0.8)] scan-line" />
+
+                {/* Carbon Fibre Texture Overlay */}
+                <div className="absolute inset-0 bg-carbon-fibre" />
+
+                {/* High-Frequency Biometric Flicker */}
+                <div className="absolute inset-0 bg-[#ef4444]/5 animate-biometric-flicker" />
+            </div>
 
             {/* Main Content Area with Constraints */}
             <div className="flex-1 pt-32 pb-20 relative z-10 w-full">

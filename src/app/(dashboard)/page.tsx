@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import AiCoach from "@/components/AiCoach";
 import { DayCard, DayDetailModal } from "@/components/WeeklySchedule";
+import { TiltCard } from "@/components/TiltCard";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -147,12 +148,12 @@ export default function Home() {
 
       {/* Hero Section */}
       <header className="flex flex-col md:flex-row justify-between items-end gap-10">
-        <div className="space-y-4 max-w-2xl">
+        <div className="space-y-4 max-w-2xl slide-in">
           <div className="flex items-center gap-2 text-primary">
             <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-            <span className="text-[10px] font-bold uppercase tracking-[0.3em]">System Active • Week {currentWeek}</span>
+            <span className="text-[10px] font-bold uppercase tracking-[0.4em] opacity-60">System Active • Week {currentWeek}</span>
           </div>
-          <h1 className="font-serif text-6xl md:text-8xl text-stone-900 leading-[0.9]">
+          <h1 className="font-serif text-7xl md:text-9xl text-stone-900 leading-[0.85] tracking-tighter">
             Current Rhythm
           </h1>
           <p className="text-stone-500 text-xl font-light italic">
@@ -162,16 +163,16 @@ export default function Home() {
 
         <Link
           href="/workout"
-          className="group relative bg-primary text-white pl-10 pr-6 py-6 rounded-full font-bold text-lg flex items-center gap-6 transition-all shadow-2xl shadow-primary/30 hover:scale-[1.05] active:scale-[0.98]"
+          className="group relative bg-primary text-white pl-10 pr-6 py-6 rounded-[32px] font-bold text-lg flex items-center gap-6 transition-all btn-pro shadow-[0_20px_40px_-10px_rgba(239,68,68,0.3)] hover:shadow-[0_25px_50px_-12px_rgba(239,68,68,0.5)] active:scale-[0.98]"
         >
           Initiate Today's Pulse
-          <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center group-hover:bg-white/30 transition-colors">
+          <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center group-hover:bg-white/30 transition-all group-hover:rotate-[-10deg]">
             <ArrowRight size={20} />
           </div>
         </Link>
       </header>
 
-      {/* ... analytics section ... */}
+      {/* Analytics Grid */}
       <motion.div
         variants={container}
         initial="hidden"
@@ -179,25 +180,35 @@ export default function Home() {
         className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
       >
         {[
-          { icon: Calendar, label: "Streak", value: streak, unit: "Days", color: "text-red-500", bg: "bg-red-500/5" },
-          { icon: Activity, label: "Volume", value: "42k", unit: "lb", color: "text-orange-500", bg: "bg-orange-500/5" },
-          { icon: Flame, label: "Burn", value: "840", unit: "kcal", color: "text-amber-500", bg: "bg-amber-500/5" },
-          { icon: List, label: "Flow", value: completion, unit: "%", color: "text-stone-500", bg: "bg-stone-500/5" },
+          { icon: Calendar, label: "Streak", value: streak, unit: "Days", color: "text-red-500", bg: "bg-red-500/5", glow: "shadow-red-500/10" },
+          { icon: Activity, label: "Volume", value: "42k", unit: "lb", color: "text-orange-500", bg: "bg-orange-500/5", glow: "shadow-orange-500/10" },
+          { icon: Flame, label: "Burn", value: "840", unit: "kcal", color: "text-amber-500", bg: "bg-amber-500/5", glow: "shadow-amber-500/10" },
+          { icon: List, label: "Flow", value: completion, unit: "%", color: "text-stone-500", bg: "bg-stone-500/5", glow: "shadow-stone-900/5" },
         ].map((m, i) => (
-          <motion.div
+          <TiltCard
             key={i}
-            variants={item}
-            whileHover={{ y: -6 }}
-            className="group bg-white/50 backdrop-blur-xl border border-black/[0.03] rounded-[32px] p-8 hover:bg-white/80 transition-all hover:shadow-[0_20px_40px_rgba(0,0,0,0.03)] cursor-pointer"
+            glowColor={m.glow}
+            className="group rounded-[40px] p-8 cursor-pointer overflow-hidden"
           >
-            <div className="flex justify-between items-start mb-8">
-              <div className={`p-4 rounded-2xl ${m.bg} ${m.color} transition-transform group-hover:scale-110`}><m.icon size={24} /></div>
-              <span className="text-[10px] text-stone-400 uppercase tracking-widest font-bold">{m.label}</span>
+            {/* Background Icon Watermark */}
+            <div className={`absolute -right-8 -bottom-8 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity duration-200 pointer-events-none ${m.color}`}>
+              <m.icon size={140} strokeWidth={1} />
             </div>
-            <h3 className="text-5xl font-serif text-stone-900 mb-1">
-              {m.value} <span className="text-sm text-stone-400 font-sans uppercase tracking-widest font-bold ml-1">{m.unit}</span>
-            </h3>
-          </motion.div>
+
+            <div className="flex justify-between items-start mb-10 relative z-10">
+              <div className={`w-14 h-14 rounded-2xl ${m.bg} ${m.color} flex items-center justify-center transition-transform duration-200 group-hover:scale-105 shadow-sm border border-black/[0.02]`}>
+                <m.icon size={24} />
+              </div>
+              <span className="text-[10px] text-stone-400 uppercase tracking-[0.3em] font-bold opacity-60">{m.label}</span>
+            </div>
+
+            <div className="relative z-10">
+              <h3 className="text-5xl font-serif text-stone-900 mb-1">
+                {m.value} <span className="text-sm text-stone-400 font-sans uppercase tracking-[0.2em] font-bold ml-1">{m.unit}</span>
+              </h3>
+              <div className="w-8 h-[2px] bg-stone-100 group-hover:w-16 group-hover:bg-primary/20 transition-[width,background-color] duration-300 mt-4" />
+            </div>
+          </TiltCard>
         ))}
       </motion.div>
 
@@ -208,11 +219,11 @@ export default function Home() {
         <div className="lg:col-span-8 space-y-8">
           <div className="flex justify-between items-end border-b border-black/[0.03] pb-6">
             <div>
-              <h3 className="font-serif text-3xl text-stone-900">Weekly Protocol</h3>
+              <h3 className="font-serif text-4xl text-stone-900 tracking-tight">Weekly Protocol</h3>
               <p className="text-stone-400 text-sm mt-1">Adaptive training schedule based on biometric data.</p>
             </div>
-            <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-stone-400">
-              <CalendarDays size={14} />
+            <div className="flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.3em] text-stone-400 bg-stone-100/50 px-4 py-2 rounded-full border border-black/5">
+              <CalendarDays size={14} className="text-primary" />
               <span>Phase {currentPhase} • Pulse 0{currentWeek}</span>
             </div>
           </div>
@@ -232,6 +243,7 @@ export default function Home() {
                   isToday={isToday}
                   isDone={isDone}
                   isPast={isPast}
+                  phase={currentPhase}
                   onClick={() => handleDayClick({ ...day, isFuture })}
                 />
               );
@@ -242,11 +254,11 @@ export default function Home() {
         {/* Intelligence / Coaching */}
         <div className="lg:col-span-4 space-y-8">
           <div className="border-b border-black/[0.03] pb-6">
-            <h3 className="font-serif text-3xl text-stone-900">Coach AI</h3>
+            <h3 className="font-serif text-4xl text-stone-900 tracking-tight">Coach AI</h3>
             <p className="text-stone-400 text-sm mt-1">Real-time performance adjustments.</p>
           </div>
 
-          <div className="bg-white/70 backdrop-blur-xl border border-black/5 rounded-[40px] p-2 h-[600px] shadow-2xl relative overflow-hidden group">
+          <div className="glass-card border border-white/40 rounded-[48px] p-2 h-[600px] shadow-2xl relative overflow-hidden group">
             <div className="absolute inset-0 bg-gradient-to-b from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
             <AiCoach />
           </div>

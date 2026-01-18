@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { CheckCircle, HeartPulse, ArrowRight, Zap, Target, Activity } from "lucide-react";
+import { CheckCircle, HeartPulse, ArrowRight, Zap, Target, Activity, Flower2, Footprints, Moon } from "lucide-react";
 import { LogStrengthSets, LogCardioBasic, LogMetcon } from "@/components/LogInput";
 import { createClient } from "@/utils/supabase/client";
 import { useEffect, useState } from "react";
@@ -9,6 +9,30 @@ import { ProgramData, WorkoutSegment } from "@/lib/types";
 
 import { PostFlightModal } from "@/components/FlightModals";
 import PrCelebration from "@/components/PrCelebration";
+import { TiltCard } from "@/components/TiltCard";
+
+// Helper for type-based styling
+const getSegmentIcon = (type: string, name: string = "", dayName: string = "", phase: number = 1) => {
+    const lower = name.toLowerCase();
+    const lowerDay = dayName.toLowerCase();
+
+    // Global Overrides
+    if (lowerDay === 'sunday' || lower.includes('rest')) return Moon;
+
+    // Semantic Keyword Detection
+    if (lower.includes('run') || lower.includes('sprint') || lower.includes('jog') || lower.includes('tempo') || lower.includes('ruck')) return Footprints;
+    if (lower.includes('yoga') || lower.includes('stretch') || lower.includes('mobility') || lower.includes('flow')) return Flower2;
+    if (lower.includes('rest') || lower.includes('sleep') || lower.includes('recovery day')) return Moon;
+
+    // Fallback to Protocol Type
+    switch (type) {
+        case 'MAIN_LIFT': return Zap;
+        case 'ACCESSORY': return Activity;
+        case 'CARDIO': return HeartPulse;
+        case 'REST': return Moon;
+        default: return Target;
+    }
+};
 
 // Animation Variants
 const container = {
@@ -179,9 +203,9 @@ export default function WorkoutPage() {
                 <header className="space-y-4">
                     <div className="flex items-center gap-2 text-primary">
                         <HeartPulse size={16} className="animate-pulse" />
-                        <span className="text-[10px] font-bold uppercase tracking-[0.3em]">Live Pulse Session</span>
+                        <span className="text-[10px] font-bold uppercase tracking-[0.4em] opacity-60">Live Pulse Session</span>
                     </div>
-                    <h1 className="font-serif text-6xl md:text-8xl text-stone-900 leading-[0.9]">{todaysWorkout?.title}</h1>
+                    <h1 className="font-serif text-6xl md:text-8xl text-stone-900 leading-[0.85] tracking-tight">{todaysWorkout?.title}</h1>
                     <p className="text-stone-500 text-xl font-light italic max-w-2xl">
                         Calibrate your output. Maintain the protocol's intensity spectrum.
                     </p>
@@ -189,83 +213,95 @@ export default function WorkoutPage() {
 
                 {/* Workout Cards */}
                 <div className="space-y-8">
-                    {segments.map((segment, idx) => (
-                        <motion.div
-                            key={idx}
-                            variants={item}
-                            className="group bg-white/70 backdrop-blur-xl border border-black/[0.03] hover:border-black/10 rounded-[40px] p-10 transition-all duration-300 shadow-xl shadow-black/5 overflow-hidden relative"
-                        >
-                            <div className="absolute top-0 left-0 w-1 h-full bg-primary opacity-20" />
+                    {segments.map((segment, idx) => {
+                        const Icon = getSegmentIcon(segment.type, segment.name, actualDayName, profile?.current_phase);
+                        return (
+                            <TiltCard
+                                key={idx}
+                                glowColor={segment.type === 'MAIN_LIFT' ? "shadow-primary/10" : "shadow-stone-900/5"}
+                                className="group rounded-[48px] p-10 overflow-hidden"
+                            >
+                                {/* Background Icon Watermark */}
+                                <div className={`absolute -right-12 -bottom-12 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity duration-300 pointer-events-none ${segment.type === 'MAIN_LIFT' ? 'text-primary' : 'text-stone-300'}`} style={{ willChange: 'opacity' }}>
+                                    <Icon size={180} strokeWidth={1} />
+                                </div>
 
-                            <div className="flex flex-col md:flex-row md:items-start justify-between gap-10">
-                                <div className="flex-1 space-y-6">
-                                    <div className="flex items-center gap-4">
-                                        <div className="flex gap-2">
-                                            <span className={`px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest ${segment.type === 'MAIN_LIFT' ? 'bg-primary/5 text-primary' : 'bg-stone-100 text-stone-400'
+                                <div className="flex flex-col md:flex-row md:items-start justify-between gap-10 relative z-10">
+                                    <div className="flex-1 space-y-8">
+                                        <div className="flex items-center gap-4">
+                                            <span className={`px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all ${segment.type === 'MAIN_LIFT' ? 'bg-primary/5 text-primary' : 'bg-stone-100 text-stone-400'
                                                 }`}>
                                                 {segment.type}
                                             </span>
-                                        </div>
-                                        <h2 className="font-serif text-3xl text-stone-900 italic">
-                                            {segment.name}
-                                        </h2>
-                                        <span id={`status-${idx}`} className="text-emerald-500 hidden"><CheckCircle size={24} /></span>
-                                    </div>
-
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                        <div className="space-y-3">
-                                            {segment.target?.sets && (
-                                                <div className="flex items-center gap-3 text-stone-900">
-                                                    <Target size={18} className="text-stone-300" />
-                                                    <span className="font-serif text-2xl italic">{segment.target.sets} sets <span className="text-stone-300 font-sans text-lg not-italic">×</span> {segment.target.reps} reps</span>
-                                                </div>
-                                            )}
-                                            {segment.target?.percent_1rm && (
-                                                <div className="flex items-center gap-3">
-                                                    <Zap size={18} className="text-primary/40" />
-                                                    <span className="text-stone-500 text-lg font-light">
-                                                        Load: <span className="font-serif text-2xl text-stone-900 italic">{calcWeight(segment.name, segment.target.percent_1rm)}lb</span>
-                                                        <span className="text-[10px] font-bold uppercase tracking-widest text-primary/50 ml-3">@{segment.target.percent_1rm * 100}%</span>
-                                                    </span>
-                                                </div>
-                                            )}
+                                            <h2 className="font-serif text-4xl text-stone-900 tracking-tight italic">
+                                                {segment.name}
+                                            </h2>
+                                            <span id={`status-${idx}`} className="text-emerald-500 hidden drop-shadow-[0_0_15px_rgba(16,185,129,0.3)]">
+                                                <CheckCircle size={32} />
+                                            </span>
                                         </div>
 
-                                        {segment.details && (
-                                            <div className="bg-stone-50/50 rounded-2xl p-6 border border-black/[0.01]">
-                                                <p className="text-stone-400 text-sm leading-relaxed italic">
-                                                    "{segment.details}"
-                                                </p>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                            <div className="space-y-5">
+                                                {segment.target?.sets && (
+                                                    <div className="flex items-center gap-4 text-stone-900">
+                                                        <div className="w-12 h-12 rounded-2xl bg-stone-50 border border-black/[0.03] flex items-center justify-center text-stone-300 transition-transform duration-200 group-hover:scale-105">
+                                                            <Target size={20} />
+                                                        </div>
+                                                        <span className="font-serif text-3xl italic tracking-tight">
+                                                            {segment.target.sets} <span className="text-stone-400 font-sans text-sm not-italic uppercase tracking-widest font-bold mx-1">sets of</span> {segment.target.reps}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                                {segment.target?.percent_1rm && (
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="w-12 h-12 rounded-2xl bg-primary/5 border border-primary/10 flex items-center justify-center text-primary transition-transform duration-200 group-hover:scale-105">
+                                                            <Zap size={20} />
+                                                        </div>
+                                                        <span className="text-stone-500 text-xl font-light">
+                                                            Load: <span className="font-serif text-3xl text-stone-900 italic tracking-tight">{calcWeight(segment.name, segment.target.percent_1rm)}lb</span>
+                                                            <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-primary/40 ml-4">@{segment.target.percent_1rm * 100}%</span>
+                                                        </span>
+                                                    </div>
+                                                )}
                                             </div>
+
+                                            {segment.details && (
+                                                <div className="bg-stone-50/70 rounded-[32px] p-6 border border-black/[0.02] transition-colors duration-200 group-hover:bg-white/70">
+                                                    <p className="text-stone-400 text-sm leading-relaxed italic">
+                                                        "{segment.details}"
+                                                    </p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="w-full md:w-auto flex items-center justify-end">
+                                        {segment.tracking_mode === 'CHECKBOX' && (
+                                            <button
+                                                onClick={() => logSegment(segment, idx, { completed: true })}
+                                                className="h-24 w-24 rounded-[32px] bg-primary/5 border border-primary/10 flex items-center justify-center hover:bg-primary hover:text-white transition-colors duration-200 btn-pro hover:shadow-primary/30 group/btn"
+                                            >
+                                                <CheckCircle size={36} className="transition-transform group-hover/btn:scale-110 group-hover/btn:rotate-6" />
+                                            </button>
                                         )}
+                                        {segment.tracking_mode === 'STRENGTH_SETS' && <LogStrengthSets segment={segment} idx={idx} onLog={logSegment} />}
+                                        {segment.tracking_mode === 'METCON' && <LogMetcon segment={segment} idx={idx} onLog={logSegment} />}
+                                        {segment.tracking_mode === 'CARDIO_BASIC' && <LogCardioBasic segment={segment} idx={idx} onLog={logSegment} />}
                                     </div>
                                 </div>
-
-                                <div className="w-full md:w-auto flex items-center justify-end">
-                                    {segment.tracking_mode === 'CHECKBOX' && (
-                                        <button
-                                            onClick={() => logSegment(segment, idx, { completed: true })}
-                                            className="h-20 w-20 rounded-3xl bg-primary/5 border border-primary/10 flex items-center justify-center hover:bg-primary hover:text-white transition-all group-hover:scale-105 group-hover:rotate-3"
-                                        >
-                                            <CheckCircle size={32} />
-                                        </button>
-                                    )}
-                                    {segment.tracking_mode === 'STRENGTH_SETS' && <LogStrengthSets segment={segment} idx={idx} onLog={logSegment} />}
-                                    {segment.tracking_mode === 'METCON' && <LogMetcon segment={segment} idx={idx} onLog={logSegment} />}
-                                    {segment.tracking_mode === 'CARDIO_BASIC' && <LogCardioBasic segment={segment} idx={idx} onLog={logSegment} />}
-                                </div>
-                            </div>
-                        </motion.div>
-                    ))}
+                            </TiltCard>
+                        );
+                    })}
                 </div>
 
                 <motion.button
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                     onClick={() => setShowPostFlight(true)}
-                    className="w-full py-8 rounded-[40px] bg-stone-900 text-white text-2xl font-serif italic flex items-center justify-center gap-6 shadow-2xl transition-all hover:bg-primary"
+                    className="w-full py-10 rounded-[48px] bg-stone-900 text-white text-3xl font-serif italic flex items-center justify-center gap-6 shadow-2xl transition-all btn-pro hover:bg-primary hover:shadow-primary/30"
                 >
-                    Complete Pulse Sequence <ArrowRight size={24} />
+                    Complete Pulse Sequence <ArrowRight size={28} />
                 </motion.button>
             </motion.div>
         </div>
