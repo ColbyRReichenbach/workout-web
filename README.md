@@ -1,54 +1,68 @@
-# Pulse: The Hybrid Athlete Performance Tracker
+# Pulse
 
-Pulse is a high-performance web application designed for the modern hybrid athlete—those who balance elite-level strength with superior aerobic endurance. Built with a focus on precision tracking, biometric correlation, and progressive overload, Pulse transforms fragmented workout data into a unified performance baseline.
+A performance-focused workout tracking application built for hybrid athletes. Currently in active personal use with a production-ready architecture.
 
-## ⚡ Core Philosophy
-Elite performance is a byproduct of precision. Pulse is engineered to validate training stimuli through:
-- **Biometric Correlation:** Integrates sleep, HRV, and readiness metrics (HealthKit) with session output.
-- **Adaptive Progression:** Respects the current training phase (Structural Integrity, Strength/Threshold, Peak Power).
-- **Density Tracking:** Monitors Metcon rounds/reps and interval splits to measure work capacity over time.
+## Overview
 
-## 🛠 Tech Stack
-- **Frontend:** [Next.js 15+](https://nextjs.org/) (App Router, React 19)
-- **Styling:** [Tailwind CSS](https://tailwindcss.com/) with a custom Glassmorphic Design System
-- **Backend/DB:** [Supabase](https://supabase.com/) (PostgreSQL, Realtime, RLS)
-- **State/Animations:** [Framer Motion](https://www.framer.com/motion/)
-- **Icons:** [Lucide React](https://lucide.dev/)
+Pulse tracks strength training, conditioning, and recovery data through an integrated dashboard. It correlates biometric inputs (sleep, HRV, readiness) with session output to surface actionable insights over multi-phase training blocks.
 
-## 📈 Architecture & Logic
-The project follows a strict relational architecture to handle multi-dimensional athlete data:
-- `workout_sessions`: Consolidated mission headers for daily protocols.
-- `logs`: High-resolution performance data (split-times, set-by-set load, RPE).
-- `sleep_logs`: HealthKit-derived recovery intelligence.
-- `readiness_logs`: AI-driven athlete readiness scoring.
+**Live Demo:** [pulse-workout.vercel.app](https://pulse-workout.vercel.app)
 
-## 🚀 Getting Started
+## Tech Stack
 
-### Prerequisites
-- Node.js 20+
-- Supabase Project & API Keys
+| Layer | Technology |
+|-------|------------|
+| Framework | Next.js 15 (App Router) |
+| Database | Supabase (PostgreSQL + RLS) |
+| Styling | Tailwind CSS |
+| Animations | Framer Motion |
+| Auth | Supabase Auth (OAuth, Email) |
 
-### Installation
-1. Clone the repository
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-3. Configure environment variables in `.env.local`:
-   ```env
-   NEXT_PUBLIC_SUPABASE_URL=your_url
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_key
-   ```
-4. Start the engine:
-   ```bash
-   npm run dev
-   ```
+## Features
 
-## 📄 Documentation
-Detailed guides are available in the `/docs` directory:
-- [Routine Master Plan](./docs/routine_master_plan.md): The training blueprint.
-- [Tracking Specification](./docs/tracked.md): Biometric and performance data definitions.
-- [Technical Roadmap](./docs/product_roadmap.md): The path to V1.0.
+- **Phase-aware programming** — Supports periodized training blocks (Structural, Strength, Peak)
+- **Biometric integration** — Correlates HealthKit sleep/HRV data with performance
+- **Session logging** — Set-by-set tracking with RPE, load, and volume calculations
+- **Analytics dashboard** — Tonnage trends, PR proximity, recovery index visualization
+- **AI Coach** — Contextual guidance based on current phase and biometric state
 
----
-**The resistance you face today is the foundation of the strength you reveal tomorrow.**
+## Local Development
+
+```bash
+# Install dependencies
+npm install
+
+# Configure environment
+cp .env.example .env.local
+# Add your Supabase URL and anon key
+
+# Start development server
+npm run dev
+```
+
+Requires Node.js 20+ and a Supabase project.
+
+## Architecture
+
+```
+src/
+├── app/                # Next.js App Router pages
+│   ├── (dashboard)/    # Authenticated routes
+│   └── actions/        # Server actions
+├── components/         # Reusable UI components
+├── lib/                # Types, utilities
+└── utils/              # Supabase client config
+```
+
+Database schema follows a relational model with Row-Level Security policies for multi-user scalability.
+
+## Roadmap
+
+- [ ] Apple Watch companion app
+- [ ] Multi-user team features
+- [ ] Advanced periodization templates
+- [ ] Export/reporting functionality
+
+## License
+
+MIT
