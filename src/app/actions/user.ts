@@ -49,9 +49,11 @@ export async function updateOnboardingData(formData: FormData) {
     const aiName = formData.get('ai_name') as string
     const aiPersonality = formData.get('ai_personality') as string
 
+    // Use upsert to create profile for new OAuth users or update existing
     const { error } = await supabase
         .from('profiles')
-        .update({
+        .upsert({
+            id: user.id,
             full_name: fullName,
             height,
             weight_lbs: weightLbs,
@@ -63,8 +65,7 @@ export async function updateOnboardingData(formData: FormData) {
             ai_personality: aiPersonality,
             current_week: 1,
             current_phase: 1
-        })
-        .eq('id', user.id)
+        }, { onConflict: 'id' })
 
     if (error) {
         console.error('Error updating profile:', error)

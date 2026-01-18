@@ -11,12 +11,43 @@ export default function OnboardingPage() {
     const [isGuest, setIsGuest] = useState(false);
     const [units, setUnits] = useState<"imperial" | "metric">("imperial");
 
+    // Form data state - persisted across all steps
+    const [formState, setFormState] = useState({
+        full_name: "",
+        height_ft: "",
+        height_in: "",
+        height_cm: "",
+        weight: "",
+        squat_max: "",
+        bench_max: "",
+        deadlift_max: "",
+        ai_name: "",
+        ai_personality: "Clinical"
+    });
+
+    const updateField = (field: string, value: string) => {
+        setFormState(prev => ({ ...prev, [field]: value }));
+    };
+
     useEffect(() => {
         const checkGuest = () => {
             if (typeof document !== "undefined") {
                 setIsGuest(document.cookie.includes("guest-mode=true"));
                 if (document.cookie.includes("guest-mode=true")) {
                     setUnits("imperial");
+                    // Set default values for guest
+                    setFormState({
+                        full_name: "Colby Reichenbach",
+                        height_ft: "6",
+                        height_in: "2",
+                        height_cm: "",
+                        weight: "195",
+                        squat_max: "345",
+                        bench_max: "245",
+                        deadlift_max: "405",
+                        ai_name: "ECHO-P1",
+                        ai_personality: "Stoic"
+                    });
                 }
             }
         };
@@ -65,10 +96,32 @@ export default function OnboardingPage() {
                     ))}
                 </div>
 
-                <form action={async (formData) => {
-                    await updateOnboardingData(formData);
-                }} className="relative">
+                <form
+                    onSubmit={async (e) => {
+                        e.preventDefault();
+                        // Only allow form submission on final step
+                        if (step !== 5) {
+                            return;
+                        }
+                        // On step 5, let the server action handle it
+                        const formData = new FormData(e.currentTarget);
+                        await updateOnboardingData(formData);
+                    }}
+                    className="relative"
+                >
+                    {/* Hidden inputs to persist all form data across steps */}
                     <input type="hidden" name="units" value={units} />
+                    <input type="hidden" name="full_name" value={formState.full_name} />
+                    <input type="hidden" name="height_ft" value={formState.height_ft} />
+                    <input type="hidden" name="height_in" value={formState.height_in} />
+                    <input type="hidden" name="height_cm" value={formState.height_cm} />
+                    <input type="hidden" name="weight" value={formState.weight} />
+                    <input type="hidden" name="squat_max" value={formState.squat_max} />
+                    <input type="hidden" name="bench_max" value={formState.bench_max} />
+                    <input type="hidden" name="deadlift_max" value={formState.deadlift_max} />
+                    <input type="hidden" name="ai_name" value={formState.ai_name} />
+                    <input type="hidden" name="ai_personality" value={formState.ai_personality} />
+
                     <AnimatePresence mode="wait">
 
                         {/* STEP 1: IDENTITY */}
@@ -97,14 +150,21 @@ export default function OnboardingPage() {
                                     <div className="flex-1">
                                         <label className="text-[10px] uppercase font-bold text-stone-400 tracking-[0.3em] block mb-2">Athlete Designation</label>
                                         <input
-                                            name="full_name"
                                             type="text"
                                             placeholder="Enter your name"
-                                            defaultValue={isGuest ? "Colby Reichenbach" : ""}
+                                            value={formState.full_name}
+                                            onChange={(e) => updateField('full_name', e.target.value)}
                                             readOnly={isGuest}
                                             className="w-full bg-transparent text-3xl font-serif text-stone-900 outline-none placeholder:text-stone-200"
                                             autoFocus
-                                            required
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    e.preventDefault();
+                                                    if (formState.full_name.trim()) {
+                                                        setStep(2);
+                                                    }
+                                                }
+                                            }}
                                         />
                                     </div>
                                 </div>
@@ -206,10 +266,10 @@ export default function OnboardingPage() {
                                                 <div className="flex items-baseline gap-4">
                                                     <div className="flex items-baseline gap-2">
                                                         <input
-                                                            name="height_ft"
                                                             type="number"
                                                             placeholder="6"
-                                                            defaultValue={isGuest ? "6" : ""}
+                                                            value={formState.height_ft}
+                                                            onChange={(e) => updateField('height_ft', e.target.value)}
                                                             readOnly={isGuest}
                                                             className="w-12 bg-transparent text-3xl font-serif text-stone-900 outline-none placeholder:text-stone-200"
                                                         />
@@ -217,10 +277,10 @@ export default function OnboardingPage() {
                                                     </div>
                                                     <div className="flex items-baseline gap-2">
                                                         <input
-                                                            name="height_in"
                                                             type="number"
                                                             placeholder="2"
-                                                            defaultValue={isGuest ? "2" : ""}
+                                                            value={formState.height_in}
+                                                            onChange={(e) => updateField('height_in', e.target.value)}
                                                             readOnly={isGuest}
                                                             className="w-12 bg-transparent text-3xl font-serif text-stone-900 outline-none placeholder:text-stone-200"
                                                         />
@@ -229,10 +289,10 @@ export default function OnboardingPage() {
                                                 </div>
                                             ) : (
                                                 <input
-                                                    name="height_cm"
                                                     type="number"
                                                     placeholder="188"
-                                                    defaultValue={isGuest ? "188" : ""}
+                                                    value={formState.height_cm}
+                                                    onChange={(e) => updateField('height_cm', e.target.value)}
                                                     readOnly={isGuest}
                                                     className="w-full bg-transparent text-3xl font-serif text-stone-900 outline-none placeholder:text-stone-200"
                                                 />
@@ -250,13 +310,12 @@ export default function OnboardingPage() {
                                                 Weight ({units === 'imperial' ? 'lbs' : 'kg'})
                                             </label>
                                             <input
-                                                name="weight"
                                                 type="number"
                                                 placeholder={units === 'imperial' ? "195" : "88"}
-                                                defaultValue={isGuest ? (units === 'imperial' ? 195 : 88) : ""}
+                                                value={formState.weight}
+                                                onChange={(e) => updateField('weight', e.target.value)}
                                                 readOnly={isGuest}
                                                 className="w-full bg-transparent text-3xl font-serif text-stone-900 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none placeholder:text-stone-200"
-                                                required
                                             />
                                         </div>
                                     </div>
@@ -288,9 +347,9 @@ export default function OnboardingPage() {
 
                                 <div className="grid grid-cols-1 gap-4">
                                     {[
-                                        { key: 'squat_max', label: 'Back Squat', value: 405 },
-                                        { key: 'bench_max', label: 'Bench Press', value: 315 },
-                                        { key: 'deadlift_max', label: 'Deadlift', value: 495 }
+                                        { key: 'squat_max', label: 'Back Squat' },
+                                        { key: 'bench_max', label: 'Bench Press' },
+                                        { key: 'deadlift_max', label: 'Deadlift' }
                                     ].map((field) => (
                                         <div key={field.key} className="bg-white p-8 rounded-[40px] shadow-sm border border-black/[0.03] group transition-all flex items-center gap-6">
                                             <div className="w-14 h-14 bg-stone-50 text-rose-500 rounded-2xl flex items-center justify-center shrink-0">
@@ -299,13 +358,12 @@ export default function OnboardingPage() {
                                             <div className="flex-1">
                                                 <label className="text-[10px] uppercase font-bold text-stone-400 tracking-[0.3em] block mb-1">{field.label} ({units === 'imperial' ? 'lbs' : 'kg'})</label>
                                                 <input
-                                                    name={field.key}
                                                     type="number"
                                                     placeholder="0"
-                                                    defaultValue={isGuest ? (units === 'imperial' ? field.value : Math.round(field.value * 0.453592)) : ""}
+                                                    value={formState[field.key as keyof typeof formState]}
+                                                    onChange={(e) => updateField(field.key, e.target.value)}
                                                     readOnly={isGuest}
                                                     className="w-full bg-transparent text-3xl font-serif text-stone-900 outline-none placeholder:text-stone-200"
-                                                    required
                                                 />
                                             </div>
                                         </div>
@@ -344,13 +402,12 @@ export default function OnboardingPage() {
                                         <div className="flex-1">
                                             <label className="text-[10px] uppercase font-bold text-stone-400 tracking-[0.3em] block mb-1">Agent Designation</label>
                                             <input
-                                                name="ai_name"
                                                 type="text"
                                                 placeholder="e.g. ECHO-P1"
-                                                defaultValue={isGuest ? "ECHO-P1" : ""}
+                                                value={formState.ai_name}
+                                                onChange={(e) => updateField('ai_name', e.target.value)}
                                                 readOnly={isGuest}
                                                 className="w-full bg-transparent text-3xl font-serif text-stone-900 outline-none placeholder:text-stone-200"
-                                                required
                                             />
                                         </div>
                                     </div>
@@ -361,18 +418,17 @@ export default function OnboardingPage() {
                                             {['Stoic', 'Motivational', 'Clinical', 'Direct'].map((persona) => (
                                                 <label key={persona} className={`
                                                     p-6 rounded-[28px] border transition-all cursor-pointer flex items-center justify-center gap-3
-                                                    has-[:checked]:bg-rose-600 has-[:checked]:border-rose-600 has-[:checked]:text-white
+                                                    ${formState.ai_personality === persona ? 'bg-rose-600 border-rose-600 text-white' : 'bg-white border-black/[0.03]'}
                                                     active:outline-none focus-within:ring-2 focus-within:ring-rose-500/20
-                                                    ${isGuest ? 'cursor-default' : 'hover:border-rose-500/20 bg-white'}
+                                                    ${isGuest ? 'cursor-default' : 'hover:border-rose-500/20'}
                                                 `}>
                                                     <input
                                                         type="radio"
-                                                        name="ai_personality"
                                                         value={persona}
                                                         className="peer sr-only"
-                                                        defaultChecked={isGuest ? persona === 'Stoic' : persona === 'Clinical'}
+                                                        checked={formState.ai_personality === persona}
+                                                        onChange={() => updateField('ai_personality', persona)}
                                                         disabled={isGuest}
-                                                        required
                                                     />
                                                     <Sparkles size={16} className="opacity-40" />
                                                     <span className="text-sm font-bold uppercase tracking-widest">{persona}</span>

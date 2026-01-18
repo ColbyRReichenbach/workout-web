@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/client";
+import { createClient } from "@/utils/supabase/client";
 
 export interface UserSettings {
     id: string;

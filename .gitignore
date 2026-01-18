@@ -1,50 +1,258 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# ============================================================================
+# PULSE TRACKER - Git Ignore Configuration
+# ============================================================================
+# 
+# This file specifies files and directories that should NOT be committed.
+# Security-sensitive files are explicitly listed at the top.
+#
+# Last Updated: 2026-01-18
+# ============================================================================
 
-# dependencies
-/node_modules
-/.pnp
-.pnp.*
+
+# ============================================================================
+# 🔒 SECURITY CRITICAL - NEVER COMMIT
+# ============================================================================
+
+# Environment files with secrets
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+.env.staging
+*.env
+
+# Private keys and certificates
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+*.der
+*.jks
+*.keystore
+
+# API keys, tokens, and credentials
+**/credentials.json
+**/secrets.json
+**/config.secret.*
+*.credentials
+.npmrc
+.yarnrc
+
+# Supabase service role key (if stored locally)
+supabase/.env
+
+
+# ============================================================================
+# 📦 DEPENDENCIES
+# ============================================================================
+
+node_modules/
+.pnp
+.pnp.js
+.pnp.cjs
 .yarn/*
 !.yarn/patches
 !.yarn/plugins
 !.yarn/releases
+!.yarn/sdks
 !.yarn/versions
 
-# testing
-/coverage
+# Package manager locks (keep package-lock.json for reproducibility)
+yarn.lock
+pnpm-lock.yaml
+bun.lockb
 
-# next.js
-/.next/
-/out/
 
-# production
-/build
+# ============================================================================
+# 🏗️ BUILD OUTPUT
+# ============================================================================
 
-# misc
+# Next.js
+.next/
+out/
+build/
+dist/
+
+# Turbopack
+.turbo/
+
+# Vercel
+.vercel/
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+
+# ============================================================================
+# 🧪 TESTING & COVERAGE
+# ============================================================================
+
+coverage/
+.nyc_output/
+*.lcov
+test-results/
+playwright-report/
+playwright/.cache/
+
+
+# ============================================================================
+# 🛠️ DEVELOPMENT & IDE
+# ============================================================================
+
+# macOS
 .DS_Store
-*.pem
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
 
-# debug
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux
+*~
+
+# IDEs and editors
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json.example
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+*.swn
+
+# Vim
+[._]*.s[a-v][a-z]
+[._]*.sw[a-p]
+[._]s[a-rt-v][a-z]
+[._]ss[a-gi-z]
+[._]sw[a-p]
+
+
+# ============================================================================
+# 📝 LOGS & DEBUG
+# ============================================================================
+
+logs/
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-.pnpm-debug.log*
+pnpm-debug.log*
+lerna-debug.log*
 
-# internal resources
-/docs/
-/supabase/migrations/
-/scripts/
 
-# env files (can opt-in for committing if needed)
-.env*
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+# ============================================================================
+# 🗄️ LOCAL DATA & CACHE
+# ============================================================================
 
-# vercel
-.vercel
+# Local database files
+*.db
+*.sqlite
+*.sqlite3
 
-# typescript
-*.tsbuildinfo
-next-env.d.ts
+# Cache directories
+.cache/
+.parcel-cache/
+.eslintcache/
+.stylelintcache/
+*.cache
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+
+# ============================================================================
+# 📊 INTERNAL DOCUMENTATION (Keep routine_master_plan.md!)
+# ============================================================================
+
+# Development-only docs (not needed in production)
+docs/analytics_implementation.md
+docs/how_to.md
+docs/implementation_plan.md
+docs/oauth_setup.md
+docs/product_roadmap.md
+docs/security_implementation.md
+docs/tracked.md
+docs/visual_technical_strategy.md
+docs/workflow_c_ai_coach.md
+docs/pre-deployment.md
+
+# DO NOT ignore routine_master_plan.md - it's needed for the AI coach!
+
+
+# ============================================================================
+# 🗃️ DATABASE SEED & MIGRATION SCRIPTS (Local only)
+# ============================================================================
+
+# SQL seed data (large files, local development only)
+scripts/
+supabase/migrations/
+
+# Exception: Keep migration files if using supabase CLI
+# !supabase/migrations/*.sql
+
+
+# ============================================================================
+# 📱 MOBILE / NATIVE (if applicable)
+# ============================================================================
+
+# iOS
+*.xcworkspace
+*.xcuserdata
+Pods/
+DerivedData/
+
+# Android
+*.apk
+*.aab
+*.dex
+.gradle/
+local.properties
+
+
+# ============================================================================
+# 🔍 ANALYTICS & MONITORING
+# ============================================================================
+
+# Sentry
+.sentryclirc
+
+
+# ============================================================================
+# 📋 MISCELLANEOUS
+# ============================================================================
+
+# Downloaded files
+*.download
+*.part
+
+# Compressed files (usually not source code)
+*.7z
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+*.zip
+
+# Exception for intentional archives
+!public/*.zip
+
+
+# ============================================================================
+# END OF GITIGNORE
+# ============================================================================

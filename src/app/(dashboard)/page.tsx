@@ -45,18 +45,22 @@ export default function Home() {
       const supabase = createClient();
 
       // Fetch Profile
-      const { data: profile } = await supabase.from('profiles').select('current_week, current_phase, height, weight_lbs').single();
+      const { data: profile, error: profileError } = await supabase.from('profiles').select('current_week, current_phase, height, weight_lbs').single();
 
-      if (profile) {
-        // Redirect to onboarding if profile incomplete
-        if (!profile.height || !profile.weight_lbs) {
-          router.push('/onboarding');
-          return;
-        }
-
-        setCurrentWeek(profile.current_week || 1);
-        setCurrentPhase(profile.current_phase || 1);
+      // If no profile exists (new user from OAuth), redirect to onboarding
+      if (!profile || profileError) {
+        router.push('/onboarding');
+        return;
       }
+
+      // If profile exists but is incomplete, also redirect to onboarding
+      if (!profile.height || !profile.weight_lbs) {
+        router.push('/onboarding');
+        return;
+      }
+
+      setCurrentWeek(profile.current_week || 1);
+      setCurrentPhase(profile.current_phase || 1);
 
       // Fetch Library to get titles for the week
       const { data: library } = await supabase.from('workout_library').select('program_data').single();
