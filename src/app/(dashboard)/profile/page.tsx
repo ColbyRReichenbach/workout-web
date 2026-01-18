@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { createClient } from "@/utils/supabase/client";
-import { toDisplayWeight, toStorageWeight, normalizeUnit, getUnitLabel } from "@/lib/conversions";
+import { toDisplayWeight, toStorageWeight, getUnitLabel } from "@/lib/conversions";
 import { useEffect, useState } from "react";
 import { Check, Scale, Activity, Zap, User, Target, TrendingUp, HeartPulse } from "lucide-react";
 import { TiltCard } from "@/components/TiltCard";
@@ -101,9 +101,10 @@ export default function ProfilePage() {
             setLoading(false);
         }
         fetchProfile();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // Sync Form with Profile and Units
+    // Sync Form with Profile and Units (eslint-disable needed for controlled form pattern)
     useEffect(() => {
         if (profile) {
             setForm(prev => ({

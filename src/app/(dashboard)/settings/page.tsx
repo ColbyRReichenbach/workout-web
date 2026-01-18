@@ -48,6 +48,7 @@ export default function SettingsPage() {
             }
         }
         fetchSettings();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const updateDB = async (newPrefs: PreferenceState) => {

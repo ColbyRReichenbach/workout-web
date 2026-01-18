@@ -227,7 +227,7 @@ export const PremiumAreaChart = memo(function PremiumAreaChart({
 /**
  * Progression Bar Chart
  */
-export const ProgressionBarChart = memo(function ProgressionBarChart({ data, height = 300, color = "bg-primary", units = "", secondaryUnits = "" }: MultiChartProps) {
+export const ProgressionBarChart = memo(function ProgressionBarChart({ data, height = 300, color = "bg-primary", units = "" }: MultiChartProps) {
     const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
     const { units: systemUnits } = useSettings();
     const displayUnits = units || getUnitLabel(systemUnits, 'weight');
@@ -535,11 +535,12 @@ export const RecoveryIndexChart = memo(function RecoveryIndexChart({ stress, rec
 export const PowerDensityChart = memo(function PowerDensityChart({ data, height = 250 }: { data: { x: number, y: number }[], height?: number }) {
     const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
-    if (data.length === 0) return null;
     const { maxX, maxY } = useMemo(() => ({
         maxX: Math.max(...data.map(d => d.x), 1),
         maxY: Math.max(...data.map(d => d.y), 1)
     }), [data]);
+
+    if (data.length === 0) return null;
 
     return (
         <div className="relative w-full overflow-visible" style={{ height: `${height}px`, willChange: 'transform' }}>

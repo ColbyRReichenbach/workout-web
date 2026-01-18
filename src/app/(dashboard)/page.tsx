@@ -143,7 +143,7 @@ export default function Home() {
     const vol = allLogs.reduce((acc, log) => {
       const pd = log.performance_data || {};
       if (pd.sets && Array.isArray(pd.sets)) {
-        return acc + pd.sets.reduce((sAcc: number, s: any) => sAcc + ((Number(s.weight) || 0) * (Number(s.reps) || 0)), 0);
+        return acc + pd.sets.reduce((sAcc: number, s: { weight?: number; reps?: number }) => sAcc + ((Number(s.weight) || 0) * (Number(s.reps) || 0)), 0);
       }
       return acc + ((Number(pd.weight) || 0) * (Number(pd.reps) || 0));
     }, 0);
