@@ -1,19 +1,68 @@
 "use client";
 
+import { createClient } from "@/utils/supabase/client";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useState } from "react";
 import { Check, Bell, Moon, Globe, Bot, Shield, Sliders, ChevronRight, HeartPulse } from "lucide-react";
 import { TiltCard } from "@/components/TiltCard";
 
 export default function SettingsPage() {
+    const [loading, setLoading] = useState(true);
     const [preferences, setPreferences] = useState({
         aiName: "ECHO-P1",
         aiPersonality: "Stoic",
-        units: "Imperial (lb)",
+        units: "imperial",
         theme: "Pulse Light",
         notifications: true,
         dataPrivacy: "Private"
     });
+
+    const supabase = createClient();
+
+    useEffect(() => {
+        async function fetchSettings() {
+            const { data } = await supabase.from('profiles').select('*').single();
+            if (data) {
+                setPreferences({
+                    aiName: data.ai_name || "ECHO-P1",
+                    aiPersonality: data.ai_personality || "Stoic",
+                    units: data.units || "imperial",
+                    theme: data.theme || "Pulse Light",
+                    notifications: data.notifications_enabled ?? true,
+                    dataPrivacy: data.data_privacy || "Private"
+                });
+            }
+            setLoading(false);
+        }
+        fetchSettings();
+    }, []);
+
+    const updateDB = async (newPrefs: any) => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        await supabase.from('profiles').update({
+            ai_name: newPrefs.aiName,
+            ai_personality: newPrefs.aiPersonality,
+            units: newPrefs.units,
+            theme: newPrefs.theme,
+            notifications_enabled: newPrefs.notifications,
+            data_privacy: newPrefs.dataPrivacy
+        }).eq('id', user.id);
+    };
+
+    const handleToggle = async (key: keyof typeof preferences) => {
+        const newVal = !preferences[key];
+        const newPrefs = { ...preferences, [key]: newVal };
+        setPreferences(newPrefs);
+        await updateDB(newPrefs);
+    };
+
+    const handleSelect = async (key: keyof typeof preferences, value: any) => {
+        const newPrefs = { ...preferences, [key]: value };
+        setPreferences(newPrefs);
+        await updateDB(newPrefs);
+    };
 
     const categories = [
         { id: 'system', label: 'System Configuration', icon: Sliders },
@@ -23,9 +72,7 @@ export default function SettingsPage() {
 
     const [activeCategory, setActiveCategory] = useState('system');
 
-    const handleToggle = (key: keyof typeof preferences) => {
-        setPreferences(prev => ({ ...prev, [key]: !prev[key] }));
-    };
+
 
     return (
         <div className="max-w-7xl mx-auto space-y-16">
@@ -49,8 +96,8 @@ export default function SettingsPage() {
                             key={cat.id}
                             onClick={() => setActiveCategory(cat.id)}
                             className={`w-full flex items-center gap-4 px-8 py-6 rounded-[28px] transition-all border ${activeCategory === cat.id
-                                    ? "bg-white border-black/5 text-stone-900 shadow-xl shadow-black/5"
-                                    : "bg-transparent border-transparent text-stone-400 hover:text-stone-600 hover:bg-black/5"
+                                ? "bg-white border-black/5 text-stone-900 shadow-xl shadow-black/5"
+                                : "bg-transparent border-transparent text-stone-400 hover:text-stone-600 hover:bg-black/5"
                                 }`}
                         >
                             <cat.icon size={22} className={activeCategory === cat.id ? "text-primary" : ""} />
@@ -81,15 +128,25 @@ export default function SettingsPage() {
                                     <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-[0.3em] mb-4">Environment Options</h3>
 
                                     {[
-                                        { label: "Visual Spectrum", val: preferences.theme, icon: Moon, color: "text-red-500", bg: "bg-red-500/5" },
-                                        { label: "Measurement Rhythm", val: preferences.units, icon: Globe, color: "text-orange-500", bg: "bg-orange-500/5" }
+                                        { label: "Visual Spectrum", val: preferences.theme, icon: Moon, color: "text-red-500", bg: "bg-red-500/5", key: 'theme' as const },
+                                        { label: "Measurement Rhythm", val: preferences.units, icon: Globe, color: "text-orange-500", bg: "bg-orange-500/5", key: 'units' as const }
                                     ].map((s) => (
-                                        <div key={s.label} className="flex justify-between items-center group/item cursor-pointer p-6 -m-6 rounded-3xl transition-colors hover:bg-stone-50">
+                                        <div
+                                            key={s.label}
+                                            onClick={() => {
+                                                if (s.key === 'units') {
+                                                    handleSelect('units', preferences.units === 'imperial' ? 'metric' : 'imperial');
+                                                }
+                                            }}
+                                            className="flex justify-between items-center group/item cursor-pointer p-6 -m-6 rounded-3xl transition-colors hover:bg-stone-50"
+                                        >
                                             <div className="flex items-center gap-6">
                                                 <div className={`w-14 h-14 rounded-2xl ${s.bg} flex items-center justify-center ${s.color}`}><s.icon size={28} /></div>
                                                 <div>
                                                     <h3 className="text-2xl font-serif text-stone-900">{s.label}</h3>
-                                                    <p className="text-stone-400 text-sm font-light italic">Standard protocol defaults.</p>
+                                                    <p className="text-stone-400 text-sm font-light italic">
+                                                        {s.key === 'units' ? `Currently using ${preferences.units} baselines.` : "Standard protocol defaults."}
+                                                    </p>
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-3 text-stone-400">
@@ -143,6 +200,7 @@ export default function SettingsPage() {
                                                 type="text"
                                                 value={preferences.aiName}
                                                 onChange={(e) => setPreferences({ ...preferences, aiName: e.target.value })}
+                                                onBlur={() => updateDB(preferences)}
                                                 className="w-full bg-stone-50 border border-black/[0.02] rounded-3xl px-6 py-5 text-2xl font-serif text-stone-900 focus:outline-none focus:ring-4 focus:ring-primary/5"
                                             />
                                         </div>
@@ -153,10 +211,10 @@ export default function SettingsPage() {
                                                 {['Motivational', 'Stoic', 'Clinical', 'Direct'].map(p => (
                                                     <button
                                                         key={p}
-                                                        onClick={() => setPreferences({ ...preferences, aiPersonality: p })}
+                                                        onClick={() => handleSelect('aiPersonality', p)}
                                                         className={`py-4 rounded-2xl text-[10px] font-bold uppercase tracking-[0.2em] transition-all border ${preferences.aiPersonality === p
-                                                                ? "bg-primary border-primary text-white shadow-2xl shadow-primary/30"
-                                                                : "bg-white border-black/5 text-stone-400 hover:border-black/20"
+                                                            ? "bg-primary border-primary text-white shadow-2xl shadow-primary/30"
+                                                            : "bg-white border-black/5 text-stone-400 hover:border-black/20"
                                                             }`}
                                                     >
                                                         {p}

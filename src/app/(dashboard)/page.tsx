@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import AiCoach from "@/components/AiCoach";
 import { DayCard, DayDetailModal } from "@/components/WeeklySchedule";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
@@ -23,6 +24,7 @@ const weeklyTemplate = [
 ];
 
 export default function Home() {
+  const router = useRouter();
   const [currentWeek, setCurrentWeek] = useState(1);
   const [currentPhase, setCurrentPhase] = useState(1);
   const [completedDays, setCompletedDays] = useState<Set<string>>(new Set());
@@ -42,8 +44,15 @@ export default function Home() {
       const supabase = createClient();
 
       // Fetch Profile
-      const { data: profile } = await supabase.from('profiles').select('current_week, current_phase').single();
+      const { data: profile } = await supabase.from('profiles').select('current_week, current_phase, height, weight_lbs').single();
+
       if (profile) {
+        // Redirect to onboarding if profile incomplete
+        if (!profile.height || !profile.weight_lbs) {
+          router.push('/onboarding');
+          return;
+        }
+
         setCurrentWeek(profile.current_week || 1);
         setCurrentPhase(profile.current_phase || 1);
       }

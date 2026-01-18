@@ -7,7 +7,7 @@ import { createClient } from "@/utils/supabase/client";
 import { useEffect, useState } from "react";
 import { ProgramData, WorkoutSegment } from "@/lib/types";
 
-import { PreFlightModal, PostFlightModal } from "@/components/FlightModals";
+import { PostFlightModal } from "@/components/FlightModals";
 import PrCelebration from "@/components/PrCelebration";
 
 // Animation Variants
@@ -37,7 +37,6 @@ export default function WorkoutPage() {
     const [actualDayName, setActualDayName] = useState("");
 
     // Flight State
-    const [showPreFlight, setShowPreFlight] = useState(true);
     const [showPostFlight, setShowPostFlight] = useState(false);
     const [sessionData, setSessionData] = useState<any>({});
 
@@ -86,17 +85,10 @@ export default function WorkoutPage() {
         fetchData();
     }, []);
 
-    const handlePreFlightReady = (data: any) => {
-        setSessionData({ ...sessionData, ...data });
-        setShowPreFlight(false);
-    };
-
     const handleFinishWorkout = async (data: any) => {
         const fullSession = { ...sessionData, ...data };
         const supabase = createClient();
         const { error } = await supabase.from('session_logs').insert({
-            sleep_hours: fullSession.sleep,
-            soreness: fullSession.soreness,
             session_rpe: fullSession.rpe,
             notes: fullSession.notes,
             tags: fullSession.tags
@@ -173,7 +165,6 @@ export default function WorkoutPage() {
 
     return (
         <div className="max-w-5xl mx-auto space-y-16 pb-32">
-            <PreFlightModal isOpen={showPreFlight} onClose={() => setShowPreFlight(false)} onReady={handlePreFlightReady} />
             <PostFlightModal isOpen={showPostFlight} onClose={() => setShowPostFlight(false)} onFinish={handleFinishWorkout} />
 
             <PrCelebration

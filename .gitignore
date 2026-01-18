@@ -32,6 +32,16 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# large data / scripts
+/scripts/*.sql
+/scripts/*.json
+!/scripts/execute_sql_file.js
+!/scripts/synthesize_data.js
 
 # vercel
 .vercel

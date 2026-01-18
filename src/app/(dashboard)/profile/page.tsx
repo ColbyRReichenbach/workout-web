@@ -5,6 +5,7 @@ import { createClient } from "@/utils/supabase/client";
 import { useEffect, useState } from "react";
 import { Check, Dumbbell, Scale, Activity, Zap, User, Target, TrendingUp, HeartPulse } from "lucide-react";
 import { TiltCard } from "@/components/TiltCard";
+import { logout } from "@/app/actions/auth";
 
 const PHASE_RANGES = {
     1: { min: 1, max: 8, label: "Structural Integrity" },
@@ -63,12 +64,15 @@ export default function ProfilePage() {
                 .single();
 
             if (data) {
+                const isMetric = data.units === 'metric';
+                const lbToKg = (lbs: number | null) => isMetric && lbs ? Math.round(lbs / 2.20462) : lbs;
+
                 setProfile(data);
                 setForm({
-                    weight_lbs: data.weight_lbs?.toString() || "",
-                    squat_max: data.squat_max?.toString() || "",
-                    bench_max: data.bench_max?.toString() || "",
-                    deadlift_max: data.deadlift_max?.toString() || "",
+                    weight_lbs: lbToKg(data.weight_lbs)?.toString() || "",
+                    squat_max: lbToKg(data.squat_max)?.toString() || "",
+                    bench_max: lbToKg(data.bench_max)?.toString() || "",
+                    deadlift_max: lbToKg(data.deadlift_max)?.toString() || "",
                     mile_time: secondsToTime(data.mile_time_sec),
                     k5_time: secondsToTime(data.k5_time_sec),
                     sprint_400m: secondsToTime(data.sprint_400m_sec),
@@ -89,11 +93,15 @@ export default function ProfilePage() {
 
         setLoading(true);
 
+        const isMetric = profile?.units === 'metric';
+        const lbToKg = (lbs: number | null) => isMetric && lbs ? Math.round(lbs / 2.20462) : lbs;
+        const kgToLb = (kg: number | null) => isMetric && kg ? Math.round(kg * 2.20462) : kg;
+
         const updateData = {
-            weight_lbs: parseFloat(form.weight_lbs) || null,
-            squat_max: parseFloat(form.squat_max) || null,
-            bench_max: parseFloat(form.bench_max) || null,
-            deadlift_max: parseFloat(form.deadlift_max) || null,
+            weight_lbs: kgToLb(parseFloat(form.weight_lbs)) || null,
+            squat_max: kgToLb(parseFloat(form.squat_max)) || null,
+            bench_max: kgToLb(parseFloat(form.bench_max)) || null,
+            deadlift_max: kgToLb(parseFloat(form.deadlift_max)) || null,
             mile_time_sec: form.mile_time ? timeToSeconds(form.mile_time) : null,
             k5_time_sec: form.k5_time ? timeToSeconds(form.k5_time) : null,
             sprint_400m_sec: form.sprint_400m ? timeToSeconds(form.sprint_400m) : null,
@@ -113,12 +121,15 @@ export default function ProfilePage() {
             alert("Synchronization complete.");
             const { data } = await supabase.from("profiles").select("*").single();
             if (data) {
+                const isMetric = data.units === 'metric';
+                const lbToKg = (lbs: number | null) => isMetric && lbs ? Math.round(lbs / 2.20462) : lbs;
+
                 setProfile(data);
                 setForm({
-                    weight_lbs: data.weight_lbs?.toString() || "",
-                    squat_max: data.squat_max?.toString() || "",
-                    bench_max: data.bench_max?.toString() || "",
-                    deadlift_max: data.deadlift_max?.toString() || "",
+                    weight_lbs: lbToKg(data.weight_lbs)?.toString() || "",
+                    squat_max: lbToKg(data.squat_max)?.toString() || "",
+                    bench_max: lbToKg(data.bench_max)?.toString() || "",
+                    deadlift_max: lbToKg(data.deadlift_max)?.toString() || "",
                     mile_time: secondsToTime(data.mile_time_sec),
                     k5_time: secondsToTime(data.k5_time_sec),
                     sprint_400m: secondsToTime(data.sprint_400m_sec),
@@ -152,15 +163,23 @@ export default function ProfilePage() {
                     </p>
                 </div>
 
-                <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={handleSubmit}
-                    disabled={loading}
-                    className="bg-primary text-white font-bold text-lg px-12 py-6 rounded-full shadow-2xl shadow-primary/20 hover:shadow-primary/40 transition-all flex items-center gap-4 disabled:opacity-50"
-                >
-                    {loading ? "Syncing..." : <><Check size={24} strokeWidth={3} /> Sync Baseline</>}
-                </motion.button>
+                <div className="flex gap-4">
+                    <button
+                        onClick={() => logout()}
+                        className="bg-stone-100 text-stone-500 font-bold text-lg px-8 py-6 rounded-full hover:bg-stone-200 transition-all"
+                    >
+                        Sign Out
+                    </button>
+                    <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={handleSubmit}
+                        disabled={loading}
+                        className="bg-primary text-white font-bold text-lg px-12 py-6 rounded-full shadow-2xl shadow-primary/20 hover:shadow-primary/40 transition-all flex items-center gap-4 disabled:opacity-50"
+                    >
+                        {loading ? "Syncing..." : <><Check size={24} strokeWidth={3} /> Sync Baseline</>}
+                    </motion.button>
+                </div>
             </header>
 
             {/* Bento Grid */}
@@ -182,7 +201,9 @@ export default function ProfilePage() {
 
                     <div className="mt-12 space-y-6 relative z-10">
                         <div className="relative group/field">
-                            <label className="text-[10px] font-bold text-stone-400 uppercase tracking-widest absolute -top-2 left-6 bg-white px-2 z-10 transition-colors group-hover/field:text-primary">Bodyweight</label>
+                            <label className="text-[10px] font-bold text-stone-400 uppercase tracking-widest absolute -top-2 left-6 bg-white px-2 z-10 transition-colors group-hover/field:text-primary">
+                                Bodyweight ({profile?.units === 'metric' ? 'kg' : 'lb'})
+                            </label>
                             <input
                                 type="number"
                                 value={form.weight_lbs}
@@ -190,7 +211,9 @@ export default function ProfilePage() {
                                 className={inputClasses}
                                 placeholder="0"
                             />
-                            <span className="absolute right-6 top-1/2 -translate-y-1/2 text-stone-300 font-serif text-lg italic">lb</span>
+                            <span className="absolute right-6 top-1/2 -translate-y-1/2 text-stone-300 font-serif text-lg italic">
+                                {profile?.units === 'metric' ? 'kg' : 'lb'}
+                            </span>
                         </div>
                         <div className="p-6 rounded-3xl bg-stone-50 border border-black/[0.01] flex items-center justify-between">
                             <span className="text-stone-400 text-[10px] font-bold uppercase tracking-widest">Height Spectrum</span>
@@ -276,7 +299,9 @@ export default function ProfilePage() {
                                 { label: "Deadlift", key: "deadlift_max" },
                             ].map((field) => (
                                 <div key={field.key} className="relative group/field">
-                                    <label className="text-[10px] font-bold text-stone-400 uppercase tracking-widest absolute -top-2 left-6 bg-white px-2 z-10 transition-colors group-hover/field:text-primary">{field.label}</label>
+                                    <label className="text-[10px] font-bold text-stone-400 uppercase tracking-widest absolute -top-2 left-6 bg-white px-2 z-10 transition-colors group-hover/field:text-primary">
+                                        {field.label} ({profile?.units === 'metric' ? 'kg' : 'lb'})
+                                    </label>
                                     <input
                                         type="number"
                                         value={(form as any)[field.key]}
@@ -284,6 +309,9 @@ export default function ProfilePage() {
                                         className={inputClasses}
                                         placeholder="0"
                                     />
+                                    <span className="absolute right-6 top-1/2 -translate-y-1/2 text-stone-300 font-serif text-lg italic">
+                                        {profile?.units === 'metric' ? 'kg' : 'lb'}
+                                    </span>
                                 </div>
                             ))}
                         </div>

@@ -2,10 +2,21 @@
 
 import { useChat } from '@ai-sdk/react';
 import { Send, Bot, Sparkles, HeartPulse } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { createClient } from '@/utils/supabase/client';
 
 export default function AiCoach() {
     const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat() as any;
+    const [profile, setProfile] = useState<any>(null);
+
+    useEffect(() => {
+        async function fetchProfile() {
+            const supabase = createClient();
+            const { data } = await supabase.from('profiles').select('ai_name, ai_personality').single();
+            setProfile(data);
+        }
+        fetchProfile();
+    }, []);
 
     return (
         <div className="flex flex-col h-full p-4">
@@ -15,8 +26,12 @@ export default function AiCoach() {
                     <HeartPulse size={24} className="text-white" />
                 </div>
                 <div>
-                    <h3 className="text-xl font-serif text-stone-900 italic">Echo Agent</h3>
-                    <p className="text-[10px] text-stone-400 font-bold uppercase tracking-widest">Protocol Intelligence</p>
+                    <h3 className="text-xl font-serif text-stone-900 italic">
+                        {profile?.ai_name || "ECHO-P1"}
+                    </h3>
+                    <p className="text-[10px] text-stone-400 font-bold uppercase tracking-widest">
+                        {profile?.ai_personality ? `${profile.ai_personality} Intelligence` : "Protocol Intelligence"}
+                    </p>
                 </div>
             </div>
 

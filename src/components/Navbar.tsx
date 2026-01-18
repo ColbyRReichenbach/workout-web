@@ -35,6 +35,9 @@ export function Navbar() {
     }, []);
 
     const isProfileActive = pathname === "/profile";
+    const isPublicRoute = pathname === "/login" || pathname === "/onboarding";
+
+    if (isPublicRoute) return null;
 
     return (
         <header
