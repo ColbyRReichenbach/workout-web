@@ -315,23 +315,6 @@ export default function Home() {
         ))}
       </motion.div>
 
-      {/* Checkpoint Testing Alert */}
-      {currentWeek && isCheckpointWeek(currentWeek) && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-        >
-          <CheckpointTestAlert
-            checkpointData={getCheckpointData(currentWeek)!}
-            onStartTesting={() => {
-              // Navigate to testing protocol or show modal
-              window.location.href = `/workout?day=Saturday`;
-            }}
-          />
-        </motion.div>
-      )}
-
       {/* Main Content Split */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
 
@@ -350,24 +333,20 @@ export default function Home() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {protocol.map((day, i) => {
-              const isDone = completedDays.has(day.day);
-              const isToday = day.day === todayName;
-              const isPast = i < todayIndex && !isDone;
-              const isFuture = i > todayIndex;
-
-              return (
-                <DayCard
-                  key={i}
-                  day={day}
-                  index={i}
-                  isToday={isToday}
-                  isDone={isDone}
-                  isPast={isPast}
-                  phase={currentPhase}
-                  onClick={() => handleDayClick({ ...day, isFuture })}
-                />
-              );
-            })}
+              {
+                protocol.map((day, i) => (
+                  <DayCard
+                    key={day.day}
+                    day={day}
+                    isToday={dayNames[jsDay === 0 ? 6 : jsDay - 1] === day.day}
+                    isDone={completedDays.has(day.day)}
+                    isPast={day.isFuture === false}
+                    phase={currentPhase}
+                    currentWeek={currentWeek}
+                    onClick={() => handleDayClick(day)}
+                  />
+                ))
+              }
           </div>
         </div>
 

@@ -1,11 +1,12 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { X, CheckCircle, Dumbbell, Clock, Flame, HeartPulse, Target, Activity, Zap, TrendingUp, Flower2, Footprints, Moon, LucideIcon } from "lucide-react";
+import { X, CheckCircle, Dumbbell, Clock, Flame, HeartPulse, Target, Activity, Zap, TrendingUp, Flower2, Footprints, Moon, Trophy, LucideIcon } from "lucide-react";
 import { memo, useEffect, createElement } from "react";
 import { TiltCard } from "./TiltCard";
 import { useSettings } from "@/context/SettingsContext";
 import { toDisplayWeight, toDisplayDistance, getUnitLabel } from "@/lib/conversions";
+import { isCheckpointWeek, getCheckpointData } from "@/lib/checkpointTests";
 
 import { WorkoutLog, ProtocolDay } from "@/lib/types";
 
@@ -16,6 +17,7 @@ interface DayCardProps {
     isDone: boolean;
     isPast: boolean;
     phase?: number;
+    currentWeek?: number; // For checkpoint detection
     onClick: () => void;
 }
 
@@ -78,15 +80,28 @@ const DayIcon = memo(function DayIcon({ day, phase, ...props }: { day: ProtocolD
     return createElement(getRepresentativeIcon(day, phase), props);
 });
 
-export const DayCard = memo(function DayCard({ day, isToday, isDone, isPast, phase = 1, onClick }: DayCardProps) {
-    const style = TYPE_STYLES[day.type] || TYPE_STYLES["Strength"];
+export const DayCard = memo(function DayCard({ day, isToday, isDone, isPast, phase = 1, currentWeek, onClick }: DayCardProps) {
+    // Checkpoint Detection: Is this Saturday in a checkpoint week?
+    const isCheckpointDay = currentWeek && isCheckpointWeek(currentWeek) && day.day === "Saturday";
+    const checkpointData = isCheckpointDay ? getCheckpointData(currentWeek) : null;
 
+    // Override style for checkpoint days
+    const style = isCheckpointDay
+        ? { bg: "bg-amber-500/5", text: "text-amber-600", shadow: "shadow-amber-500/20", tint: "bg-amber-500/10", icon: Trophy }
+        : TYPE_STYLES[day.type] || TYPE_STYLES["Strength"];
+
+    // Override title for checkpoint days
+    const displayTitle = isCheckpointDay ? "Checkpoint Testing" : day.title;
+    const displaySubtitle = isCheckpointDay && checkpointData
+        ? checkpointData.tests.slice(0, 2).map(t => t.name).join(" • ")
+        : null;
 
     return (
         <TiltCard
             glowColor={style.shadow}
             className={`
-                relative p-8 rounded-[48px] cursor-pointer overflow-hidden group bg-card border border-border
+                relative p-8 rounded-[48px] cursor-pointer overflow-hidden group bg-card
+                ${isCheckpointDay ? "border-2 border-amber-500" : "border border-border"}
                 ${isToday ? "ring-2 ring-primary/20 ring-offset-4" : ""}
                 ${isDone ? "opacity-100" : isPast ? "opacity-60" : ""}
             `}
@@ -108,8 +123,13 @@ export const DayCard = memo(function DayCard({ day, isToday, isDone, isPast, pha
                                 {isToday && <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />}
                             </div>
                             <h4 className="font-serif text-3xl text-foreground leading-tight">
-                                {day.title}
+                                {displayTitle}
                             </h4>
+                            {displaySubtitle && (
+                                <p className="text-xs text-amber-600 mt-1 font-medium">
+                                    {displaySubtitle}
+                                </p>
+                            )}
                         </div>
 
                         {isDone ? (
