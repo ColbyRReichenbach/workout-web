@@ -14,6 +14,8 @@ import { useSettings } from "@/context/SettingsContext";
 import { getUnitLabel, toDisplayWeight } from "@/lib/conversions";
 import { DEMO_USER_ID } from "@/lib/userSettings";
 import { calculateWorkingSet } from "@/lib/calculations/percentages";
+import { getCheckpointData } from "@/lib/checkpointTests";
+import { generateCheckpointWorkout } from "@/lib/checkpointWorkouts";
 
 // Helper for type-based styling
 const getSegmentIcon = (type: string, name: string = "", dayName: string = "") => {
@@ -126,7 +128,26 @@ export default function WorkoutPage() {
                 // Map absolute week to available relative week templates (usually 1-4)
                 const relativeWeekIdx = (absWeek - 1) % (phase.weeks?.length || 4);
                 const week = phase.weeks[relativeWeekIdx] || phase.weeks[0];
-                const todayData = week.days[workoutDayIndex] || week.days[0];
+                let todayData = week.days[workoutDayIndex] || week.days[0];
+
+                // CHECKPOINT OVERRIDE: Replace workout with actual PR tests if it's a checkpoint week Saturday
+                const todayDayName = targetDay || dayNames[workoutDayIndex];
+                if (todayDayName === "Saturday") {
+                    const checkpointData = getCheckpointData(absWeek);
+                    if (checkpointData) {
+                        console.log(`[Workout] CHECKPOINT WEEK ${absWeek} - Overriding with PR tests`);
+
+                        // Generate checkpoint workout segments
+                        const checkpointSegments = generateCheckpointWorkout(absWeek);
+
+                        // Override the workout data
+                        todayData = {
+                            day: todayDayName,
+                            title: "Checkpoint Testing",
+                            segments: checkpointSegments
+                        };
+                    }
+                }
 
                 setTodaysWorkout(todayData);
                 setSegments(todayData.segments || []);
