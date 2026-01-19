@@ -85,9 +85,9 @@ export const DayCard = memo(function DayCard({ day, isToday, isDone, isPast, pha
     const isCheckpointDay = currentWeek && isCheckpointWeek(currentWeek) && day.day === "Saturday";
     const checkpointData = isCheckpointDay ? getCheckpointData(currentWeek) : null;
 
-    // Override style for checkpoint days
+    // Override style for checkpoint days with BRIGHTER amber styling
     const style = isCheckpointDay
-        ? { bg: "bg-amber-500/5", text: "text-amber-600", shadow: "shadow-amber-500/20", tint: "bg-amber-500/10", icon: Trophy }
+        ? { bg: "bg-amber-400/20", text: "text-amber-500", shadow: "shadow-amber-500/40", tint: "bg-amber-400/20", icon: Trophy }
         : TYPE_STYLES[day.type] || TYPE_STYLES["Strength"];
 
     // Override title for checkpoint days
@@ -100,16 +100,20 @@ export const DayCard = memo(function DayCard({ day, isToday, isDone, isPast, pha
         <TiltCard
             glowColor={style.shadow}
             className={`
-                relative p-8 rounded-[48px] cursor-pointer overflow-hidden group bg-card
-                ${isCheckpointDay ? "border-2 border-amber-500" : "border border-border"}
+                relative p-8 rounded-[48px] cursor-pointer overflow-hidden group 
+                ${isCheckpointDay ? "bg-gradient-to-br from-amber-500/10 to-amber-600/5 border-2 border-amber-400 shadow-xl shadow-amber-500/30" : "bg-card border border-border"}
                 ${isToday ? "ring-2 ring-primary/20 ring-offset-4" : ""}
                 ${isDone ? "opacity-100" : isPast ? "opacity-60" : ""}
             `}
         >
             <div onClick={onClick}>
-                {/* Background Icon Watermark */}
+                {/* Background Icon Watermark - Use Trophy for checkpoint days */}
                 <div className={`absolute -right-8 -bottom-8 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity duration-300 pointer-events-none ${style.text}`} style={{ willChange: 'opacity' }}>
-                    <DayIcon day={day} phase={phase} size={160} strokeWidth={1} />
+                    {isCheckpointDay ? (
+                        <Trophy size={160} strokeWidth={1} />
+                    ) : (
+                        <DayIcon day={day} phase={phase} size={160} strokeWidth={1} />
+                    )}
                 </div>
 
                 {/* Content */}
@@ -117,10 +121,11 @@ export const DayCard = memo(function DayCard({ day, isToday, isDone, isPast, pha
                     <div className="flex justify-between items-start mb-6">
                         <div>
                             <div className="flex items-center gap-2 mb-2">
-                                <span className={`text-[10px] font-bold uppercase tracking-[0.3em] ${isToday ? "text-primary" : "text-muted-foreground"}`}>
+                                <span className={`text-[10px] font-bold uppercase tracking-[0.3em] ${isCheckpointDay ? "text-amber-500" : isToday ? "text-primary" : "text-muted-foreground"}`}>
                                     {day.day}
                                 </span>
                                 {isToday && <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />}
+                                {isCheckpointDay && <Trophy size={12} className="text-amber-500 animate-pulse" />}
                             </div>
                             <h4 className="font-serif text-3xl text-foreground leading-tight">
                                 {displayTitle}
@@ -141,16 +146,24 @@ export const DayCard = memo(function DayCard({ day, isToday, isDone, isPast, pha
                                 <X size={24} />
                             </div>
                         ) : (
-                            <div className={`h-14 w-14 rounded-2xl flex items-center justify-center transition-transform duration-200 group-hover:scale-105 ${isToday ? "bg-primary/10 border border-primary/20 text-primary shadow-lg shadow-primary/10" : "bg-card border border-border text-muted-foreground shadow-sm"
+                            <div className={`h-14 w-14 rounded-2xl flex items-center justify-center transition-transform duration-200 group-hover:scale-105 ${isCheckpointDay
+                                    ? "bg-amber-500/20 border-2 border-amber-400 text-amber-500 shadow-lg shadow-amber-500/20"
+                                    : isToday
+                                        ? "bg-primary/10 border border-primary/20 text-primary shadow-lg shadow-primary/10"
+                                        : "bg-card border border-border text-muted-foreground shadow-sm"
                                 }`}>
-                                <DayIcon day={day} phase={phase} size={26} className={isToday ? "animate-[pulse_2s_infinite]" : ""} />
+                                {isCheckpointDay ? (
+                                    <Trophy size={26} className="animate-[pulse_2s_infinite]" />
+                                ) : (
+                                    <DayIcon day={day} phase={phase} size={26} className={isToday ? "animate-[pulse_2s_infinite]" : ""} />
+                                )}
                             </div>
                         )}
                     </div>
 
                     <div className="flex items-center gap-4">
                         <span className={`px-4 py-1.5 ${style.tint} ${style.text} rounded-full text-[10px] font-bold uppercase tracking-widest`}>
-                            {day.type.replace('_', ' ')} Protocol
+                            {isCheckpointDay ? "PR Testing" : day.type.replace('_', ' ')} Protocol
                         </span>
                         {isDone && (
                             <span className="text-emerald-500 text-[10px] font-bold uppercase tracking-widest flex items-center gap-1">
