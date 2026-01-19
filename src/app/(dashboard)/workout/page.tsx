@@ -13,6 +13,7 @@ import { TiltCard } from "@/components/TiltCard";
 import { useSettings } from "@/context/SettingsContext";
 import { getUnitLabel, toDisplayWeight } from "@/lib/conversions";
 import { DEMO_USER_ID } from "@/lib/userSettings";
+import { calculateWorkingSet } from "@/lib/calculations/percentages";
 
 // Helper for type-based styling
 const getSegmentIcon = (type: string, name: string = "", dayName: string = "") => {
@@ -228,38 +229,11 @@ export default function WorkoutPage() {
             console.warn("[calcWeight] No profile loaded");
             return 0;
         }
-        const name = segmentName.toLowerCase();
 
-        // Parse string maxes to numbers with explicit logging
-        const squatMax = parseInt(String(profile.squat_max)) || 0;
-        const benchMax = parseInt(String(profile.bench_max)) || 0;
-        const deadliftMax = parseInt(String(profile.deadlift_max)) || 0;
+        // Use the new comprehensive calculation utility
+        const targetLbs = calculateWorkingSet(segmentName, percent, profile);
 
-        console.log("[calcWeight] Profile maxes:", { squatMax, benchMax, deadliftMax, profileId: profile.id });
-
-        // Determine which max to use based on exercise name
-        let base = squatMax; // default to squat
-        let liftType = "squat";
-
-        if (name.includes('bench')) {
-            base = benchMax;
-            liftType = "bench";
-        } else if (name.includes('overhead') || name.includes('ohp')) {
-            // Overhead press typically uses bench correlation or own max
-            base = benchMax;
-            liftType = "ohp (from bench)";
-        } else if (name.includes('deadlift') || name.includes('rdl') || name.includes('romanian')) {
-            base = deadliftMax;
-            liftType = "deadlift";
-        } else if (name.includes('squat') || name.includes('front squat') || name.includes('back squat')) {
-            base = squatMax;
-            liftType = "squat";
-        }
-
-        console.log(`[calcWeight] ${segmentName} -> ${liftType} @ ${base} * ${percent} = ${base * percent}`);
-
-        const targetLbs = base * percent;
-
+        // Round to nearest 5 lbs for imperial, 2.5 kg for metric
         if (units === 'metric') {
             const targetKg = targetLbs * 0.453592;
             return Math.round(targetKg / 2.5) * 2.5;
