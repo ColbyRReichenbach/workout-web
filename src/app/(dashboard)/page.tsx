@@ -332,21 +332,18 @@ export default function Home() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {protocol.map((day, i) => {
-              {
-                protocol.map((day, i) => (
-                  <DayCard
-                    key={day.day}
-                    day={day}
-                    isToday={dayNames[jsDay === 0 ? 6 : jsDay - 1] === day.day}
-                    isDone={completedDays.has(day.day)}
-                    isPast={day.isFuture === false}
-                    phase={currentPhase}
-                    currentWeek={currentWeek}
-                    onClick={() => handleDayClick(day)}
-                  />
-                ))
-              }
+            {protocol.map((day, i) => (
+              <DayCard
+                key={day.day}
+                day={day}
+                isToday={todayName === day.day}
+                isDone={completedDays.has(day.day)}
+                isPast={i < todayIndex && !completedDays.has(day.day)}
+                phase={currentPhase}
+                currentWeek={currentWeek}
+                onClick={() => handleDayClick(day)}
+              />
+            ))}
           </div>
         </div>
 
