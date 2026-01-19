@@ -53,7 +53,7 @@ export class ErrorBoundary extends Component<Props, State> {
                 <div className="min-h-[400px] flex items-center justify-center">
                     <div className="text-center p-8 max-w-md">
                         <div className="text-6xl mb-4">⚠️</div>
-                        <h2 className="text-xl font-semibold text-gray-900 mb-2">
+                        <h2 className="text-xl font-bold text-gray-900 mb-2">
                             Something went wrong
                         </h2>
                         <p className="text-gray-600 mb-6">
@@ -67,7 +67,7 @@ export class ErrorBoundary extends Component<Props, State> {
                         </button>
                         {process.env.NODE_ENV === 'development' && this.state.error && (
                             <div className="mt-6 p-4 bg-gray-100 rounded-lg text-left">
-                                <p className="text-sm font-mono text-red-600">
+                                <p className="text-sm font-sans text-red-600">
                                     {this.state.error.message}
                                 </p>
                             </div>

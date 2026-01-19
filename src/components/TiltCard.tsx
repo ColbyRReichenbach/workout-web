@@ -6,11 +6,13 @@ interface TiltCardProps {
     children: React.ReactNode;
     className?: string;
     glowColor?: string;
+    onClick?: () => void;
 }
 
-export const TiltCard = memo(function TiltCard({ children, className, glowColor = "shadow-primary/10" }: TiltCardProps) {
+export const TiltCard = memo(function TiltCard({ children, className, glowColor = "shadow-primary/10", onClick }: TiltCardProps) {
     return (
         <div
+            onClick={onClick}
             className={`
                 relative bg-card border border-border
                 shadow-sm hover:shadow-xl ${glowColor}

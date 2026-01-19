@@ -12,6 +12,7 @@ import PrCelebration from "@/components/PrCelebration";
 import { TiltCard } from "@/components/TiltCard";
 import { useSettings } from "@/context/SettingsContext";
 import { getUnitLabel, toDisplayWeight } from "@/lib/conversions";
+import { DEMO_USER_ID } from "@/lib/userSettings";
 
 // Helper for type-based styling
 const getSegmentIcon = (type: string, name: string = "", dayName: string = "") => {
@@ -60,6 +61,7 @@ export default function WorkoutPage() {
 
     // Flight State
     const [showPostFlight, setShowPostFlight] = useState(false);
+    const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
 
     // Logged segments tracking (indices of segments already logged)
     const [loggedSegments, setLoggedSegments] = useState<Set<number>>(new Set());
@@ -151,6 +153,39 @@ export default function WorkoutPage() {
 
                     console.log("[Workout] Found existing logs for segments:", [...alreadyLogged]);
                     setLoggedSegments(alreadyLogged);
+
+                    // If logs exist, check if there's an active session
+                    const { data: session } = await supabase
+                        .from('workout_sessions')
+                        .select('id')
+                        .eq('user_id', profileId)
+                        .eq('day_name', todayDayName)
+                        .eq('week_number', absWeek)
+                        .order('created_at', { ascending: false })
+                        .limit(1)
+                        .single();
+
+                    if (session) {
+                        setActiveSessionId(session.id);
+                    } else {
+                        // Create a session automatically if none exists
+                        const { data: newSession } = await supabase
+                            .from('workout_sessions')
+                            .insert({
+                                user_id: profileId,
+                                day_name: todayDayName,
+                                week_number: absWeek,
+                                phase_id: phaseIdx + 1,
+                                session_title: todayData.title,
+                                start_time: new Date().toISOString()
+                            })
+                            .select()
+                            .single();
+
+                        if (newSession) {
+                            setActiveSessionId(newSession.id);
+                        }
+                    }
                 }
             }
             setLoading(false);
@@ -158,16 +193,33 @@ export default function WorkoutPage() {
         fetchData();
     }, []);
 
-    const handleFinishWorkout = async (data: PostFlightData) => {
-        const fullSession = { ...data };
-        const supabase = createClient();
-        const { error } = await supabase.from('session_logs').insert({
-            session_rpe: fullSession.rpe,
-            notes: fullSession.notes,
-            tags: fullSession.tags
-        });
 
-        if (error) console.error("Failed to save session log:", error);
+    const handleFinishWorkout = async (data: PostFlightData) => {
+        const supabase = createClient();
+        if (activeSessionId) {
+            const { error } = await supabase
+                .from('workout_sessions')
+                .update({
+                    perceived_exertion: data.rpe,
+                    notes: data.notes,
+                    tags: data.tags,
+                    end_time: new Date().toISOString()
+                })
+                .eq('id', activeSessionId);
+
+            if (error) console.error("Failed to update session:", error);
+        } else {
+            // Fallback for sessions not started with PreFlight
+            const { data: { user } } = await supabase.auth.getUser();
+            await supabase.from('workout_sessions').insert({
+                user_id: user?.id || DEMO_USER_ID,
+                day_name: actualDayName,
+                week_number: profile?.current_week || 1,
+                perceived_exertion: data.rpe,
+                notes: data.notes,
+                tags: data.tags
+            });
+        }
         window.location.href = "/";
     };
 
@@ -282,6 +334,7 @@ export default function WorkoutPage() {
         // Insert new log data
         await supabase.from('logs').insert({
             user_id: currentUserId,
+            session_id: activeSessionId,
             segment_name: segment.name,
             segment_type: segment.type,
             tracking_mode: segment.tracking_mode,
@@ -371,7 +424,7 @@ export default function WorkoutPage() {
                                             <div className="space-y-5">
                                                 {segment.target?.sets && (
                                                     <div className="flex items-center gap-4 text-foreground">
-                                                        <div className="w-12 h-12 rounded-2xl bg-muted border border-border flex items-center justify-center text-muted-foreground transition-transform duration-200 group-hover:scale-105">
+                                                        <div className="w-12 h-12 rounded-xl bg-muted border border-border flex items-center justify-center text-muted-foreground transition-transform duration-200 group-hover:scale-105">
                                                             <Target size={20} />
                                                         </div>
                                                         <span className="font-serif text-3xl italic tracking-tight">
@@ -381,7 +434,7 @@ export default function WorkoutPage() {
                                                 )}
                                                 {segment.target?.percent_1rm && (
                                                     <div className="flex items-center gap-4">
-                                                        <div className="w-12 h-12 rounded-2xl bg-primary/5 border border-primary/10 flex items-center justify-center text-primary transition-transform duration-200 group-hover:scale-105">
+                                                        <div className="w-12 h-12 rounded-xl bg-primary/5 border border-primary/10 flex items-center justify-center text-primary transition-transform duration-200 group-hover:scale-105">
                                                             <Zap size={20} />
                                                         </div>
                                                         <span className="text-muted-foreground text-xl font-light">
@@ -393,7 +446,7 @@ export default function WorkoutPage() {
                                             </div>
 
                                             {segment.details && (
-                                                <div className="bg-muted/30 rounded-[32px] p-6 border border-border transition-colors duration-200 group-hover:bg-muted/50">
+                                                <div className="bg-muted/30 rounded-xl p-6 border border-border transition-colors duration-200 group-hover:bg-muted/50">
                                                     <p className="text-muted-foreground text-sm leading-relaxed italic">
                                                         &quot;{segment.details}&quot;
                                                     </p>
@@ -405,7 +458,7 @@ export default function WorkoutPage() {
                                     <div className="w-full md:w-auto flex items-center justify-end">
                                         {loggedSegments.has(idx) ? (
                                             <div className="flex flex-col items-center gap-3">
-                                                <div className="flex items-center gap-3 bg-emerald-500/5 border border-emerald-500/10 rounded-2xl px-6 py-4">
+                                                <div className="flex items-center gap-3 bg-emerald-500/5 border border-emerald-500/10 rounded-xl px-6 py-4">
                                                     <CheckCircle className="text-emerald-500" size={20} />
                                                     <span className="text-emerald-600 font-bold text-xs uppercase tracking-widest">Synchronized</span>
                                                 </div>
@@ -421,7 +474,7 @@ export default function WorkoutPage() {
                                                 {segment.tracking_mode === 'CHECKBOX' && (
                                                     <button
                                                         onClick={() => logSegment(segment, idx, { completed: true })}
-                                                        className="h-24 w-24 rounded-[32px] bg-primary/5 border border-primary/10 flex items-center justify-center hover:bg-primary hover:text-white transition-colors duration-200 btn-pro hover:shadow-primary/30 group/btn"
+                                                        className="h-24 w-24 rounded-xl bg-primary/5 border border-primary/10 flex items-center justify-center hover:bg-primary hover:text-white transition-colors duration-200 btn-pro hover:shadow-primary/30 group/btn"
                                                     >
                                                         <CheckCircle size={36} className="transition-transform group-hover/btn:scale-110 group-hover/btn:rotate-6" />
                                                     </button>

@@ -199,7 +199,7 @@ export const PremiumAreaChart = memo(function PremiumAreaChart({
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.95 }}
                         transition={{ duration: 0.15 }}
-                        className="absolute z-50 bg-stone-900 text-white shadow-2xl p-4 rounded-2xl pointer-events-none min-w-[120px]"
+                        className="absolute z-50 bg-stone-900 text-white shadow-2xl p-4 rounded-xl pointer-events-none min-w-[120px]"
                         style={getTooltipStyle()}
                     >
                         <div className="text-[9px] font-bold text-stone-500 uppercase tracking-widest mb-2">
@@ -284,7 +284,7 @@ export const ProgressionBarChart = memo(function ProgressionBarChart({ data, hei
                                     animate={{ opacity: 1, scale: 1 }}
                                     exit={{ opacity: 0, scale: 0.95 }}
                                     transition={{ duration: 0.15 }}
-                                    className={`absolute ${tooltipPos} bg-stone-900 text-white p-4 rounded-2xl shadow-2xl whitespace-nowrap z-50 pointer-events-none`}
+                                    className={`absolute ${tooltipPos} bg-stone-900 text-white p-4 rounded-xl shadow-2xl whitespace-nowrap z-50 pointer-events-none`}
                                 >
                                     <div className="text-[9px] font-bold text-stone-500 uppercase tracking-widest mb-2">Week {i + 1}</div>
                                     <div className="text-lg font-serif">{val.toLocaleString()} {displayUnits}</div>
@@ -318,7 +318,7 @@ export const StructuralHeatmap = memo(function StructuralHeatmap({ data, readine
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         transition={{ delay: i * 0.005, duration: 0.3 }}
-                        className={`aspect-square rounded-lg relative cursor-pointer ${active ? 'bg-primary' : 'bg-muted'}`}
+                        className={`aspect-square rounded-xl relative cursor-pointer ${active ? 'bg-primary' : 'bg-muted'}`}
                         style={{
                             opacity: active ? Math.max(0.3, readinessVal / 100) : 1,
                             willChange: 'opacity, transform'
@@ -500,7 +500,7 @@ export const RecoveryIndexChart = memo(function RecoveryIndexChart({ stress, rec
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.95 }}
                         transition={{ duration: 0.15 }}
-                        className="absolute z-50 bg-stone-900 text-white p-4 rounded-2xl shadow-2xl pointer-events-none min-w-[140px]"
+                        className="absolute z-50 bg-stone-900 text-white p-4 rounded-xl shadow-2xl pointer-events-none min-w-[140px]"
                         style={getTooltipStyle()}
                     >
                         <div className="text-[9px] font-bold text-stone-500 uppercase tracking-widest mb-2">

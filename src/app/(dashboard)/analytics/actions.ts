@@ -2,13 +2,14 @@
 import { normalizeUnit } from "@/utils/units";
 
 import { createClient } from "@/utils/supabase/server";
+import { DEMO_USER_ID } from "@/lib/userSettingsServer";
 
 export async function getAnalyticsData() {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
     // If no authenticated user, default to demo user for initial analytics view
-    const currentUserId = user?.id || '00000000-0000-0000-0000-000000000001';
+    const currentUserId = user?.id || DEMO_USER_ID;
 
     // Parallelize all data fetching with explicit user filters
     const [

@@ -3,10 +3,11 @@
 import { motion } from "framer-motion";
 import {
   Activity, Calendar, Flame, List, CalendarDays,
-  ArrowRight
+  ArrowRight, HeartPulse, Scale
 } from "lucide-react";
 import AiCoach from "@/components/AiCoach";
 import { DayCard, DayDetailModal } from "@/components/WeeklySchedule";
+import { BiometricsModal } from "@/components/BiometricsModal";
 import { TiltCard } from "@/components/TiltCard";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -15,6 +16,7 @@ import { createClient } from "@/utils/supabase/client";
 import { WorkoutDay, ProtocolDay, WorkoutLog } from "@/lib/types";
 import { useSettings } from "@/context/SettingsContext";
 import { getUnitLabel } from "@/lib/conversions";
+import { DEMO_USER_ID } from "@/lib/userSettings";
 
 // Types for workout data
 
@@ -45,6 +47,7 @@ export default function Home() {
   // Modal State
   const [selectedDay, setSelectedDay] = useState<ProtocolDay | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [biometricsOpen, setBiometricsOpen] = useState(false);
 
 
 
@@ -67,7 +70,7 @@ export default function Home() {
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('current_week, current_phase, height, weight_lbs')
-        .eq('id', user?.id || '00000000-0000-0000-0000-000000000001')
+        .eq('id', user?.id || DEMO_USER_ID)
         .single();
 
       // If no profile exists (new user from OAuth), redirect to onboarding
@@ -83,7 +86,7 @@ export default function Home() {
       }
 
       // Fetch ALL logs for this user to track streak across weeks
-      const currentUserId = user?.id || '00000000-0000-0000-0000-000000000001';
+      const currentUserId = user?.id || DEMO_USER_ID;
       const { data: allUserLogs } = await supabase
         .from('logs')
         .select('*')
@@ -271,11 +274,21 @@ export default function Home() {
             glow: "shadow-orange-500/10"
           },
           { icon: Flame, label: "Burn", value: totalVolume > 0 ? Math.round(totalVolume * 0.05) : "0", unit: "kcal", color: "text-amber-500", bg: "bg-amber-500/5", glow: "shadow-amber-500/10" },
-          { icon: List, label: "Flow", value: totalCompletion, unit: "%", color: "text-muted-foreground", bg: "bg-muted", glow: "shadow-muted-foreground/5" },
+          {
+            icon: Scale,
+            label: "Vitals",
+            value: "Sync",
+            unit: "Capture",
+            color: "text-primary",
+            bg: "bg-primary/5",
+            glow: "shadow-primary/10",
+            onClick: () => setBiometricsOpen(true)
+          },
         ].map((m, i) => (
           <TiltCard
             key={i}
             glowColor={m.glow}
+            onClick={m.onClick}
             className="group rounded-[40px] p-8 cursor-pointer overflow-hidden"
           >
             {/* Background Icon Watermark */}
@@ -352,6 +365,7 @@ export default function Home() {
           </div>
         </div>
       </div>
+      <BiometricsModal isOpen={biometricsOpen} onClose={() => setBiometricsOpen(false)} />
     </div>
   );
 }

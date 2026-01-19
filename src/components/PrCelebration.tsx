@@ -66,7 +66,7 @@ export default function PrCelebration({ show, onComplete, value, unit }: PrCeleb
                         className="absolute text-center"
                     >
                         <h2 className="text-4xl font-serif text-white font-bold drop-shadow-md">New Record!</h2>
-                        <p className="text-xl text-yellow-300 font-mono mt-2">{value} {unit}</p>
+                        <p className="text-xl text-yellow-300 font-serif mt-2">{value} {unit}</p>
                     </motion.div>
                 </div>
             )}

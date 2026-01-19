@@ -411,7 +411,7 @@ export default function LoginPage() {
                                     onClick={() => { setView('reset'); setStatus(null); }}
                                     onMouseEnter={onEnter}
                                     onMouseLeave={onLeave}
-                                    className="text-xs text-zinc-400 font-semibold hover:text-[#ef4444] transition-colors"
+                                    className="text-xs text-zinc-400 font-bold hover:text-[#ef4444] transition-colors"
                                 >
                                     Forgot your password?
                                 </button>

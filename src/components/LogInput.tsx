@@ -49,7 +49,7 @@ export function LogStrengthSets({ segment, idx, onLog, calculatedWeight }: LogPr
 
     if (saved) {
         return (
-            <div className="flex items-center gap-4 bg-emerald-500/5 border border-emerald-500/10 rounded-2xl px-6 py-4">
+            <div className="flex items-center gap-4 bg-emerald-500/5 border border-emerald-500/10 rounded-xl px-6 py-4">
                 <CheckCircle className="text-emerald-500" size={20} />
                 <span className="text-emerald-600 font-bold text-xs uppercase tracking-widest">Protocol Synchronized</span>
             </div>
@@ -69,7 +69,7 @@ export function LogStrengthSets({ segment, idx, onLog, calculatedWeight }: LogPr
             <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
                 {sets.map((set, sIdx) => (
                     <div key={sIdx} className="grid grid-cols-[30px_1fr_1fr] gap-4 items-center">
-                        <span className="text-[10px] font-bold text-muted-foreground font-mono">S{sIdx + 1}</span>
+                        <span className="text-[10px] font-bold text-muted-foreground font-serif">S{sIdx + 1}</span>
                         <input
                             type="number"
                             placeholder="0"
@@ -91,13 +91,13 @@ export function LogStrengthSets({ segment, idx, onLog, calculatedWeight }: LogPr
             <div className="flex gap-3 pt-2 font-sans font-medium">
                 <button
                     onClick={() => setSets([...sets, { weight: sets[sets.length - 1]?.weight || "", reps: "" }])}
-                    className="flex-1 py-3 rounded-2xl bg-muted text-muted-foreground hover:bg-muted/80 transition-colors duration-150 flex items-center justify-center gap-2 text-xs"
+                    className="flex-1 py-3 rounded-xl bg-muted text-muted-foreground hover:bg-muted/80 transition-colors duration-150 flex items-center justify-center gap-2 text-xs"
                 >
                     <Plus size={14} /> Add Set
                 </button>
                 <button
                     onClick={handleSave}
-                    className="flex-[2] py-3 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center transition-transform duration-150 shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] gap-2 text-xs font-bold uppercase tracking-widest"
+                    className="flex-[2] py-3 rounded-xl bg-primary text-primary-foreground flex items-center justify-center transition-transform duration-150 shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] gap-2 text-xs font-bold uppercase tracking-widest"
                 >
                     <Save size={14} /> Index Performance
                 </button>
@@ -120,7 +120,7 @@ export function LogMetcon({ segment, idx, onLog }: LogProps) {
 
     if (saved) {
         return (
-            <div className="flex items-center gap-4 bg-emerald-500/5 border border-emerald-500/10 rounded-2xl px-6 py-4">
+            <div className="flex items-center gap-4 bg-emerald-500/5 border border-emerald-500/10 rounded-xl px-6 py-4">
                 <CheckCircle className="text-emerald-500" size={20} />
                 <span className="text-emerald-600 font-bold text-xs uppercase tracking-widest">Protocol Synchronized</span>
             </div>
@@ -180,7 +180,7 @@ export function LogMetcon({ segment, idx, onLog }: LogProps) {
 
             <button
                 onClick={handleSave}
-                className="w-full py-4 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center transition-transform duration-150 shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] gap-2 text-xs font-bold uppercase tracking-widest"
+                className="w-full py-4 rounded-xl bg-primary text-primary-foreground flex items-center justify-center transition-transform duration-150 shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] gap-2 text-xs font-bold uppercase tracking-widest"
             >
                 <Save size={16} /> Log Metcon Results
             </button>
@@ -202,7 +202,7 @@ export function LogCardioBasic({ segment, idx, onLog }: LogProps) {
 
     if (saved) {
         return (
-            <div className="flex items-center gap-4 bg-emerald-500/5 border border-emerald-500/10 rounded-2xl px-6 py-4">
+            <div className="flex items-center gap-4 bg-emerald-500/5 border border-emerald-500/10 rounded-xl px-6 py-4">
                 <CheckCircle className="text-emerald-500" size={20} />
                 <span className="text-emerald-600 font-bold text-xs uppercase tracking-widest">Protocol Synchronized</span>
             </div>
@@ -248,7 +248,7 @@ export function LogCardioBasic({ segment, idx, onLog }: LogProps) {
             </div>
             <button
                 onClick={handleSave}
-                className="w-full py-4 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center transition-transform duration-150 shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] gap-2 text-xs font-bold uppercase tracking-widest"
+                className="w-full py-4 rounded-xl bg-primary text-primary-foreground flex items-center justify-center transition-transform duration-150 shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] gap-2 text-xs font-bold uppercase tracking-widest"
             >
                 <Save size={16} /> Sync Cardio Performance
             </button>

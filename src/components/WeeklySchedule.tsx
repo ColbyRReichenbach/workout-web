@@ -308,7 +308,7 @@ export function DayDetailModal({ isOpen, onClose, day, isDone, isToday, logs }: 
                                                                 <div className="flex flex-wrap gap-1.5 justify-end max-w-[250px]">
 
                                                                     {((log.performance_data as PerformanceData).sets as SetData[]).map((s, si) => (
-                                                                        <span key={si} className="text-[9px] bg-muted border border-border px-2 py-1 rounded-md text-muted-foreground font-mono">
+                                                                        <span key={si} className="text-[9px] bg-muted border border-border px-2 py-1 rounded-md text-muted-foreground font-serif">
                                                                             {String(toDisplayWeight(s.weight || 0, units))}{weightLabel} × {String(s.reps || 0)}
                                                                         </span>
                                                                     ))}

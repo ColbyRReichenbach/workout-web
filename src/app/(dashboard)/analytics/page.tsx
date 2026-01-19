@@ -10,8 +10,10 @@ import {
     RecoveryIndexChart
 } from "@/components/AnalyticsCharts";
 import { SleepAnalysisModal } from "@/components/SleepAnalysisModal";
+import { PRHistory } from "@/components/PRHistory";
 import { useSettings } from "@/context/SettingsContext";
 import { getUnitLabel } from "@/lib/conversions";
+import { DEMO_USER_ID } from "@/lib/userSettings";
 
 // BASELINE MAXES (from Master Plan)
 const BASELINE = {
@@ -457,8 +459,10 @@ export default function AnalyticsPage() {
                     </div>
                 </div>
 
-                <aside className="lg:col-span-1">
-                    <div className="bg-card rounded-[48px] p-10 border border-border shadow-sm h-full flex flex-col justify-between">
+                <aside className="lg:col-span-1 space-y-8">
+                    <PRHistory />
+
+                    <div className="bg-card rounded-[48px] p-10 border border-border shadow-sm flex flex-col justify-between">
                         <div className="space-y-8">
                             <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center text-indigo-500 border border-indigo-500/20">
                                 <Moon size={24} />

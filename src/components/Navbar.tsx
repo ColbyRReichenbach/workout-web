@@ -47,14 +47,14 @@ export function Navbar() {
             )}
         >
             <div className={cn(
-                "max-w-7xl mx-auto rounded-[32px] transition-all duration-500 flex items-center justify-between px-6 py-3 relative z-10 glass-pro",
+                "max-w-7xl mx-auto rounded-[48px] transition-all duration-500 flex items-center justify-between px-6 py-3 relative z-10 glass-pro",
                 scrolled
                     ? "border-border shadow-[0_20px_40px_-20px_rgba(0,0,0,0.1)] bg-background/80"
                     : "border-white/10 shadow-none bg-background/30"
             )}>
                 {/* Logo */}
                 <Link href="/" className="flex items-center gap-3 group relative z-20 magnetic-scale">
-                    <div className="w-10 h-10 rounded-2xl bg-primary flex items-center justify-center text-primary-foreground shadow-lg shadow-primary/20 group-hover:shadow-primary/40 transition-all">
+                    <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-primary-foreground shadow-lg shadow-primary/20 group-hover:shadow-primary/40 transition-all">
                         <HeartPulse size={24} />
                     </div>
                     <span className="font-serif text-2xl font-bold tracking-tighter text-foreground group-hover:text-primary transition-colors">
@@ -71,7 +71,7 @@ export function Navbar() {
                                 key={item.name}
                                 href={item.href}
                                 className={cn(
-                                    "relative px-5 py-2.5 text-[13px] font-bold uppercase tracking-widest rounded-2xl transition-all flex items-center gap-2 group",
+                                    "relative px-5 py-2.5 text-[13px] font-bold uppercase tracking-widest rounded-xl transition-all flex items-center gap-2 group",
                                     isActive
                                         ? "text-primary"
                                         : "text-muted-foreground hover:text-foreground hover:bg-muted"
@@ -80,7 +80,7 @@ export function Navbar() {
                                 {isActive && (
                                     <motion.div
                                         layoutId="nav-pill"
-                                        className="absolute inset-0 bg-primary/5 rounded-2xl border border-primary/10"
+                                        className="absolute inset-0 bg-primary/5 rounded-xl border border-primary/10"
                                         transition={{ type: "spring", bounce: 0.25, duration: 0.5 }}
                                     />
                                 )}
@@ -106,7 +106,7 @@ export function Navbar() {
                 {/* Mobile Toggle */}
                 <button
                     onClick={() => setIsMenuOpen(!isMenuOpen)}
-                    className="md:hidden p-3 ml-1 rounded-2xl bg-muted hover:bg-muted/80 transition-all relative z-20"
+                    className="md:hidden p-3 ml-1 rounded-xl bg-muted hover:bg-muted/80 transition-all relative z-20"
                 >
                     {isMenuOpen ? <X size={20} className="text-foreground" /> : <Menu size={20} className="text-foreground" />}
                 </button>
@@ -119,7 +119,7 @@ export function Navbar() {
                         initial={{ opacity: 0, scale: 0.95, y: -20 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: -20 }}
-                        className="md:hidden mt-4 bg-background/90 backdrop-blur-2xl border border-border rounded-3xl p-4 shadow-2xl overflow-hidden"
+                        className="md:hidden mt-4 bg-background/90 backdrop-blur-2xl border border-border rounded-[48px] p-4 shadow-2xl overflow-hidden"
                     >
                         <div className="grid grid-cols-2 gap-2">
                             {navigation.map((item) => {
@@ -130,7 +130,7 @@ export function Navbar() {
                                         href={item.href}
                                         onClick={() => setIsMenuOpen(false)}
                                         className={cn(
-                                            "flex items-center gap-3 px-4 py-4 text-sm font-medium rounded-2xl transition-all",
+                                            "flex items-center gap-3 px-4 py-4 text-sm font-medium rounded-xl transition-all",
                                             isActive
                                                 ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
                                                 : "text-muted-foreground bg-muted hover:bg-muted/80"

@@ -170,7 +170,7 @@ export default function ProfilePage() {
         );
     }
 
-    const inputClasses = "w-full bg-muted/30 border border-border rounded-3xl px-6 pt-8 pb-2 text-2xl font-serif focus:outline-none focus:ring-4 focus:ring-primary/5 transition-all placeholder:text-muted-foreground/30 text-foreground";
+    const inputClasses = "w-full bg-muted/30 border border-border rounded-xl px-6 pt-8 pb-2 text-2xl font-serif focus:outline-none focus:ring-4 focus:ring-primary/5 transition-all placeholder:text-muted-foreground/30 text-foreground";
 
     return (
         <div className="max-w-7xl mx-auto space-y-16">
@@ -207,13 +207,13 @@ export default function ProfilePage() {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 auto-rows-auto">
 
                 {/* 1. Identity & Weight (Medium) */}
-                <TiltCard className="lg:col-span-4 rounded-[40px] p-10 flex flex-col justify-between group overflow-hidden bg-card border-border" glowColor="shadow-red-500/5">
+                <TiltCard className="lg:col-span-4 rounded-[48px] p-10 flex flex-col justify-between group overflow-hidden bg-card border-border" glowColor="shadow-red-500/5">
                     <div className="absolute -right-12 -top-12 opacity-[0.02] group-hover:opacity-[0.05] transition-opacity pointer-events-none text-primary">
                         <User size={300} strokeWidth={1} />
                     </div>
 
                     <div>
-                        <div className="w-16 h-16 rounded-3xl bg-primary/5 flex items-center justify-center text-primary mb-8 transition-transform group-hover:scale-110">
+                        <div className="w-16 h-16 rounded-xl bg-primary/5 flex items-center justify-center text-primary mb-8 transition-transform group-hover:scale-110">
                             <Scale size={32} />
                         </div>
                         <h2 className="text-3xl font-serif text-foreground mb-2">Biometrics</h2>
@@ -236,7 +236,7 @@ export default function ProfilePage() {
                                 {getUnitLabel(units, 'weight')}
                             </span>
                         </div>
-                        <div className="p-6 rounded-3xl bg-muted/30 border border-border flex items-center justify-between">
+                        <div className="p-6 rounded-xl bg-muted/30 border border-border flex items-center justify-between">
                             <span className="text-muted-foreground text-[10px] font-bold uppercase tracking-widest">Height Spectrum</span>
                             <span className="text-foreground font-serif text-2xl italic">{profile?.height || "6'1\""}</span>
                         </div>
@@ -244,13 +244,13 @@ export default function ProfilePage() {
                 </TiltCard>
 
                 {/* 2. Program Tracking (Medium) */}
-                <TiltCard className="lg:col-span-4 rounded-[40px] p-10 flex flex-col group overflow-hidden bg-card border-border" glowColor="shadow-primary/10">
+                <TiltCard className="lg:col-span-4 rounded-[48px] p-10 flex flex-col group overflow-hidden bg-card border-border" glowColor="shadow-primary/10">
                     <div className="absolute -right-12 -bottom-12 opacity-[0.02] group-hover:opacity-[0.05] transition-opacity pointer-events-none text-primary">
                         <Activity size={300} strokeWidth={1} />
                     </div>
 
                     <div>
-                        <div className="w-16 h-16 rounded-3xl bg-primary/5 flex items-center justify-center text-primary mb-8 transition-transform group-hover:scale-110">
+                        <div className="w-16 h-16 rounded-xl bg-primary/5 flex items-center justify-center text-primary mb-8 transition-transform group-hover:scale-110">
                             <Target size={32} />
                         </div>
                         <h2 className="text-3xl font-serif text-foreground mb-2">Program Sync</h2>
@@ -267,7 +267,7 @@ export default function ProfilePage() {
                                     <button
                                         key={p}
                                         onClick={() => handlePhaseChange(p)}
-                                        className={`py-3 rounded-2xl border text-sm font-bold transition-all ${form.current_phase === p
+                                        className={`py-3 rounded-xl border text-sm font-bold transition-all ${form.current_phase === p
                                             ? "bg-primary border-primary text-primary-foreground shadow-xl shadow-primary/20"
                                             : "bg-card border-border text-muted-foreground hover:border-foreground/20"
                                             }`}
@@ -300,14 +300,14 @@ export default function ProfilePage() {
                 </TiltCard>
 
                 {/* 3. Strength Matrix (Large) */}
-                <TiltCard className="lg:col-span-4 rounded-[40px] p-10 flex flex-col group overflow-hidden bg-card border-border" glowColor="shadow-primary/10">
+                <TiltCard className="lg:col-span-4 rounded-[48px] p-10 flex flex-col group overflow-hidden bg-card border-border" glowColor="shadow-primary/10">
                     <div className="absolute -right-12 -bottom-12 opacity-[0.02] group-hover:opacity-[0.05] transition-opacity pointer-events-none text-primary">
                         <HeartPulse size={400} strokeWidth={1} />
                     </div>
 
                     <div className="flex flex-col justify-between h-full mb-16 gap-10">
                         <div>
-                            <div className="w-16 h-16 rounded-3xl bg-primary/5 flex items-center justify-center text-primary mb-8 transition-transform group-hover:scale-110">
+                            <div className="w-16 h-16 rounded-xl bg-primary/5 flex items-center justify-center text-primary mb-8 transition-transform group-hover:scale-110">
                                 <TrendingUp size={32} />
                             </div>
                             <h2 className="text-3xl font-serif text-foreground mb-2">Power Benchmarks</h2>
@@ -340,14 +340,14 @@ export default function ProfilePage() {
                 </TiltCard>
 
                 {/* 4. Endurance Benchmarks (Extra Wide) */}
-                <TiltCard className="lg:col-span-12 rounded-[40px] p-10 flex flex-col md:flex-row md:items-center justify-between group overflow-hidden bg-card border-border" glowColor="shadow-primary/5">
+                <TiltCard className="lg:col-span-12 rounded-[48px] p-10 flex flex-col md:flex-row md:items-center justify-between group overflow-hidden bg-card border-border" glowColor="shadow-primary/5">
                     <div className="absolute right-1/4 -top-20 opacity-[0.02] group-hover:opacity-[0.05] transition-opacity pointer-events-none text-primary">
                         <Activity size={300} strokeWidth={1} />
                     </div>
 
                     <div className="md:w-1/3 mb-10 md:mb-0">
                         <div className="flex items-center gap-6 mb-2">
-                            <div className="w-14 h-14 rounded-2xl bg-primary/5 flex items-center justify-center text-primary transition-transform group-hover:rotate-12">
+                            <div className="w-14 h-14 rounded-xl bg-primary/5 flex items-center justify-center text-primary transition-transform group-hover:rotate-12">
                                 <Zap size={28} />
                             </div>
                             <h2 className="text-3xl font-serif text-foreground">Endurance Pulse</h2>

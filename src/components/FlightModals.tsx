@@ -48,7 +48,7 @@ export function PreFlightModal({ isOpen, onClose, onReady }: PreFlightProps) {
                             </div>
                             <button
                                 onClick={onClose}
-                                className="h-12 w-12 flex items-center justify-center rounded-2xl bg-muted hover:bg-muted/80 text-muted-foreground transition-colors border border-border"
+                                className="h-12 w-12 flex items-center justify-center rounded-xl bg-muted hover:bg-muted/80 text-muted-foreground transition-colors border border-border"
                             >
                                 <X size={20} />
                             </button>
@@ -82,7 +82,7 @@ export function PreFlightModal({ isOpen, onClose, onReady }: PreFlightProps) {
                                             key={level}
                                             onClick={() => setSoreness(level)}
                                             className={`
-                                                py-4 rounded-2xl border text-[10px] font-bold uppercase tracking-widest transition-colors duration-150
+                                                py-4 rounded-xl border text-[10px] font-bold uppercase tracking-widest transition-colors duration-150
                                                 ${soreness === level
                                                     ? "bg-primary border-primary text-primary-foreground shadow-2xl shadow-primary/20"
                                                     : "bg-muted border-transparent text-muted-foreground hover:bg-muted/80"}
@@ -97,7 +97,7 @@ export function PreFlightModal({ isOpen, onClose, onReady }: PreFlightProps) {
                             {/* 3. Submit */}
                             <button
                                 onClick={() => onReady({ sleep, soreness })}
-                                className="w-full py-6 rounded-[24px] bg-foreground text-background font-bold text-lg hover:scale-[1.02] active:scale-[0.98] transition-transform duration-150 shadow-2xl hover:bg-primary hover:text-primary-foreground shadow-black/10"
+                                className="w-full py-6 rounded-xl bg-foreground text-background font-bold text-lg hover:scale-[1.02] active:scale-[0.98] transition-transform duration-150 shadow-2xl hover:bg-primary hover:text-primary-foreground shadow-black/10"
                             >
                                 Initiate Session
                             </button>
@@ -188,7 +188,7 @@ export function PostFlightModal({ isOpen, onClose, onFinish }: PostFlightProps) 
                                         <button
                                             key={tag}
                                             onClick={() => toggleTag(tag)}
-                                            className={`px-5 py-2.5 rounded-2xl text-[10px] font-bold uppercase tracking-widest border transition-colors duration-150 ${selectedTags.includes(tag)
+                                            className={`px-5 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest border transition-colors duration-150 ${selectedTags.includes(tag)
                                                 ? "bg-primary text-primary-foreground border-primary shadow-xl shadow-primary/20"
                                                 : "bg-card text-muted-foreground border-border hover:border-foreground/20"
                                                 }`}
@@ -204,13 +204,13 @@ export function PostFlightModal({ isOpen, onClose, onFinish }: PostFlightProps) 
                                 value={notes}
                                 onChange={(e) => setNotes(e.target.value)}
                                 placeholder="Debriefing notes..."
-                                className="w-full h-32 bg-muted/50 border border-border rounded-[24px] p-6 text-sm text-foreground resize-none focus:bg-card focus:ring-4 focus:ring-primary/5 outline-none font-serif italic shadow-inner placeholder:text-muted-foreground"
+                                className="w-full h-32 bg-muted/50 border border-border rounded-xl p-6 text-sm text-foreground resize-none focus:bg-card focus:ring-4 focus:ring-primary/5 outline-none font-serif italic shadow-inner placeholder:text-muted-foreground"
                             />
 
                             {/* 4. Complete button */}
                             <button
                                 onClick={() => onFinish({ rpe, tags: selectedTags, notes })}
-                                className="w-full py-6 rounded-[24px] bg-primary text-primary-foreground font-bold text-lg hover:bg-foreground hover:text-background transition-colors duration-150 shadow-2xl shadow-primary/20"
+                                className="w-full py-6 rounded-xl bg-primary text-primary-foreground font-bold text-lg hover:bg-foreground hover:text-background transition-colors duration-150 shadow-2xl shadow-primary/20"
                             >
                                 Synchronize Log
                             </button>

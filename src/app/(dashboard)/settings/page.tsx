@@ -3,10 +3,11 @@
 import { createClient } from "@/utils/supabase/client";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Bell, Moon, Globe, Bot, Shield, Sliders, HeartPulse } from "lucide-react";
+import { Bell, Moon, Globe, Bot, Shield, Sliders, HeartPulse, Download, Database } from "lucide-react";
 import { TiltCard } from "@/components/TiltCard";
 import { normalizeUnit } from "@/lib/conversions";
 import { useSettings } from "@/context/SettingsContext";
+import { exportUserData } from "@/app/actions/export";
 
 interface PreferenceState {
     aiName: string;
@@ -150,7 +151,7 @@ export default function SettingsPage() {
                         <button
                             key={cat.id}
                             onClick={() => setActiveCategory(cat.id)}
-                            className={`w-full flex items-center gap-4 px-8 py-6 rounded-[28px] transition-all border ${activeCategory === cat.id
+                            className={`w-full flex items-center gap-4 px-8 py-6 rounded-xl transition-all border ${activeCategory === cat.id
                                 ? "bg-card border-border text-foreground shadow-xl shadow-black/5"
                                 : "bg-transparent border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/10"
                                 }`}
@@ -166,7 +167,7 @@ export default function SettingsPage() {
 
                 {/* Settings Panel (Right) */}
                 <div className="lg:col-span-9">
-                    <TiltCard className="rounded-[40px] p-12 min-h-[600px] group overflow-hidden bg-card border-border" glowColor="shadow-primary/5">
+                    <TiltCard className="rounded-[48px] p-12 min-h-[600px] group overflow-hidden bg-card border-border" glowColor="shadow-primary/5">
 
                         <div className="absolute -right-20 -bottom-20 opacity-[0.02] group-hover:opacity-[0.04] transition-opacity pointer-events-none text-primary">
                             <Sliders size={400} strokeWidth={1} />
@@ -183,9 +184,9 @@ export default function SettingsPage() {
                                     <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.3em] mb-4">Environment Options</h3>
 
                                     {/* Visual Spectrum (Theme) */}
-                                    <div className="flex justify-between items-center py-4 rounded-3xl transition-colors hover:bg-muted/30 pr-4">
+                                    <div className="flex justify-between items-center py-4 rounded-xl transition-colors hover:bg-muted/30 pr-4">
                                         <div className="flex items-center gap-6">
-                                            <div className="w-14 h-14 rounded-2xl bg-red-500/10 flex items-center justify-center text-red-500"><Moon size={28} /></div>
+                                            <div className="w-14 h-14 rounded-xl bg-red-500/10 flex items-center justify-center text-red-500"><Moon size={28} /></div>
                                             <div>
                                                 <h3 className="text-2xl font-serif text-foreground">Visual Spectrum</h3>
                                                 <p className="text-muted-foreground text-sm font-light italic">Standard protocol defaults.</p>
@@ -208,9 +209,9 @@ export default function SettingsPage() {
                                     </div>
 
                                     {/* Measurement Rhythm (Units) */}
-                                    <div className="flex justify-between items-center py-4 rounded-3xl transition-colors hover:bg-muted/30 pr-4">
+                                    <div className="flex justify-between items-center py-4 rounded-xl transition-colors hover:bg-muted/30 pr-4">
                                         <div className="flex items-center gap-6">
-                                            <div className="w-14 h-14 rounded-2xl bg-orange-500/10 flex items-center justify-center text-orange-500"><Globe size={28} /></div>
+                                            <div className="w-14 h-14 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-500"><Globe size={28} /></div>
                                             <div>
                                                 <h3 className="text-2xl font-serif text-foreground">Measurement Rhythm</h3>
                                                 <p className="text-muted-foreground text-sm font-light italic">Currently using {units} baselines.</p>
@@ -232,9 +233,9 @@ export default function SettingsPage() {
                                         </div>
                                     </div>
 
-                                    <div className="flex justify-between items-center py-4 rounded-3xl transition-colors hover:bg-muted/30 pr-4">
+                                    <div className="flex justify-between items-center py-4 rounded-xl transition-colors hover:bg-muted/30 pr-4">
                                         <div className="flex items-center gap-6">
-                                            <div className="w-14 h-14 rounded-2xl bg-amber-500/10 flex items-center justify-center text-amber-500"><Bell size={28} /></div>
+                                            <div className="w-14 h-14 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-500"><Bell size={28} /></div>
                                             <div>
                                                 <h3 className="text-2xl font-serif text-foreground">Synchronized Alerts</h3>
                                                 <p className="text-muted-foreground text-sm font-light italic">Real-time pulse notifications.</p>
@@ -264,8 +265,8 @@ export default function SettingsPage() {
                                     animate={{ opacity: 1, x: 0 }}
                                     className="space-y-12"
                                 >
-                                    <div className="bg-muted/30 rounded-[32px] p-10 flex gap-10 items-center border border-border">
-                                        <div className="w-24 h-24 rounded-3xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20 transition-transform hover:rotate-6">
+                                    <div className="bg-muted/30 rounded-xl p-10 flex gap-10 items-center border border-border">
+                                        <div className="w-24 h-24 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20 transition-transform hover:rotate-6">
                                             <HeartPulse size={48} />
                                         </div>
                                         <div>
@@ -282,7 +283,7 @@ export default function SettingsPage() {
                                                 value={preferences.aiName}
                                                 onChange={(e) => setPreferences({ ...preferences, aiName: e.target.value })}
                                                 onBlur={() => updateDB(preferences)}
-                                                className="w-full bg-card border border-border rounded-3xl px-6 py-5 text-2xl font-serif text-foreground focus:outline-none focus:ring-4 focus:ring-primary/5"
+                                                className="w-full bg-card border border-border rounded-xl px-6 py-5 text-2xl font-serif text-foreground focus:outline-none focus:ring-4 focus:ring-primary/5"
                                             />
                                         </div>
 
@@ -293,7 +294,7 @@ export default function SettingsPage() {
                                                     <button
                                                         key={p}
                                                         onClick={() => handleSelect('aiPersonality', p)}
-                                                        className={`py-4 rounded-2xl text-[10px] font-bold uppercase tracking-[0.2em] transition-all border ${preferences.aiPersonality === p
+                                                        className={`py-4 rounded-xl text-[10px] font-bold uppercase tracking-[0.2em] transition-all border ${preferences.aiPersonality === p
                                                             ? "bg-primary border-primary text-primary-foreground shadow-2xl shadow-primary/30"
                                                             : "bg-card border-border text-muted-foreground hover:border-foreground/20"
                                                             }`}
@@ -319,7 +320,7 @@ export default function SettingsPage() {
                                             <h3 className="text-4xl font-serif italic">Privacy Protocol</h3>
                                         </div>
 
-                                        <div className="p-10 bg-emerald-500/5 rounded-[40px] border border-emerald-500/10">
+                                        <div className="p-10 bg-emerald-500/5 rounded-[48px] border border-emerald-500/10">
                                             <p className="text-muted-foreground text-lg font-light leading-relaxed italic">
                                                 Your biometric spectrum is encrypted at rest. Data is strictly utilized for the Pulse training algorithm and is never broadcasted to external entities.
                                             </p>
@@ -327,13 +328,30 @@ export default function SettingsPage() {
 
                                         <div className="space-y-4 pt-6">
                                             {['HealthKit Sync', 'Agent Data Review', 'Biometric Lock'].map(item => (
-                                                <div key={item} className="flex justify-between items-center p-6 bg-muted/20 rounded-3xl hover:bg-muted/40 transition-all cursor-pointer group">
+                                                <div key={item} className="flex justify-between items-center p-6 bg-muted/20 rounded-xl hover:bg-muted/40 transition-all cursor-pointer group">
                                                     <span className="text-foreground font-serif text-xl">{item}</span>
                                                     <div className="w-12 h-7 bg-muted rounded-full relative transition-colors group-hover:bg-muted-foreground/30">
                                                         <div className="w-5 h-5 bg-background rounded-full absolute top-1 left-1 shadow-sm" />
                                                     </div>
                                                 </div>
                                             ))}
+                                        </div>
+
+                                        <div className="pt-12 border-t border-border mt-12">
+                                            <div className="flex items-center gap-6 text-foreground mb-8">
+                                                <Database className="text-primary" size={24} />
+                                                <h3 className="text-2xl font-serif italic">Archive Protocols</h3>
+                                            </div>
+                                            <p className="text-muted-foreground text-sm font-light italic mb-8">
+                                                Download your complete neural performance history as a standardized JSON archive for external analysis or portability.
+                                            </p>
+                                            <button
+                                                onClick={handleExport}
+                                                className="flex items-center gap-4 px-10 py-5 bg-background border border-border rounded-xl text-[10px] font-bold uppercase tracking-widest text-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all shadow-sm group"
+                                            >
+                                                <Download size={16} className="group-hover:-translate-y-1 transition-transform" />
+                                                Initiate Data Export
+                                            </button>
                                         </div>
                                     </div>
                                 </motion.div>

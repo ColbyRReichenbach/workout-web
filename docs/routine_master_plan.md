@@ -117,6 +117,16 @@
 *   **Weeks 5-7:** Increase Squat/Bench weight by 5-10 lbs per week. Increase Wednesday Run by 5 mins per week.
 *   **Week 8 (Deload):** Reduce all weights to 50% 1RM. Reduce Run to 30 mins.
 
+### Week 8 Checkpoint: Aerobic Capacity Test
+**Saturday of Week 8:**
+*   **5k Run Time Trial** – Establishes new aerobic threshold
+*   **2k Row Time Trial** – Establishes new rowing pace baseline
+
+**How to Recalculate for Phase 2:**
+*   **New Zone 2 Pace** = (5k pace) + 60-75 seconds/mile
+*   **New Tempo Run Pace** = (5k pace) + 20-30 seconds/mile
+*   **New Row Interval Pace** = (2k pace) + 8-10 seconds/500m
+
 ---
 
 ## PHASE 2: STRENGTH & THRESHOLD (Weeks 9–20)
@@ -187,6 +197,21 @@
 *   **Week 14:** Deload (Light weights, easy cardio).
 *   **Weeks 17-19:** Increase Squat to 315 lbs (3x3). Increase Tempo Run to 3 miles at pace.
 
+### Week 20 Checkpoint: Strength & Speed Test
+**Saturday of Week 20:**
+*   **Updated 1RM Tests** (or 3RM to estimate):
+    *   Back Squat 1RM
+    *   Bench Press 1RM
+    *   Deadlift 1RM
+*   **1 Mile Run Time Trial**
+*   **500m Row Max Effort**
+
+**How to Recalculate for Phase 3:**
+*   **Phase 3 Heavy Double** = (New 1RM) × 0.93
+*   **Phase 3 Heavy Single** = (New 1RM) × 0.96
+*   **400m Interval Pace** = (1 Mile time ÷ 4) - 10 seconds
+*   **Sprint Work Watts** = Estimated from 500m row power output
+
 ---
 
 ## PHASE 3: THE PEAK (Weeks 21–32)
@@ -241,15 +266,45 @@
 
 ---
 
-## PHASE 4: THE WASHOUT (Weeks 33–36)
-**Goal:** Drop fatigue.
-*   **Weights:** Dumbbells only. Nothing heavier than 50lbs.
-*   **Cardio:** Nature walks/hikes only. No timers.
-*   **Frequency:** Train when you feel like it (3-4 days).
+## PHASE 4: THE TAPER (Weeks 33–36)
+**Goal:** Dissipate fatigue while maintaining neuro-muscular "pop."
+*   **Weights:** Barbell "Priming" Singles @ 70-80% 1RM. No accessories.
+*   **Cardio:** 20-30 min Zone 2 only. Maintain the engine, do not tax it.
+*   **Frequency:** 3 days per week (e.g., Mon/Wed/Fri).
+*   **Tracking Focus:** Modal should track "Movement Quality" and "Readiness." Stop if speed drops.
+
+### Phase 4 Weekly Template
+*   **Monday:** Squat 3x1 @ 75%, Bench 3x1 @ 75%. 20 min easy spin.
+*   **Tuesday:** Active Recovery – 30 min Zone 1 Walk (HR <130) + 15 min Yoga Flow.
+*   **Wednesday:** Deadlift 2x1 @ 70% (Very fast), OHP 3x1 @ 75%. 20 min easy row.
+*   **Thursday:** Active Recovery – 30 min Zone 1 Swim or Easy Bike + Full-body stretching.
+*   **Friday:** Clean & Jerk 5x1 @ 70% (Technique focus), Snatch 5x1 @ 70%. 20 min easy run.
+*   **Saturday:** 45 min Zone 2 Continuous Movement (Multi-modal: 15 min row, 15 min bike, 15 min walk).
+*   **Sunday:** Complete Rest – Focus on sleep, nutrition, and mental recovery.
 
 ---
 
-## PHASE 5: RE-CALIBRATION (Weeks 37–52)
-*   **Action:** Re-test 1RM Squat, Deadlift, Bench, and 1 Mile Run.
-*   **Restart Phase 1:** Use new numbers.
-*   **Expectation:** Your Zone 2 pace should now be 9:30/mile instead of 10:30+, and your Phase 1 Squat weights should be 265 lbs instead of 240.
+## PHASE 5: RE-CALIBRATION & PR TESTING (Weeks 37–52)
+**Goal:** Establish new 1RM baselines and re-enter high-volume training.
+**The Strategy:** Alternate between "Testing Weeks" and "Re-Entry Weeks."
+
+### Phase 5 Testing Split (Weeks 37, 44, 51)
+*   **MONDAY: Olympic Maxes**
+    *   Build to 1RM Clean & Jerk.
+    *   Build to 1RM Snatch.
+*   **WEDNESDAY: Structural Maxes**
+    *   Build to 1RM Front Squat.
+    *   Build to 1RM Bench Press.
+*   **FRIDAY: Absolute Maxes**
+    *   Build to 1RM Back Squat.
+    *   Build to 1RM Deadlift.
+*   **SATURDAY: Conditioning Benchmarks (Rotated)**
+    *   **Week 37:** 1 Mile Run (PR) + 500m Row (Max Effort).
+    *   **Week 44:** 5k Run (PR) + Assault Bike (Max Watts - 30 sec test).
+    *   **Week 51:** 400m Repeats (8 x 400m for avg pace) + 2k Row (PR) + Ski Erg (1k PR).
+
+### Phase 5 Re-Entry Logic (Non-Testing Weeks)
+*   Restart **PHASE 1 (Structural Integrity)** using the new 1RM numbers.
+*   **Retest Rule:** If a PR is tested in Week 37, it **must** be retested in Week 51 to quantify the final block's progress.
+
+**Expectation:** Your Zone 2 pace should now be ~9:15/mile, and your Front Squat should ideally approach your old Back Squat numbers.

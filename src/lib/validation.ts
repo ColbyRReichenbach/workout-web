@@ -216,6 +216,52 @@ export const sessionLogSchema = z.object({
 })
 
 // ============================================
+// PERFORMANCE DATA SCHEMA (JSONB validation)
+// ============================================
+
+/**
+ * Validates the performance_data JSONB field in logs table
+ * Supports strength, cardio, and metcon workout types
+ */
+export const performanceDataSchema = z.object({
+    // Strength training sets
+    sets: z.array(z.object({
+        weight: z.number().min(0).max(BOUNDS.WEIGHT_MAX).optional(),
+        reps: z.number().int().min(0).max(BOUNDS.REPS_MAX).optional(),
+        rpe: z.number().min(BOUNDS.RPE_MIN).max(BOUNDS.RPE_MAX).optional(),
+    })).optional(),
+
+    // Single set values (legacy format)
+    weight: z.number().min(0).max(BOUNDS.WEIGHT_MAX).optional(),
+    reps: z.number().int().min(0).max(BOUNDS.REPS_MAX).optional(),
+
+    // Metcon / AMRAP
+    rounds: z.number().int().min(0).max(100).optional(),
+    additional_reps: z.number().int().min(0).max(1000).optional(),
+    time_seconds: z.number().min(0).max(BOUNDS.DURATION_MAX * 60).optional(),
+
+    // Cardio
+    distance: z.number().min(0).max(1000).optional(), // km or miles
+    duration_min: z.number().min(0).max(BOUNDS.DURATION_MAX).optional(),
+    avg_hr: z.number().min(BOUNDS.HR_MIN).max(BOUNDS.HR_MAX).optional(),
+    pace: z.string().max(20).optional(),
+
+    // General
+    notes: z.string().max(BOUNDS.NOTES_MAX_LENGTH).optional(),
+}).passthrough() // Allow additional fields for extensibility
+
+/**
+ * Safely validate performance data before database insert
+ */
+export function validatePerformanceData(data: unknown): { success: true; data: z.infer<typeof performanceDataSchema> } | { success: false; error: string } {
+    const result = performanceDataSchema.safeParse(data)
+    if (result.success) {
+        return { success: true, data: result.data }
+    }
+    return { success: false, error: result.error.message }
+}
+
+// ============================================
 // BIOMETRIC SCHEMAS
 // ============================================
 
