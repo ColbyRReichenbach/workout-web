@@ -130,8 +130,10 @@ export default function WorkoutPage() {
                 const week = phase.weeks[relativeWeekIdx] || phase.weeks[0];
                 let todayData = week.days[workoutDayIndex] || week.days[0];
 
-                // CHECKPOINT OVERRIDE: Replace workout with actual PR tests if it's a checkpoint week Saturday
+                // Get day name once for reuse
                 const todayDayName = targetDay || dayNames[workoutDayIndex];
+
+                // CHECKPOINT OVERRIDE: Replace workout with actual PR tests if it's a checkpoint week Saturday
                 if (todayDayName === "Saturday") {
                     const checkpointData = getCheckpointData(absWeek);
                     if (checkpointData) {
@@ -153,7 +155,6 @@ export default function WorkoutPage() {
                 setSegments(todayData.segments || []);
 
                 // Fetch existing logs for today's workout to prevent duplicate submissions
-                const todayDayName = targetDay || dayNames[workoutDayIndex];
                 const { data: existingLogs } = await supabase
                     .from('logs')
                     .select('segment_name')
