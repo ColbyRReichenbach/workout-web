@@ -27,12 +27,24 @@ const PHASE_RANGES: Record<number, PhaseRange> = {
 
 interface ProfileFormState {
     weight_lbs: string;
+    // Powerlifting Maxes
     squat_max: string;
     bench_max: string;
     deadlift_max: string;
+    // Olympic Lift Maxes
+    front_squat_max: string;
+    clean_jerk_max: string;
+    snatch_max: string;
+    ohp_max: string;
+    // Cardio Benchmarks
     mile_time: string;
     k5_time: string;
     sprint_400m: string;
+    row_2k: string;
+    row_500m: string;
+    ski_1k: string;
+    bike_max_watts: string;
+    // Training State
     current_week: number;
     current_phase: number;
 }
@@ -46,9 +58,17 @@ export default function ProfilePage() {
         squat_max: "",
         bench_max: "",
         deadlift_max: "",
+        front_squat_max: "",
+        clean_jerk_max: "",
+        snatch_max: "",
+        ohp_max: "",
         mile_time: "",
         k5_time: "",
         sprint_400m: "",
+        row_2k: "",
+        row_500m: "",
+        ski_1k: "",
+        bike_max_watts: "",
         current_week: 1,
         current_phase: 1,
     });
@@ -113,9 +133,17 @@ export default function ProfilePage() {
                 squat_max: toDisplayWeight(profile.squat_max, units)?.toString() || "",
                 bench_max: toDisplayWeight(profile.bench_max, units)?.toString() || "",
                 deadlift_max: toDisplayWeight(profile.deadlift_max, units)?.toString() || "",
+                front_squat_max: toDisplayWeight(profile.front_squat_max, units)?.toString() || "",
+                clean_jerk_max: toDisplayWeight(profile.clean_jerk_max, units)?.toString() || "",
+                snatch_max: toDisplayWeight(profile.snatch_max, units)?.toString() || "",
+                ohp_max: toDisplayWeight(profile.ohp_max, units)?.toString() || "",
                 mile_time: secondsToTime(profile.mile_time_sec),
                 k5_time: secondsToTime(profile.k5_time_sec),
                 sprint_400m: secondsToTime(profile.sprint_400m_sec),
+                row_2k: secondsToTime(profile.row_2k_sec),
+                row_500m: secondsToTime(profile.row_500m_sec),
+                ski_1k: secondsToTime(profile.ski_1k_sec),
+                bike_max_watts: profile.bike_max_watts?.toString() || "",
                 current_week: profile.current_week || 1,
                 current_phase: profile.current_phase || 1,
             }));
@@ -136,10 +164,17 @@ export default function ProfilePage() {
             squat_max: toStorageWeight(form.squat_max, units) || null,
             bench_max: toStorageWeight(form.bench_max, units) || null,
             deadlift_max: toStorageWeight(form.deadlift_max, units) || null,
-            deadlift_max: toStorageWeight(form.deadlift_max, units) || null,
+            front_squat_max: toStorageWeight(form.front_squat_max, units) || null,
+            clean_jerk_max: toStorageWeight(form.clean_jerk_max, units) || null,
+            snatch_max: toStorageWeight(form.snatch_max, units) || null,
+            ohp_max: toStorageWeight(form.ohp_max, units) || null,
             mile_time_sec: form.mile_time ? timeToSeconds(form.mile_time) : null,
             k5_time_sec: form.k5_time ? timeToSeconds(form.k5_time) : null,
             sprint_400m_sec: form.sprint_400m ? timeToSeconds(form.sprint_400m) : null,
+            row_2k_sec: form.row_2k ? timeToSeconds(form.row_2k) : null,
+            row_500m_sec: form.row_500m ? timeToSeconds(form.row_500m) : null,
+            ski_1k_sec: form.ski_1k ? timeToSeconds(form.ski_1k) : null,
+            bike_max_watts: form.bike_max_watts ? parseFloat(form.bike_max_watts) : null,
             current_week: form.current_week,
             current_phase: form.current_phase,
         };
