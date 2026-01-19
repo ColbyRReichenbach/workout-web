@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import {
   Activity, Calendar, Flame, List, CalendarDays,
-  ArrowRight, HeartPulse, Scale
+  ArrowRight, HeartPulse, Scale, TrendingUp, Award
 } from "lucide-react";
 import AiCoach from "@/components/AiCoach";
 import { DayCard, DayDetailModal } from "@/components/WeeklySchedule";
@@ -17,6 +17,8 @@ import { WorkoutDay, ProtocolDay, WorkoutLog } from "@/lib/types";
 import { useSettings } from "@/context/SettingsContext";
 import { getUnitLabel } from "@/lib/conversions";
 import { DEMO_USER_ID } from "@/lib/userSettings";
+import { CheckpointTestAlert } from "@/components/CheckpointTestAlert";
+import { isCheckpointWeek, getCheckpointData } from "@/lib/checkpointTests";
 
 // Types for workout data
 
@@ -312,6 +314,23 @@ export default function Home() {
           </TiltCard>
         ))}
       </motion.div>
+
+      {/* Checkpoint Testing Alert */}
+      {currentWeek && isCheckpointWeek(currentWeek) && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+        >
+          <CheckpointTestAlert
+            checkpointData={getCheckpointData(currentWeek)!}
+            onStartTesting={() => {
+              // Navigate to testing protocol or show modal
+              window.location.href = `/workout?day=Saturday`;
+            }}
+          />
+        </motion.div>
+      )}
 
       {/* Main Content Split */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
