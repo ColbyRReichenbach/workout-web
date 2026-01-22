@@ -93,13 +93,27 @@ export const getUnitLabel = (unit: UnitSystem, type: 'weight' | 'distance'): str
  * back to their baseline counterparts in the BASELINE maxes table.
  */
 export const mapExerciseToBaseline = (name: string): string => {
-    if (!name) return "";
+    if (!name) return "Other";
     const lower = name.toLowerCase();
 
     if (lower.includes("back squat")) return "Back Squat";
+    if (lower.includes("front squat")) return "Front Squat";
     if (lower.includes("bench press") || (lower.includes("bench") && !lower.includes("press"))) return "Bench Press";
     if (lower.includes("deadlift")) return "Deadlift";
     if (lower.includes("overhead press") || lower.includes("ohp")) return "Overhead Press";
+    if (lower.includes("clean")) return "Clean & Jerk";
+    if (lower.includes("snatch")) return "Snatch";
 
-    return name; // Fallback to original
+    // Cardio Benchmarks
+    if (lower.includes("1 mile") || (lower === "mile")) return "1 Mile";
+    if (lower.includes("5k")) return "5k";
+    if (lower.includes("400m")) return "400m";
+    if (lower.includes("row") && lower.includes("2k")) return "2k Row";
+    if (lower.includes("row") && lower.includes("500m")) return "500m Row";
+    if (lower.includes("ski") && lower.includes("1k")) return "1k Ski";
+    if (lower.includes("bike") && (lower.includes("max") || lower.includes("watt"))) return "Max Bike Watts";
+    if (lower.includes("zone 2") && lower.includes("pace")) return "Zone 2 Pace";
+    if (lower.includes("tempo") && lower.includes("pace")) return "Tempo Pace";
+
+    return "Other";
 };

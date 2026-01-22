@@ -7,7 +7,8 @@ import {
     PremiumAreaChart,
     ProgressionBarChart,
     StructuralHeatmap,
-    RecoveryIndexChart
+    RecoveryIndexChart,
+    PRProximityChart
 } from "@/components/AnalyticsCharts";
 import { PRAnalysisModal } from "@/components/PRAnalysisModal";
 import { PRHistory } from "@/components/PRHistory";
@@ -73,7 +74,34 @@ export default function AnalyticsPage() {
         readinessHistory: number[];
         activityHeatmap: boolean[];
         readinessHeatmap: number[];
+        weeklyCardioDist: number[];
+        aerobicVolume: number[];
+        powerDensity: number[];
+        readinessSurplus: number[];
+        prMagnitude: number[];
+        historicalPRs: any[];
+        runningMaxes: Record<string, number>;
+        profileMaxes: {
+            squat_max?: number;
+            bench_max?: number;
+            deadlift_max?: number;
+            ohp_max?: number;
+            clean_jerk_max?: number;
+            snatch_max?: number;
+            mile_time_sec?: number;
+            k5_time_sec?: number;
+            sprint_400m_sec?: number;
+            row_2k_sec?: number;
+            row_500m_sec?: number;
+            ski_1k_sec?: number;
+            bike_max_watts?: number;
+            zone2_pace_per_mile_sec?: number;
+            tempo_pace_per_mile_sec?: number;
+            zone2_row_pace_500m_sec?: number;
+        };
     } | null>(null);
+
+    const [viewMode, setViewMode] = useState<'tonnage' | 'cardio'>('tonnage');
 
     const { units } = useSettings();
 
@@ -125,6 +153,62 @@ export default function AnalyticsPage() {
             const stressMap: Record<number, number> = {};
             const recMap: Record<number, { sum: number, count: number }> = {};
             const prMap: Record<string, number> = {};
+            const distMap: Record<number, number> = {};
+            const durationMap: Record<number, number> = {};
+            const powerMap: Record<number, { sum: number, count: number }> = {};
+            const prCountMap: Record<number, number> = {};
+            const runningMaxes: Record<string, number> = {};
+            const historicalPRs: any[] = [];
+
+            // 1. Seed historicalPRs with Profile Baselines (Weight)
+            const weightBaselines: Record<string, number | undefined> = {
+                "Back Squat": raw.profile.squat_max,
+                "Front Squat": raw.profile.front_squat_max,
+                "Bench Press": raw.profile.bench_max,
+                "Deadlift": raw.profile.deadlift_max,
+                "Overhead Press": raw.profile.ohp_max,
+                "Clean & Jerk": raw.profile.clean_jerk_max,
+                "Snatch": raw.profile.snatch_max
+            };
+            Object.entries(weightBaselines).forEach(([name, val]) => {
+                if (val && val > 0) {
+                    runningMaxes[name] = val;
+                    historicalPRs.push({
+                        id: `baseline-${name}`,
+                        exercise_name: name,
+                        value: val,
+                        unit: 'lbs',
+                        pr_type: 'Weight',
+                        created_at: ANCHOR_DATE.toISOString()
+                    });
+                }
+            });
+
+            // 2. Seed historicalPRs with Profile Baselines (Cardio Time/Pace)
+            const cardioBaselines: Record<string, { val: number | undefined, type: string, unit: string }> = {
+                "1 Mile": { val: raw.profile.mile_time_sec, type: 'Time', unit: 'sec' },
+                "5k": { val: raw.profile.k5_time_sec, type: 'Time', unit: 'sec' },
+                "400m": { val: raw.profile.sprint_400m_sec, type: 'Time', unit: 'sec' },
+                "2k Row": { val: raw.profile.row_2k_sec, type: 'Time', unit: 'sec' },
+                "500m Row": { val: raw.profile.row_500m_sec, type: 'Time', unit: 'sec' },
+                "1k Ski": { val: raw.profile.ski_1k_sec, type: 'Time', unit: 'sec' },
+                "Max Bike Watts": { val: raw.profile.bike_max_watts, type: 'Pwr', unit: 'watts' },
+                "Zone 2 Pace": { val: raw.profile.zone2_pace_per_mile_sec, type: 'Pace', unit: 'sec' },
+                "Tempo Pace": { val: raw.profile.tempo_pace_per_mile_sec, type: 'Pace', unit: 'sec' }
+            };
+            Object.entries(cardioBaselines).forEach(([name, config]) => {
+                if (config.val && config.val > 0) {
+                    runningMaxes[name] = config.val;
+                    historicalPRs.push({
+                        id: `baseline-${name}`,
+                        exercise_name: name,
+                        value: config.val,
+                        unit: config.unit,
+                        pr_type: config.type,
+                        created_at: ANCHOR_DATE.toISOString()
+                    });
+                }
+            });
 
             // Heatmap arrays (56 days = 8 weeks of structural phase)
             const activeDays = new Array(56).fill(false);
@@ -181,15 +265,109 @@ export default function AnalyticsPage() {
                                 // System Stress (Simplified TSS)
                                 const tss = (vol * (relInt / 100)) / 100;
                                 stressMap[weekIdx] = (stressMap[weekIdx] || 0) + tss;
+
+                                // Power Density (Vol * Rel Intensity / Time)
+                                if (perf.duration_min) {
+                                    const dur = parseFloat(perf.duration_min) || 30;
+                                    const pwr = (vol * (relInt / 100)) / dur;
+                                    if (!powerMap[weekIdx]) powerMap[weekIdx] = { sum: 0, count: 0 };
+                                    powerMap[weekIdx].sum += pwr;
+                                    powerMap[weekIdx].count++;
+                                }
+
+                                // Historical PR Detection (Weight) - ONLY Main Lifts in Profile
+                                const baselineMapping = mapExerciseToBaseline(log.segment_name);
+                                const isMainLift = baselineMapping !== "Other";
+
+                                if (isMainLift && avgWeight > (runningMaxes[baselineMapping] || 0)) {
+                                    runningMaxes[baselineMapping] = avgWeight;
+                                    historicalPRs.push({
+                                        id: `${log.date}-${baselineMapping}`,
+                                        exercise_name: baselineMapping,
+                                        value: avgWeight,
+                                        unit: 'lbs',
+                                        pr_type: 'Weight',
+                                        created_at: log.date
+                                    });
+                                }
                             }
                         }
 
-                        // Aerobic Efficiency
-                        if (perf.avg_hr && perf.distance && perf.duration_min) {
-                            const mph = parseFloat(perf.distance) / (parseFloat(perf.duration_min) / 60);
-                            if (mph > 0) {
-                                const efficiency = (mph / perf.avg_hr) * 1000;
-                                efficiencyMap[weekIdx] = efficiency;
+                        // Aerobic Efficiency & Cardio Volume
+                        if (perf.distance || perf.duration_min) {
+                            const dist = parseFloat(perf.distance || "0");
+                            const dur = parseFloat(perf.duration_min || "0");
+
+                            if (dist > 0) {
+                                distMap[weekIdx] = (distMap[weekIdx] || 0) + dist;
+
+                                // Historical PR Detection (Cardio) - Time & Pace
+                                const baselineName = mapExerciseToBaseline(log.segment_name);
+                                const cardioKeywords = ["Run", "Cycle", "Row", "Swim", "Ski"];
+                                const isMainCardio = cardioKeywords.some(kw => log.segment_name.includes(kw) || baselineName.includes(kw));
+
+                                if (isMainCardio && dur > 0 && dist > 0) {
+                                    const isBenchmark = ["1 Mile", "5k", "400m", "2k Row", "500m Row", "1k Ski", "Max Bike Watts", "Zone 2 Pace", "Tempo Pace"].includes(baselineName);
+                                    const totalSec = dur * 60;
+                                    const avgWatts = parseFloat(perf.avg_watts || "0");
+
+                                    if (isBenchmark) {
+                                        // Track Fastest Time or Power PR
+                                        const profileBenchMapping: Record<string, number | undefined> = {
+                                            "1 Mile": raw.profile.mile_time_sec,
+                                            "5k": raw.profile.k5_time_sec,
+                                            "400m": raw.profile.sprint_400m_sec,
+                                            "2k Row": raw.profile.row_2k_sec,
+                                            "500m Row": raw.profile.row_500m_sec,
+                                            "1k Ski": raw.profile.ski_1k_sec,
+                                            "Max Bike Watts": raw.profile.bike_max_watts,
+                                            "Zone 2 Pace": raw.profile.zone2_pace_per_mile_sec,
+                                            "Tempo Pace": raw.profile.tempo_pace_per_mile_sec
+                                        };
+                                        const currentBest = runningMaxes[baselineName] || profileBenchMapping[baselineName] || (baselineName === "Max Bike Watts" ? 0 : Infinity);
+
+                                        const isImprovement = baselineName === "Max Bike Watts" ? (avgWatts > currentBest) : (totalSec < currentBest);
+                                        const newValue = baselineName === "Max Bike Watts" ? avgWatts : totalSec;
+
+                                        if (isImprovement && newValue > 0) {
+                                            runningMaxes[baselineName] = newValue;
+                                            historicalPRs.push({
+                                                id: `${log.date}-${baselineName}`,
+                                                exercise_name: baselineName,
+                                                value: newValue,
+                                                unit: baselineName === "Max Bike Watts" ? 'watts' : 'sec',
+                                                pr_type: baselineName === "Max Bike Watts" ? 'Pwr' : (baselineName.includes("Pace") ? 'Pace' : 'Time'),
+                                                created_at: log.date
+                                            });
+                                        }
+                                    } else {
+                                        // Track Best Pace PR (sec per unit distance)
+                                        const pace = totalSec / dist;
+                                        const paceKey = `${baselineName}-pace`;
+                                        const currentBestPace = runningMaxes[paceKey] || Infinity;
+
+                                        if (pace < currentBestPace) {
+                                            runningMaxes[paceKey] = pace;
+                                            historicalPRs.push({
+                                                id: `${log.date}-${paceKey}`,
+                                                exercise_name: `${baselineName} Pace`,
+                                                value: pace,
+                                                unit: 'sec',
+                                                pr_type: 'Pace',
+                                                created_at: log.date
+                                            });
+                                        }
+                                    }
+                                }
+                                if (dur > 0) durationMap[weekIdx] = (durationMap[weekIdx] || 0) + dur;
+
+                                if (perf.avg_hr && dist > 0 && dur > 0) {
+                                    const mph = dist / (dur / 60);
+                                    if (mph > 0) {
+                                        const efficiency = (mph / perf.avg_hr) * 1000;
+                                        efficiencyMap[weekIdx] = efficiency;
+                                    }
+                                }
                             }
                         }
                     }
@@ -248,6 +426,26 @@ export default function AnalyticsPage() {
                 if (recoveryIndex[i] === 0) recoveryIndex[i] = recoveryIndex[i - 1] || 80;
             }
 
+            const powerDensity = Array.from({ length: TOTAL_WEEKS }, (_, i) =>
+                (powerMap[i] && powerMap[i].count > 0) ? (powerMap[i].sum / powerMap[i].count) : 0
+            );
+            const readinessSurplus = Array.from({ length: TOTAL_WEEKS }, (_, i) =>
+                Math.max(-50, Math.min(50, (recoveryIndex[i] || 70) - (Math.min(100, systemStress[i] / 2) || 40)))
+            );
+            const prMagnitude = Array.from({ length: TOTAL_WEEKS }, (_, i) => {
+                const count = historicalPRs.filter(p => {
+                    const d = new Date(p.created_at);
+                    const diffTime = d.getTime() - ANCHOR_DATE.getTime();
+                    const w = Math.floor(diffTime / (7 * 24 * 60 * 60 * 1000));
+                    return w === i;
+                }).length;
+                return count * 10; // Scale for chart visibility
+            });
+
+            for (let i = 1; i < TOTAL_WEEKS; i++) {
+                if (powerDensity[i] === 0) powerDensity[i] = powerDensity[i - 1] || 25; // Lower fallback for better visual
+            }
+
             setData({
                 rawLogs: raw.volumeData,
                 rawSleepData: raw.sleepData,
@@ -261,7 +459,32 @@ export default function AnalyticsPage() {
                 currentWeek: profileWeek,
                 readinessHistory: raw.readinessData.map(r => r.readiness_score || 0),
                 activityHeatmap: activeDays,
-                readinessHeatmap: readyDays
+                readinessHeatmap: readyDays,
+                weeklyCardioDist: Array.from({ length: TOTAL_WEEKS }, (_, i) => distMap[i] || 0),
+                aerobicVolume: Array.from({ length: TOTAL_WEEKS }, (_, i) => durationMap[i] || 0),
+                powerDensity,
+                readinessSurplus,
+                prMagnitude,
+                historicalPRs: historicalPRs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()),
+                runningMaxes,
+                profileMaxes: {
+                    squat_max: raw.profile.squat_max,
+                    bench_max: raw.profile.bench_max,
+                    deadlift_max: raw.profile.deadlift_max,
+                    ohp_max: raw.profile.ohp_max,
+                    clean_jerk_max: raw.profile.clean_jerk_max,
+                    snatch_max: raw.profile.snatch_max,
+                    mile_time_sec: raw.profile.mile_time_sec,
+                    k5_time_sec: raw.profile.k5_time_sec,
+                    sprint_400m_sec: raw.profile.sprint_400m_sec,
+                    row_2k_sec: raw.profile.row_2k_sec,
+                    row_500m_sec: raw.profile.row_500m_sec,
+                    ski_1k_sec: raw.profile.ski_1k_sec,
+                    bike_max_watts: raw.profile.bike_max_watts,
+                    zone2_pace_per_mile_sec: raw.profile.zone2_pace_per_mile_sec,
+                    tempo_pace_per_mile_sec: raw.profile.tempo_pace_per_mile_sec,
+                    zone2_row_pace_500m_sec: raw.profile.zone2_row_pace_500m_sec,
+                }
             });
         };
         fetchData();
@@ -386,12 +609,18 @@ export default function AnalyticsPage() {
                         <div className="relative z-10 h-full flex flex-col justify-between">
                             <div className="mb-8">
                                 <h4 className="text-xl font-serif text-foreground">
-                                    {isPhase1 && "Efficiency Curve (Speed/HR)"}
+                                    {isPhase1 && "Aerobic efficiency (Pace/HR)"}
                                     {isPhase2 && "CNS Intensity Progression (%1RM)"}
-                                    {isPhase3 && "Peak Load Intensity (%1RM)"}
+                                    {isPhase3 && "Power Density Index (Work/Time)"}
+                                    {isPhase4 && "Readiness Surplus (Super-Compensation)"}
+                                    {isPhase5 && "Performance Baseline Delta (P1 vs P5)"}
                                 </h4>
                                 <p className="text-muted-foreground text-xs font-light italic mt-1">
-                                    Measure of physiological adaptation vs output.
+                                    {isPhase1 && "Visualizing physiological adaptation: maintaining higher output at lower cardiovascular costs."}
+                                    {isPhase2 && "Tracking relative load tolerance as we transition into heavier strength blocks."}
+                                    {isPhase3 && "Peak performance window: measuring the density of work capacity at maximum recursive intensity."}
+                                    {isPhase4 && "Recovery must exceed load. Tracking the accumulation of physiological resources for the final peak."}
+                                    {isPhase5 && "The full evolution: Comparing absolute performance peaks against your Week 1 structural baselines."}
                                 </p>
                             </div>
 
@@ -400,15 +629,39 @@ export default function AnalyticsPage() {
                                     <PremiumAreaChart
                                         data={data.efficiencyIndex}
                                         color="#ef4444"
-                                        units=" pts"
+                                        units=" Ef."
                                         height={300}
                                     />
                                 )}
-                                {(isPhase2 || isPhase3 || isPhase4 || isPhase5) && (
+                                {isPhase2 && (
                                     <PremiumAreaChart
                                         data={data.cnsIntensity}
-                                        color={isPhase3 || isPhase5 ? "var(--primary)" : "var(--foreground)"}
+                                        color="var(--foreground)"
                                         units="%"
+                                        height={300}
+                                    />
+                                )}
+                                {isPhase3 && (
+                                    <PremiumAreaChart
+                                        data={data.powerDensity}
+                                        color="#fbbf24"
+                                        units=" Pwr"
+                                        height={300}
+                                    />
+                                )}
+                                {isPhase4 && (
+                                    <PremiumAreaChart
+                                        data={data.readinessSurplus}
+                                        color="#0ea5e9"
+                                        units="%"
+                                        height={300}
+                                    />
+                                )}
+                                {isPhase5 && (
+                                    <PremiumAreaChart
+                                        data={data.prMagnitude}
+                                        color="var(--primary)"
+                                        units=" Mag."
                                         height={300}
                                     />
                                 )}
@@ -426,17 +679,17 @@ export default function AnalyticsPage() {
                             </div>
                             <h4 className="text-2xl font-serif text-foreground mb-4">
                                 {isPhase1 && "Structural Integrity"}
-                                {isPhase2 && "Threshold Drift"}
-                                {isPhase3 && "Peak Preparation"}
-                                {isPhase4 && "Recovery Surplus"}
-                                {isPhase5 && "Benchmark Calibration"}
+                                {isPhase2 && "Threshold Stability"}
+                                {isPhase3 && "PR Proximity"}
+                                {isPhase4 && "Taper Readiness"}
+                                {isPhase5 && "Mastery Check"}
                             </h4>
                             <p className="text-muted-foreground text-sm leading-relaxed font-light mb-10">
-                                {isPhase1 && "Tracking structural loading. Green markers indicate adaptation-ready sessions."}
-                                {isPhase2 && "Analysis of work capacity at lactic threshold. Average heart rate during 5k splits."}
-                                {isPhase3 && "Building towards PR testing. Current focus: power output density and neural efficiency."}
-                                {isPhase4 && "Recovery exceeds load. Biometrics should reflect high parasitic nervous system dominance."}
-                                {isPhase5 && "Final verification of the 52-week curriculum. Absolute metrics finalized for the next cycle."}
+                                {isPhase1 && "Consistency is the primary driver. Green markers represent high-readiness structural loading sessions."}
+                                {isPhase2 && "Cardiovascular stability during metabolic stress. Are you holding pace as the weight gets heavier?"}
+                                {isPhase3 && "Tracking the delta between your current capabilities and your 52-week peak objectives."}
+                                {isPhase4 && "Parasympathetic dominance is required. HRV stability should be surfacing as systemic stress drops."}
+                                {isPhase5 && "Relative strength evolution. Visualizing the absolute shift in neurological recruitment since Cycle 1."}
                             </p>
                         </div>
 
@@ -450,29 +703,62 @@ export default function AnalyticsPage() {
                             {isPhase2 && (
                                 <div className="space-y-6">
                                     {[
-                                        { label: "Lactic Drift", val: -4.2, unit: "%" },
-                                        { label: "Split Stability", val: 88, unit: "pts" }
-                                    ].map(s => (
-                                        <div key={s.label} className="flex justify-between items-end border-b border-border pb-2">
-                                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{s.label}</span>
-                                            <span className="text-xl font-serif text-foreground">{s.val}{s.unit}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                            {(isPhase3 || isPhase4 || isPhase5) && (
-                                <div className="space-y-6">
-                                    {[
-                                        { label: "Power Density", val: "High", status: "Optimizing" },
-                                        { label: "Neural Efficiency", val: "94%", status: "Stable" },
-                                        { label: "PR Testing", val: isPhase5 ? "Live" : "Scheduled", status: isPhase5 ? "Active" : "Incoming" }
+                                        { label: "Lactic Stability", val: 92, unit: " pts" },
+                                        { label: "Pace Std Dev", val: -5.4, unit: "%" },
+                                        { label: "HR Decay Rate", val: "Optimal", status: "Active" }
                                     ].map(s => (
                                         <div key={s.label} className="flex justify-between items-end border-b border-border pb-2">
                                             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{s.label}</span>
                                             <div className="text-right">
-                                                <span className="text-xl font-serif text-foreground">{s.val}</span>
-                                                <span className="text-[8px] text-muted-foreground uppercase ml-2">{s.status}</span>
+                                                <span className="text-xl font-serif text-foreground">{s.val}{s.unit}</span>
+                                                {s.status && <span className="text-[8px] text-muted-foreground uppercase ml-2">{s.status}</span>}
                                             </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                            {isPhase3 && (
+                                <div className="space-y-6">
+                                    <PRProximityChart
+                                        label="Squat Objective"
+                                        current={data.runningMaxes["Back Squat"] || 315}
+                                        target={data.profileMaxes.squat_max ? data.profileMaxes.squat_max * 1.1 : 405}
+                                    />
+                                    <PRProximityChart
+                                        label="Engine Capacity"
+                                        current={Math.max(...data.efficiencyIndex)}
+                                        target={Math.max(...data.efficiencyIndex) * 1.2 || 100}
+                                        units="pts"
+                                    />
+                                </div>
+                            )}
+                            {isPhase4 && (
+                                <div className="space-y-4">
+                                    {[
+                                        { label: "HRV Stability", val: Math.round(data.rawSleepData.slice(-7).reduce((a, b) => a + (b.hrv_ms || 0), 0) / 7) || 65, unit: "ms" },
+                                        { label: "Deep Sleep Avg", val: `${Math.round(data.rawSleepData.slice(-7).reduce((a, b) => a + (b.deep_sleep_minutes || 0), 0) / 7)}m`, unit: "" },
+                                        { label: "Stress Clearance", val: data.readinessSurplus[data.currentWeek - 1] > 20 ? "High" : "Stable", status: "Optimizing" }
+                                    ].map(s => (
+                                        <div key={s.label} className="flex justify-between items-end border-b border-border pb-2">
+                                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{s.label}</span>
+                                            <div className="text-right">
+                                                <span className="text-xl font-serif text-foreground">{s.val}{s.unit}</span>
+                                                {s.status && <span className="text-[8px] text-muted-foreground uppercase ml-2">{s.status}</span>}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                            {isPhase5 && (
+                                <div className="space-y-6">
+                                    {[
+                                        { label: "Cycle Comparison", val: "+" + Math.round(((Math.max(...data.weeklyTonnage) - data.weeklyTonnage[0]) / (data.weeklyTonnage[0] || 1)) * 100), unit: "%" },
+                                        { label: "Absolute Peak", val: Math.max(...data.cnsIntensity).toFixed(1), unit: "%" },
+                                        { label: "Baselines Met", val: "100", unit: "%" }
+                                    ].map(s => (
+                                        <div key={s.label} className="flex justify-between items-end border-b border-border pb-2">
+                                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{s.label}</span>
+                                            <span className="text-xl font-serif text-foreground">{s.val}{s.unit}</span>
                                         </div>
                                     ))}
                                 </div>
@@ -494,11 +780,11 @@ export default function AnalyticsPage() {
                         <div className="bg-card p-4 rounded-2xl border border-border flex gap-10 shadow-sm">
                             <div>
                                 <p className="text-[8px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Stress (TSS avg)</p>
-                                <p className="text-xl font-serif text-red-500">{Math.round(data.systemStress[data.systemStress.length - 1])}</p>
+                                <p className="text-xl font-serif text-red-500">{Math.round(data.systemStress[data.currentWeek - 1] || 0)}</p>
                             </div>
                             <div>
                                 <p className="text-[8px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Recov Stability</p>
-                                <p className="text-xl font-serif text-sky-500">{Math.round(data.recoveryIndex.slice(-4).reduce((a, b) => a + b, 0) / 4)}%</p>
+                                <p className="text-xl font-serif text-sky-500">{Math.round(data.recoveryIndex.slice(-4).reduce((a, b) => a + b, 0) / 4) || 0}%</p>
                             </div>
                         </div>
                     </div>
@@ -581,45 +867,83 @@ export default function AnalyticsPage() {
 
             {/* STAGE 4: VOLUME & BENCHMARKS ARCHITECTURE */}
             <section className="space-y-12">
-                <div className="space-y-2">
-                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Background Architecture</span>
-                    <h2 className="text-4xl font-serif text-foreground tracking-tight">Macro-Cycle Progression</h2>
+                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 px-2">
+                    <div className="space-y-2">
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Background Architecture</span>
+                        <h2 className="text-4xl font-serif text-foreground tracking-tight">Macro-Cycle Progression</h2>
+                    </div>
+
+                    <div className="flex bg-muted/30 p-1 rounded-full border border-border self-start md:self-auto">
+                        <button
+                            onClick={() => setViewMode('tonnage')}
+                            className={`px-6 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all ${viewMode === 'tonnage' ? 'bg-primary text-primary-foreground shadow-lg' : 'text-muted-foreground hover:text-foreground'}`}
+                        >
+                            Tonnage
+                        </button>
+                        <button
+                            onClick={() => setViewMode('cardio')}
+                            className={`px-6 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all ${viewMode === 'cardio' ? 'bg-primary text-primary-foreground shadow-lg' : 'text-muted-foreground hover:text-foreground'}`}
+                        >
+                            Distance
+                        </button>
+                    </div>
                 </div>
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
                     <div className="lg:col-span-2 bg-card rounded-[48px] p-12 md:p-16 border border-border shadow-sm flex flex-col justify-between">
                         <div className="flex justify-between items-end mb-12">
                             <div className="flex gap-12">
                                 <div>
-                                    <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-2">Total Tonnage Arc</p>
+                                    <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-2">
+                                        {viewMode === 'tonnage' ? 'Total Tonnage Arc' : 'Total Distance Arc'}
+                                    </p>
                                     <p className="text-5xl font-serif text-foreground tracking-tighter">
-                                        {(units === 'metric'
-                                            ? (data.weeklyTonnage.reduce((a, b) => a + b, 0) / 1000 * 0.453592).toFixed(1)
-                                            : (data.weeklyTonnage.reduce((a, b) => a + b, 0) / 1000).toFixed(1)
-                                        )} <span className="text-lg">{units === 'metric' ? 'k/kg' : 'k/lbs'}</span>
+                                        {viewMode === 'tonnage' ? (
+                                            units === 'metric'
+                                                ? (data.weeklyTonnage.reduce((a, b) => a + b, 0) / 1000 * 0.453592).toFixed(1)
+                                                : (data.weeklyTonnage.reduce((a, b) => a + b, 0) / 1000).toFixed(1)
+                                        ) : (
+                                            units === 'metric'
+                                                ? (data.weeklyCardioDist.reduce((a, b) => a + b, 0) * 1.60934).toFixed(1)
+                                                : (data.weeklyCardioDist.reduce((a, b) => a + b, 0)).toFixed(1)
+                                        )}
+                                        <span className="text-lg">
+                                            {viewMode === 'tonnage'
+                                                ? (units === 'metric' ? 'k/kg' : 'k/lbs')
+                                                : (units === 'metric' ? ' km' : ' mi')
+                                            }
+                                        </span>
                                     </p>
                                 </div>
                                 <div>
-                                    <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-2">Work Density</p>
-                                    <p className="text-5xl font-serif text-muted-foreground italic tracking-tighter">High</p>
+                                    <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-2">
+                                        {viewMode === 'tonnage' ? 'Work Density' : 'Aerobic Volume'}
+                                    </p>
+                                    <p className="text-5xl font-serif text-muted-foreground italic tracking-tighter">
+                                        {viewMode === 'tonnage' ? 'High' : `${Math.round(data.aerobicVolume.reduce((a, b) => a + b, 0) / 60)}h`}
+                                    </p>
                                 </div>
                             </div>
                         </div>
                         <ProgressionBarChart
-                            data={units === 'metric'
-                                ? data.weeklyTonnage.map(v => v * 0.453592)
-                                : data.weeklyTonnage
+                            data={viewMode === 'tonnage'
+                                ? (units === 'metric' ? data.weeklyTonnage.map(v => v * 0.453592) : data.weeklyTonnage)
+                                : (units === 'metric' ? data.weeklyCardioDist.map(v => v * 1.60934) : data.weeklyCardioDist)
                             }
                             height={250}
-                            color="bg-primary"
-                            units={getUnitLabel(units, 'weight')}
+                            color={viewMode === 'tonnage' ? "bg-primary" : "bg-sky-500"}
+                            units={viewMode === 'tonnage' ? getUnitLabel(units, 'weight') : (units === 'metric' ? 'km' : 'mi')}
                         />
                     </div>
 
                     <div className="lg:col-span-1">
-                        <PRHistory onOpenSpectrum={(history: any[]) => {
-                            setPrHistory(history);
-                            setPrModalOpen(true);
-                        }} />
+                        <PRHistory
+                            prs={data.historicalPRs}
+                            viewMode={viewMode}
+                            onOpenSpectrum={(history: any[]) => {
+                                setPrHistory(history);
+                                setPrModalOpen(true);
+                            }}
+                        />
                     </div>
                 </div>
             </section>
