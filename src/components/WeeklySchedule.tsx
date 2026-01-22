@@ -147,14 +147,14 @@ export const DayCard = memo(function DayCard({ day, isToday, isDone, isPast, pha
 
                         {isDone ? (
                             <div className="h-14 w-14 rounded-[20px] bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20 group-hover:bg-emerald-500 group-hover:text-white transition-colors duration-200">
-                                <CheckCircle size={28} />
+                                <CheckCircle size={26} />
                             </div>
                         ) : isPast ? (
                             <div className="h-14 w-14 rounded-[20px] bg-red-500/5 flex items-center justify-center border border-red-500/10 group-hover:bg-red-500 group-hover:text-white transition-colors duration-200">
-                                <X size={24} />
+                                <X size={26} />
                             </div>
                         ) : (
-                            <div className={`h-14 w-14 rounded-2xl flex items-center justify-center transition-transform duration-200 group-hover:scale-105 ${isPrDay
+                            <div className={`h-14 w-14 rounded-[20px] flex items-center justify-center transition-transform duration-200 group-hover:scale-105 ${isPrDay
                                 ? "bg-amber-500/20 border-2 border-amber-400 text-amber-500 shadow-lg shadow-amber-500/20"
                                 : isToday
                                     ? "bg-primary/10 border border-primary/20 text-primary shadow-lg shadow-primary/10"
