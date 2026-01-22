@@ -1,34 +1,51 @@
-# Pulse V2 Changelog
+# Pulse V2: Architectural Overhaul & Changelog
 
-This document details the comprehensive updates included in the `pulse-v2` release.
+This release marks a fundamental shift in the *Pulse* architecture, moving from a static, hardcoded routine to a fully dynamic, user-responsive training ecosystem.
 
-## 1. Phase 5 & 52-Week Program Overhaul
-- **Complete 52-Week Generation**: Updated `scripts/generate_52_weeks.js` to fully generate all 5 Phases of the training year.
-    - **Phase 1**: Aerobic Base & Structural Integrity (Weeks 1-8)
-    - **Phase 2**: Strength & Threshold (Weeks 9-20)
-    - **Phase 3**: Peak Power (Weeks 21-32)
-    - **Phase 4**: The Taper (Weeks 33-36)
-    - **Phase 5**: Re-Calibration & Testing (Weeks 37-52)
-- **Testing vs. Re-Entry**: Phase 5 now correctly alternates between "Testing Weeks" (Olympic/Structural Maxes) and "Re-Entry Weeks" (cycling through Phase 1 base patterns) to ensure safe volume ramp-up.
-- **Dynamic Logic Preserved**: All dynamic tokens (e.g., `{{zone_2_hr}}`) are preserved in the JSON output for frontend resolution.
+## 1. Core Philosophy: From Static to Dynamic
+The original system relied on **hardcoded values** (e.g., "Row at 2:00/500m" or "Bench 135lbs"). This worked for a specific moment in time but failed to adapt as the athlete became stronger or faster.
+*   **Old Way**: Static text strings that became obsolete after a few weeks of progress.
+*   **Pulse V2**: A living system that calculates every target based on the user's *current* capabilities. As you hit new PRs, the entire 52-week program instantly recalibrates to push you further.
 
-## 2. Weight Percentage Recalibration
-Following a safety and efficacy audit, several accessory lifts in **Phases 1, 2, and 5** were recalibrated to safer hypertrophy ranges.
-- **Walking Lunges**: Reduced from 20% to **10%** of Squat Max (per hand).
-- **Pendlay Rows**: Reduced from 70% to **50%** of Bench Max (Strict form focus).
-- **DB Press (Superset)**: Reduced from 25-30% to **20%** of Bench Max.
-- **Bulgarian Split Squats**: Reduced from 25% to **12.5%** of Squat Max (per hand).
-- **Single Arm Row**: Reduced from 30% to **20%** of Deadlift Max.
+## 2. Workout Logic & Progression
+We have replaced arbitrary weight assignments with precision calculations derived from your 1RM and Benchmark stats.
 
-*Note: All dual-hand exercise notes were updated to explicitly state "Weight per hand" to avoid user confusion.*
+| Feature | Previous "Hardcoded" State | Pulse V2 "Dynamic" State |
+| :--- | :--- | :--- |
+| **Strength Load** | "3 sets of 10 @ 135lbs" | **`70% 1RM`** (Calculates 205lbs automatically if Max is 295) |
+| **Cardio Paces** | "Run at 8:00/mile" | **`{{zone_2_pace}}`** (Resolves to 7:45 or 8:15 based on latest 5k) |
+| **Progression** | Manual Excel updates required | **Auto-Regulating**: Hitting a PR update instantly updates all future weeks. |
 
-## 3. Database Synchronization & Tooling
-- **Incremental Update Script**: Added a `--update-db` flag to `scripts/generate_52_weeks.js`.
-    - This allows developers to regenerate the program JSON and immediately sync it to Supabase using local credentials (`.env.local`), handling duplicate cleanup automatically.
-- **Sleep Data Synthesis**: Created `scripts/synthesize_sleep.js` to backfill missing sleep logs for analytics continuity (specifically filling the gap up to Week 20/Jan 22, 2026).
+## 3. Database Architecture Changes
+We moved away from storing "display text" to storing "logic tokens."
+*   **Before**: The database stored literal strings like `"Zone 2 Run (8:00 pace)"`.
+*   **After**: The database stores **structured JSON segments** with tokenized details:
+    ```json
+    {
+      "segment": "Zone 2 Run",
+      "target": { "details": "Target: {{zone_2_pace_mile}}" }
+    }
+    ```
+    The frontend converts `{{zone_2_pace_mile}}` into a real number at render time.
 
-## 4. UI/UX Improvements
-- **Workout Card Redesign**:
-    - Refactored `src/app/(dashboard)/workout/page.tsx` to move segment descriptions/details to a dedicated full-width section at the bottom of the card.
-    - This solves layout issues where long text (e.g., complex Cardio/MetCon instructions) was being squeezed into narrow grid columns.
-- **Dynamic Target Support**: Updated the frontend to correctly interpret and display new numeric targets, including derived decimal percentages (e.g., `progressions`) and per-hand calculations.
+## 4. Codebase Logic Updates
+*   **`generate_52_weeks.js`**: Now the "Brain" of the operation. It programmatically builds the entire year, injecting logic hooks instead of flat text.
+*   **Frontend Rendering (`workout/page.tsx`)**:
+    *   **Dynamic Resolution Engine**: Added logic to parse user profile stats (`mile_time_sec`, `squat_max`, etc.) and inject them into workout cards in real-time.
+    *   **Unified UI**: Refactored workout cards to handle variable text lengths gracefully by moving details to a dedicated bottom section.
+
+## 5. Recalibration & Safety Audit
+To support this dynamic scaling, we audited the baseline percentages to ensure they remain safe even as users get stronger.
+
+*   **Accesory Lifts**: Reduced from aggressive strength % to hypertrophy ranges.
+    *   *Lunges*: 20% → **10%** (Safety & Stability)
+    *   *Rows*: 70% → **50%** (Form focus)
+    *   *Split Squats*: 25% → **12.5%** (Unilateral balance)
+
+## 6. The "Update Flag"
+Added a developer tool to `scripts/generate_52_weeks.js`:
+*   Running `node scripts/generate_52_weeks.js --update-db` now instantly:
+    1.  Compiles the latest logic.
+    2.  Connects to Supabase.
+    3.  Patches the live program without downtime.
+
