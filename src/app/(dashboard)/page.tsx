@@ -105,14 +105,30 @@ export default function Home() {
 
       // Fetch ALL logs for this user to track streak across weeks
       const currentUserId = user?.id || DEMO_USER_ID;
-      const { data: allUserLogs } = await supabase
+      // Fetch recent logs for streak calculation
+      const { data: recentLogsData } = await supabase
         .from('logs')
         .select('*')
         .eq('user_id', currentUserId)
         .order('created_at', { ascending: false })
-        .limit(500); // Increased limit to ensure we catch enough history
+        .limit(500);
 
-      const logs = (allUserLogs as WorkoutLog[]) || [];
+      const recentLogs = (recentLogsData as WorkoutLog[]) || [];
+
+      // Fetch logs for the SPECIFIC viewed week (Ensure calendar is correct even for past phases)
+      const { data: weekLogsData } = await supabase
+        .from('logs')
+        .select('*')
+        .eq('user_id', currentUserId)
+        .eq('week_number', viewedWeek);
+
+      const weekLogs = (weekLogsData as WorkoutLog[]) || [];
+
+      // Merge and Dedupe
+      const logMap = new Map<string, WorkoutLog>();
+      recentLogs.forEach(l => logMap.set(l.id, l));
+      weekLogs.forEach(l => logMap.set(l.id, l));
+      const logs = Array.from(logMap.values());
 
       setCurrentWeek(viewedWeek);
       // Phase will be recalculated below based on library structure
