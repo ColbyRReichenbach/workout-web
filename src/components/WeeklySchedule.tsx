@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { X, CheckCircle, Dumbbell, Clock, Flame, HeartPulse, Target, Activity, Zap, TrendingUp, Flower2, Footprints, Moon, Trophy, LucideIcon } from "lucide-react";
+import { X, CheckCircle, Check, Dumbbell, Clock, Flame, HeartPulse, Target, Activity, Zap, TrendingUp, Flower2, Footprints, Moon, Trophy, LucideIcon } from "lucide-react";
 import { memo, useEffect, createElement } from "react";
 import { TiltCard } from "./TiltCard";
 import { useSettings } from "@/context/SettingsContext";
@@ -147,7 +147,7 @@ export const DayCard = memo(function DayCard({ day, isToday, isDone, isPast, pha
 
                         {isDone ? (
                             <div className="h-14 w-14 rounded-[20px] bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20 group-hover:bg-emerald-500 group-hover:text-white transition-colors duration-200">
-                                <CheckCircle size={26} />
+                                <Check size={26} />
                             </div>
                         ) : isPast ? (
                             <div className="h-14 w-14 rounded-[20px] bg-red-500/5 flex items-center justify-center border border-red-500/10 group-hover:bg-red-500 group-hover:text-white transition-colors duration-200">
