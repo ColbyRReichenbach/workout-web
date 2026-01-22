@@ -116,9 +116,9 @@ export const PremiumAreaChart = memo(function PremiumAreaChart({
         <div className="w-full relative h-full group/chart overflow-visible" style={{ height: `${height}px`, willChange: 'transform' }}>
             <svg viewBox="-2 -2 104 104" preserveAspectRatio="none" className="w-full h-full" style={{ overflow: 'visible' }}>
                 <defs>
-                    <linearGradient id={`areaGradient-${color.replace('#', '')}`} x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor={color} stopOpacity="0.2" />
-                        <stop offset="100%" stopColor={color} stopOpacity="0" />
+                    <linearGradient id={`areaGradient-${color.replace(/[^a-zA-Z0-9]/g, '')}`} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={color.includes('var') ? color : color} stopOpacity="0.2" />
+                        <stop offset="100%" stopColor={color.includes('var') ? color : color} stopOpacity="0" />
                     </linearGradient>
                 </defs>
 
@@ -144,7 +144,7 @@ export const PremiumAreaChart = memo(function PremiumAreaChart({
                 {/* Main Area Fill */}
                 <path
                     d={`M ${points[0]?.x || 4},92 ${mainD} L ${points[points.length - 1]?.x || 96},92 Z`}
-                    fill={`url(#areaGradient-${color.replace('#', '')})`}
+                    fill={`url(#areaGradient-${color.replace(/[^a-zA-Z0-9]/g, '')})`}
                     className="transition-opacity duration-500"
                 />
 
@@ -269,12 +269,12 @@ export const ProgressionBarChart = memo(function ProgressionBarChart({ data, hei
                     >
                         <motion.div
                             initial={{ height: 0 }}
-                            animate={{ height: `${heightPct}%` }}
+                            animate={{ height: `${val > 0 ? Math.max(2, heightPct) : 0}%` }}
                             transition={{ duration: 0.8, delay: i * 0.005, ease: "circOut" }}
                             className={`w-full rounded-t-[2px] ${color} transition-all duration-300 relative`}
                             style={{
                                 opacity: hoveredIndex === null ? 0.6 : hoveredIndex === i ? 1 : 0.3,
-                                boxShadow: hoveredIndex === i ? `0 0 20px -5px ${color === 'bg-primary' ? '#ef4444' : '#1c1917'}` : 'none'
+                                boxShadow: hoveredIndex === i ? `0 0 20px -5px var(--primary)` : 'none'
                             }}
                         />
                         <AnimatePresence>

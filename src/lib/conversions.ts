@@ -53,9 +53,27 @@ export const toStorageWeight = (displayVal: number | string | null | undefined, 
 export const toDisplayDistance = (miles: number | null | undefined, unit: UnitSystem): string => {
     if (miles === null || miles === undefined) return "0.0";
     if (unit === 'metric') {
-        return (miles * MILES_TO_KM).toFixed(1);
+        const val = miles * MILES_TO_KM;
+        return val < 10 ? val.toFixed(2) : val.toFixed(1);
     }
-    return miles.toFixed(1);
+    return miles < 10 ? miles.toFixed(2) : miles.toFixed(1);
+};
+
+/**
+ * Converts a distance value from display units back to storage units (miles).
+ * @param displayVal Distance in the user's display unit (km or mi)
+ * @param unit User's preferred unit system
+ * @returns Distance in miles (for storage)
+ */
+export const toStorageDistance = (displayVal: number | string | null | undefined, unit: UnitSystem): number | null => {
+    if (displayVal === null || displayVal === undefined || displayVal === "") return null;
+    const val = typeof displayVal === 'string' ? parseFloat(displayVal) : displayVal;
+    if (isNaN(val)) return null;
+
+    if (unit === 'metric') {
+        return val / MILES_TO_KM;
+    }
+    return val;
 };
 
 /**
@@ -69,4 +87,19 @@ export const getUnitLabel = (unit: UnitSystem, type: 'weight' | 'distance'): str
         return unit === 'metric' ? 'kg' : 'lb';
     }
     return unit === 'metric' ? 'km' : 'mi';
+};
+/**
+ * Maps variant exercise names (e.g. "Back Squat 1RM", "Bench Press Singles") 
+ * back to their baseline counterparts in the BASELINE maxes table.
+ */
+export const mapExerciseToBaseline = (name: string): string => {
+    if (!name) return "";
+    const lower = name.toLowerCase();
+
+    if (lower.includes("back squat")) return "Back Squat";
+    if (lower.includes("bench press") || (lower.includes("bench") && !lower.includes("press"))) return "Bench Press";
+    if (lower.includes("deadlift")) return "Deadlift";
+    if (lower.includes("overhead press") || lower.includes("ohp")) return "Overhead Press";
+
+    return name; // Fallback to original
 };

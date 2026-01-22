@@ -22,7 +22,11 @@ interface PRRecord {
     created_at: string;
 }
 
-export function PRHistory() {
+interface PRHistoryProps {
+    onOpenSpectrum?: (prs: PRRecord[]) => void;
+}
+
+export function PRHistory({ onOpenSpectrum }: PRHistoryProps) {
     const [prs, setPrs] = useState<PRRecord[]>([]);
     const [loading, setLoading] = useState(true);
     const { units } = useSettings();
@@ -55,55 +59,72 @@ export function PRHistory() {
 
     if (prs.length === 0) {
         return (
-            <Card variant="outline" className="text-center p-12 border-dashed">
+            <Card variant="outline" className="text-center p-12 border-dashed h-full flex flex-col items-center justify-center">
                 < Award className="w-12 h-12 text-muted-foreground/20 mx-auto mb-4" />
-                <p className="text-muted-foreground font-serif italic">No personal records synchronized yet.</p>
+                <p className="text-muted-foreground font-serif italic">No benchmarks synchronized.</p>
             </Card>
         );
     }
 
-    // Group PRs by exercise to show best only or a limited list
-    const latestPrs = prs.slice(0, 5);
+    // The Hero PR is simply the latest one
+    const latestPr = prs[0];
 
     return (
-        <Card variant="elevated" className="h-full">
-            <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                    <CardTitle size="md">Personal Records</CardTitle>
-                    <p className="text-muted-foreground text-[10px] font-bold uppercase tracking-widest mt-1">Hall of Power</p>
+        <Card variant="elevated" className="h-full group hover:border-primary/50 transition-all duration-500 overflow-hidden relative">
+            <div className="absolute -right-8 -top-8 text-primary/5 -rotate-12 group-hover:scale-110 transition-transform duration-700">
+                <Award size={160} strokeWidth={0.5} />
+            </div>
+
+            <CardHeader className="relative z-10 pb-0">
+                <div className="flex justify-between items-start">
+                    <div>
+                        <CardTitle size="md">Latest Benchmark</CardTitle>
+                        <p className="text-muted-foreground text-[10px] font-bold uppercase tracking-widest mt-1">Hall of Power</p>
+                    </div>
+                    <Award className="text-primary animate-pulse" size={24} />
                 </div>
-                <Award className="text-primary" size={24} />
             </CardHeader>
-            <CardContent className="space-y-4">
-                {latestPrs.map((pr) => (
-                    <div key={pr.id} className="flex items-center justify-between p-4 bg-muted/30 rounded-xl border border-border group hover:bg-muted/50 transition-colors">
-                        <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
-                                <TrendingUp size={18} />
-                            </div>
-                            <div>
-                                <h4 className="font-serif text-lg leading-tight">{pr.exercise_name}</h4>
-                                <div className="flex items-center gap-2 text-[10px] text-muted-foreground mt-1">
-                                    <Calendar size={10} />
-                                    {new Date(pr.created_at).toLocaleDateString()}
-                                </div>
-                            </div>
-                        </div>
-                        <div className="text-right">
-                            <div className="font-serif text-2xl italic text-foreground leading-tight">
-                                {toDisplayWeight(pr.value, units)}
-                                <span className="text-xs font-sans not-italic text-muted-foreground ml-1">
-                                    {getUnitLabel(units, 'weight')}
-                                </span>
-                            </div>
-                            <span className="text-[9px] font-bold text-primary uppercase tracking-widest">{pr.pr_type}</span>
+
+            <CardContent className="relative z-10 pt-10">
+                <div className="space-y-8">
+                    <div className="space-y-2">
+                        <h4 className="font-serif text-3xl text-foreground leading-tight tracking-tight">{latestPr.exercise_name}</h4>
+                        <div className="flex items-center gap-2 text-[10px] text-muted-foreground uppercase font-bold tracking-widest">
+                            <Calendar size={12} />
+                            {new Date(latestPr.created_at).toLocaleDateString()}
                         </div>
                     </div>
-                ))}
 
-                <button className="w-full py-4 mt-2 flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors group">
-                    View Full Spectrum <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
-                </button>
+                    <div className="flex justify-between items-end border-b border-border pb-6">
+                        <div className="space-y-1">
+                            <span className="text-[10px] font-bold text-primary uppercase tracking-widest">{latestPr.pr_type}</span>
+                            <div className="font-serif text-5xl italic text-foreground tracking-tighter leading-none">
+                                {latestPr.unit === 'sec' ? (
+                                    (() => {
+                                        const m = Math.floor(latestPr.value / 60);
+                                        const s = Math.round(latestPr.value % 60);
+                                        return `${m}:${s < 10 ? '0' : ''}${s}`;
+                                    })()
+                                ) : latestPr.unit === 'watts' ? (
+                                    latestPr.value
+                                ) : (
+                                    toDisplayWeight(latestPr.value, units)
+                                )}
+                                <span className="text-lg font-sans not-italic text-muted-foreground ml-2 lowercase">
+                                    {latestPr.unit === 'sec' ? '' : latestPr.unit === 'watts' ? 'w' : getUnitLabel(units, 'weight')}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button
+                        onClick={() => onOpenSpectrum?.(prs)}
+                        className="w-full py-5 rounded-[24px] bg-muted/50 hover:bg-muted text-[10px] font-bold uppercase tracking-[0.2em] transition-all duration-300 flex items-center justify-center gap-2 group/btn"
+                    >
+                        See Full Spectrum
+                        <ChevronRight size={14} className="group-hover/btn:translate-x-1 transition-transform" />
+                    </button>
+                </div>
             </CardContent>
         </Card>
     );

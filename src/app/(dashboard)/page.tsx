@@ -9,7 +9,7 @@ import AiCoach from "@/components/AiCoach";
 import { DayCard, DayDetailModal } from "@/components/WeeklySchedule";
 import { BiometricsModal } from "@/components/BiometricsModal";
 import { TiltCard } from "@/components/TiltCard";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useState, useMemo } from "react";
 import { createClient } from "@/utils/supabase/client";
@@ -36,6 +36,11 @@ const weeklyTemplate = [
   { day: "Sunday", title: "Total Rest", type: "Rest" },
 ];
 
+const getHighestWeek = (logs: WorkoutLog[]) => {
+  if (!logs || logs.length === 0) return 1;
+  return Math.max(...logs.map(l => l.week_number));
+};
+
 export default function Home() {
   const router = useRouter();
   const [currentWeek, setCurrentWeek] = useState(1);
@@ -53,9 +58,13 @@ export default function Home() {
 
 
 
+  const searchParams = useSearchParams();
+  const targetWeekParam = searchParams.get('week');
+
   useEffect(() => {
     async function fetchData() {
       const supabase = createClient();
+      console.log("[Dashboard] Fetching data for week:", targetWeekParam);
 
       // Parallelize initial data fetch
       const [
@@ -87,6 +96,13 @@ export default function Home() {
         return;
       }
 
+      // Determine Viewed Week
+      let viewedWeek = profile.current_week || 1;
+      if (targetWeekParam) {
+        const parsed = parseInt(targetWeekParam);
+        if (!isNaN(parsed)) viewedWeek = parsed;
+      }
+
       // Fetch ALL logs for this user to track streak across weeks
       const currentUserId = user?.id || DEMO_USER_ID;
       const { data: allUserLogs } = await supabase
@@ -94,19 +110,39 @@ export default function Home() {
         .select('*')
         .eq('user_id', currentUserId)
         .order('created_at', { ascending: false })
-        .limit(200);
+        .limit(500); // Increased limit to ensure we catch enough history
 
       const logs = (allUserLogs as WorkoutLog[]) || [];
 
-      setCurrentWeek(profile.current_week || 1);
-      setCurrentPhase(profile.current_phase || 1);
+      setCurrentWeek(viewedWeek);
+      // Phase will be recalculated below based on library structure
 
       if (library && library.program_data?.phases) {
         const phases = library.program_data.phases;
-        const phaseIdx = (profile?.current_phase || 1) - 1;
+
+        // Find Phase for Viewed Week
+        let phaseIdx = 0;
+        let weekCount = 0;
+        // Simple iteration to find which phase contains viewedWeek
+        for (let i = 0; i < phases.length; i++) {
+          const pWeeks = phases[i].weeks?.length || 4;
+          if (viewedWeek <= weekCount + pWeeks) {
+            phaseIdx = i;
+            break;
+          }
+          weekCount += pWeeks;
+        }
+
+        console.log(`[Dashboard] Calculated Phase ${phaseIdx + 1} for Week ${viewedWeek}`);
+        setCurrentPhase(phaseIdx + 1);
+
         const phase = phases[phaseIdx] || phases[0];
-        const absWeek = profile?.current_week || 1;
-        const relativeWeekIdx = (absWeek - 1) % (phase.weeks?.length || 4);
+        // Correctly calculate relative index by subtracting potential previous weeks
+        // weekCount holds the sum of weeks from all PREVIOUS phases at this point
+        const relativeWeekIdx = (viewedWeek - 1) - weekCount;
+
+        console.log(`[Dashboard] Phase Start Offset: ${weekCount}, Relative Index: ${relativeWeekIdx}`);
+
         const weekData = phase.weeks?.[relativeWeekIdx];
 
         if (weekData?.days) {
@@ -119,15 +155,15 @@ export default function Home() {
         }
       }
 
-      // Filter for weekly board (Flow)
-      const currentWeekLogs = logs.filter(l => l.week_number === (profile?.current_week || 1));
+      // Filter logs for the VIEWED week
+      const currentWeekLogs = logs.filter(l => l.week_number === viewedWeek);
       const daysWithLogs = new Set<string>(currentWeekLogs.map((l: WorkoutLog) => l.day_name));
       setCompletedDays(daysWithLogs);
       setAllLogs(logs);
       setLoading(false);
     }
     fetchData();
-  }, [router]);
+  }, [router, targetWeekParam]);
 
   // Determine today accurately
   const jsDay = new Date().getDay();
@@ -140,7 +176,9 @@ export default function Home() {
   };
 
   const getLogsForDay = (dayName: string) => {
-    return allLogs.filter(l => l.day_name === dayName);
+    const filtered = allLogs.filter(l => l.day_name === dayName && l.week_number === currentWeek);
+    console.log(`[Dashboard] Filtering logs for ${dayName}, Week ${currentWeek}. Found ${filtered.length} entries.`);
+    return filtered;
   };
 
   // Calculate real stats
@@ -229,6 +267,7 @@ export default function Home() {
         isDone={selectedDay ? completedDays.has(selectedDay.day) : false}
         isToday={selectedDay ? selectedDay.day === todayName : false}
         logs={selectedDay ? getLogsForDay(selectedDay.day) : []}
+        currentWeek={currentWeek}
       />
 
       {/* Hero Section */}
@@ -336,7 +375,9 @@ export default function Home() {
               <DayCard
                 key={day.day}
                 day={day}
-                isToday={todayName === day.day}
+                isToday={todayName === day.day && (!window.location.search.includes('week') || currentWeek === (allLogs.length > 0 ? getHighestWeek(allLogs) : 1))}
+                // Quick hack: If URL has week param, don't show today unless it matches? 
+                // Better: Store 'realCurrentWeek' in state.
                 isDone={completedDays.has(day.day)}
                 isPast={i < todayIndex && !completedDays.has(day.day)}
                 phase={currentPhase}

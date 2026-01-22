@@ -12,7 +12,7 @@ interface LogProps {
 }
 
 import { useSettings } from "@/context/SettingsContext";
-import { getUnitLabel, toDisplayWeight, toStorageWeight } from "@/lib/conversions";
+import { getUnitLabel, toDisplayWeight, toStorageWeight, toStorageDistance } from "@/lib/conversions";
 
 export function LogStrengthSets({ segment, idx, onLog, calculatedWeight }: LogProps) {
     const { units } = useSettings();
@@ -28,6 +28,7 @@ export function LogStrengthSets({ segment, idx, onLog, calculatedWeight }: LogPr
             reps: segment.target?.reps || ""
         }))
     );
+    const [notes, setNotes] = useState("");
     const [saved, setSaved] = useState(false);
 
     const updateSet = (setIdx: number, field: 'weight' | 'reps', value: number | string) => {
@@ -43,7 +44,7 @@ export function LogStrengthSets({ segment, idx, onLog, calculatedWeight }: LogPr
             weight: toStorageWeight(s.weight, units)
         }));
 
-        onLog(segment, idx, { sets: setsToLog });
+        onLog(segment, idx, { sets: setsToLog, notes });
         setSaved(true);
     };
 
@@ -88,6 +89,13 @@ export function LogStrengthSets({ segment, idx, onLog, calculatedWeight }: LogPr
                 ))}
             </div>
 
+            <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Session notes (optional)..."
+                className="w-full bg-card border border-border rounded-xl px-4 py-3 text-sm font-serif focus:bg-background focus:ring-4 focus:ring-primary/5 outline-none text-foreground shadow-inner resize-none h-20 placeholder:text-muted-foreground"
+            />
+
             <div className="flex gap-3 pt-2 font-sans font-medium">
                 <button
                     onClick={() => setSets([...sets, { weight: sets[sets.length - 1]?.weight || "", reps: "" }])}
@@ -111,10 +119,11 @@ export function LogMetcon({ segment, idx, onLog }: LogProps) {
     const [reps, setReps] = useState("");
     const [time, setTime] = useState("");
     const [hr, setHr] = useState("");
+    const [notes, setNotes] = useState("");
     const [saved, setSaved] = useState(false);
 
     const handleSave = () => {
-        onLog(segment, idx, { rounds, reps, time_min: time, avg_hr: hr });
+        onLog(segment, idx, { rounds, reps, time_min: time, avg_hr: hr, notes });
         setSaved(true);
     };
 
@@ -178,6 +187,13 @@ export function LogMetcon({ segment, idx, onLog }: LogProps) {
                 </div>
             </div>
 
+            <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Metcon notes..."
+                className="w-full bg-card border border-border rounded-xl px-4 py-3 text-sm font-serif focus:bg-background focus:ring-4 focus:ring-primary/5 outline-none text-foreground shadow-inner resize-none h-20 placeholder:text-muted-foreground"
+            />
+
             <button
                 onClick={handleSave}
                 className="w-full py-4 rounded-xl bg-primary text-primary-foreground flex items-center justify-center transition-transform duration-150 shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] gap-2 text-xs font-bold uppercase tracking-widest"
@@ -193,10 +209,16 @@ export function LogCardioBasic({ segment, idx, onLog }: LogProps) {
     const [distance, setDistance] = useState("");
     const [duration, setDuration] = useState(segment.target?.duration_min || "");
     const [hr, setHr] = useState("");
+    const [notes, setNotes] = useState("");
     const [saved, setSaved] = useState(false);
 
     const handleSave = () => {
-        onLog(segment, idx, { distance, duration_min: duration, avg_hr: hr });
+        onLog(segment, idx, {
+            distance: toStorageDistance(distance, units),
+            duration_min: duration,
+            avg_hr: hr,
+            notes
+        });
         setSaved(true);
     };
 

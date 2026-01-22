@@ -5,11 +5,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Ruler, Weight, Activity, ChevronRight, User, Globe, Bot, Dumbbell, Sparkles, CheckCircle2 } from "lucide-react";
 import { updateOnboardingData } from "@/app/actions/user";
 import { logout } from "@/app/actions/auth";
+import { useRouter } from "next/navigation";
 
 export default function OnboardingPage() {
     const [step, setStep] = useState(1);
     const [isGuest, setIsGuest] = useState(false);
     const [units, setUnits] = useState<"imperial" | "metric">("imperial");
+    const router = useRouter();
 
     // Form data state - persisted across all steps
     const [formState, setFormState] = useState({
@@ -103,6 +105,13 @@ export default function OnboardingPage() {
                         if (step !== 5) {
                             return;
                         }
+
+                        if (isGuest) {
+                            // Guests don't need to hit the DB, just go to dashboard
+                            router.push('/');
+                            return;
+                        }
+
                         // On step 5, let the server action handle it
                         const formData = new FormData(e.currentTarget);
                         await updateOnboardingData(formData);
@@ -439,7 +448,14 @@ export default function OnboardingPage() {
                                 </div>
 
                                 <button
-                                    type="submit"
+                                    type={isGuest ? "button" : "submit"}
+                                    onClick={(e) => {
+                                        if (isGuest) {
+                                            e.preventDefault();
+                                            console.log("Guest mode finalize clicked - forcing redirect");
+                                            window.location.href = '/'; // Hard redirect to clear any state/history
+                                        }
+                                    }}
                                     className="w-full bg-rose-600 text-white h-20 rounded-[32px] font-bold text-lg mt-4 flex items-center justify-center gap-3 shadow-2xl shadow-rose-600/20 hover:bg-rose-500 transition-all active:scale-[0.98]"
                                 >
                                     {isGuest ? "Finalize Preview" : "Complete Synchronization"} <Activity size={20} className="animate-pulse" />

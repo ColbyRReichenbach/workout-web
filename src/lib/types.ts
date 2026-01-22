@@ -24,6 +24,7 @@ export interface WorkoutSegment {
 export interface WorkoutDay {
     day: string;
     title: string;
+    description?: string;
     segments: WorkoutSegment[];
 }
 

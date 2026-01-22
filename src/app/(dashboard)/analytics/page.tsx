@@ -9,19 +9,14 @@ import {
     StructuralHeatmap,
     RecoveryIndexChart
 } from "@/components/AnalyticsCharts";
-import { SleepAnalysisModal } from "@/components/SleepAnalysisModal";
+import { PRAnalysisModal } from "@/components/PRAnalysisModal";
 import { PRHistory } from "@/components/PRHistory";
+import { SleepAnalysisModal } from "@/components/SleepAnalysisModal";
 import { useSettings } from "@/context/SettingsContext";
-import { getUnitLabel } from "@/lib/conversions";
+import { getUnitLabel, mapExerciseToBaseline } from "@/lib/conversions";
 import { DEMO_USER_ID } from "@/lib/userSettings";
 
-// BASELINE MAXES (from Master Plan)
-const BASELINE = {
-    "Back Squat": 345,
-    "Bench Press": 245,
-    "Deadlift": 386,
-    "Overhead Press": 165
-};
+// BASELINE MAXES (from Master Plan) - DEPRECATED (Using Profile now)
 
 interface SleepMetric {
     date: string;
@@ -44,11 +39,16 @@ interface AnalyticsSet {
 
 interface AnalyticsLog {
     date: string;
+    week_number: number;
+    day_name: string;
     performance_data?: {
         sets?: AnalyticsSet[];
         avg_hr?: number;
         distance?: string;
         duration_min?: string;
+        weight?: number;
+        reps?: number;
+        rpe?: number;
     };
     segment_name: string;
 }
@@ -78,14 +78,45 @@ export default function AnalyticsPage() {
     const { units } = useSettings();
 
     const [sleepModalOpen, setSleepModalOpen] = useState(false);
+    const [prModalOpen, setPrModalOpen] = useState(false);
+    const [prHistory, setPrHistory] = useState<any[]>([]);
 
     useEffect(() => {
         const fetchData = async () => {
             const raw = await getAnalyticsData();
             if (!raw) return;
 
-            const START_DATE = new Date('2025-06-01T00:00:00');
-            const TOTAL_WEEKS = 32;
+            const profileWeek = raw.profile.currentWeek;
+
+            const TOTAL_WEEKS = 52;
+            let ANCHOR_DATE = new Date();
+
+            // 1. Calculate the true ANCHOR_DATE (Monday of Week 1)
+            // We use the earliest log and its week_number to find where Week 1 Monday would be
+            if (raw.volumeData.length > 0) {
+                const earliestLog = raw.volumeData[0];
+                const logDate = new Date(earliestLog.date);
+                const logWeek = earliestLog.week_number || 1;
+
+                // Align to Monday of the log's week
+                const day = logDate.getDay();
+                const diff = logDate.getDate() - (day === 0 ? 6 : day - 1);
+                const weekMonday = new Date(logDate);
+                weekMonday.setDate(diff);
+                weekMonday.setHours(0, 0, 0, 0);
+
+                // Subtract (week - 1) weeks to get to Week 1 Monday
+                ANCHOR_DATE = new Date(weekMonday);
+                ANCHOR_DATE.setDate(ANCHOR_DATE.getDate() - (logWeek - 1) * 7);
+            } else {
+                // Fallback: Monday of this week - 51 weeks
+                const now = new Date();
+                const day = now.getDay();
+                const diff = now.getDate() - (day === 0 ? 6 : day - 1);
+                ANCHOR_DATE = new Date(now);
+                ANCHOR_DATE.setDate(diff - (51 * 7));
+                ANCHOR_DATE.setHours(0, 0, 0, 0);
+            }
 
             // Intermediate Maps
             const tonnageMap: Record<number, number> = {};
@@ -93,85 +124,101 @@ export default function AnalyticsPage() {
             const intensityMap: Record<number, { sum: number, count: number }> = {};
             const stressMap: Record<number, number> = {};
             const recMap: Record<number, { sum: number, count: number }> = {};
-            const prMap: Record<string, number> = { ...BASELINE };
+            const prMap: Record<string, number> = {};
 
             // Heatmap arrays (56 days = 8 weeks of structural phase)
             const activeDays = new Array(56).fill(false);
             const readyDays = new Array(56).fill(70);
 
-            // Use profile data for phase/week (from settings)
-            const profilePhase = raw.profile.currentPhase;
-            const profileWeek = raw.profile.currentWeek;
-
             // 1. Process Logs for Tonnage, Intensity, Efficiency, Stress
             raw.volumeData.forEach((log: AnalyticsLog) => {
-                const dateParts = log.date.split('-');
-                const d = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]));
-                const week = Math.floor((d.getTime() - START_DATE.getTime()) / (7 * 24 * 60 * 60 * 1000));
-                const dayOffset = Math.floor((d.getTime() - START_DATE.getTime()) / (24 * 60 * 60 * 1000));
+                const weekIdx = log.week_number - 1;
 
-                if (week >= 0 && week < TOTAL_WEEKS) {
-
-                    // Heatmap (Phase 1 focus)
-                    if (dayOffset >= 0 && dayOffset < 56) {
-                        activeDays[dayOffset] = true;
+                if (weekIdx >= 0 && weekIdx < TOTAL_WEEKS) {
+                    // Heatmap (Phase 1 focus - days 1-56)
+                    const dateParts = log.date.split('-');
+                    const d = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]));
+                    const diffDays = Math.floor(Math.abs(d.getTime() - ANCHOR_DATE.getTime()) / (24 * 60 * 60 * 1000));
+                    if (diffDays >= 0 && diffDays < 56) {
+                        activeDays[diffDays] = true;
                     }
 
-                    if (log.performance_data && log.performance_data.sets) {
-                        const sets = log.performance_data.sets;
-                        const vol = sets.reduce((acc: number, s: AnalyticsSet) => acc + ((s.weight || 0) * (s.reps || 0)), 0);
-                        tonnageMap[week] = (tonnageMap[week] || 0) + vol;
+                    if (log.performance_data) {
+                        const perf = log.performance_data;
+                        let vol = 0;
+                        let avgWeight = 0;
 
-                        // CNS Intensity (%1RM Calculation)
-                        const baseMax = (BASELINE as Record<string, number>)[log.segment_name];
-                        if (baseMax) {
-                            const avgWeight = sets.reduce((acc: number, s: AnalyticsSet) => acc + (s.weight || 0), 0) / sets.length;
-                            const relInt = (avgWeight / baseMax) * 100;
-                            if (!intensityMap[week]) intensityMap[week] = { sum: 0, count: 0 };
-                            intensityMap[week].sum += relInt;
-                            intensityMap[week].count++;
-
-                            // Update PRs
-                            sets.forEach((s: AnalyticsSet) => {
-                                if ((s.weight || 0) > (prMap[log.segment_name] || 0)) prMap[log.segment_name] = s.weight || 0;
-                            });
-
-                            // System Stress (Simplified TSS)
-                            const tss = (vol * (relInt / 100)) / 100;
-                            stressMap[week] = (stressMap[week] || 0) + tss;
+                        if (perf.sets && Array.isArray(perf.sets)) {
+                            vol = perf.sets.reduce((acc: number, s: AnalyticsSet) => acc + ((s.weight || 0) * (s.reps || 0)), 0);
+                            avgWeight = perf.sets.reduce((acc: number, s: AnalyticsSet) => acc + (s.weight || 0), 0) / perf.sets.length;
+                        } else if (perf.weight && perf.reps) {
+                            vol = Number(perf.weight) * Number(perf.reps);
+                            avgWeight = Number(perf.weight);
                         }
-                    }
 
-                    // Aerobic Efficiency
-                    const perf = log.performance_data;
-                    if (perf && perf.avg_hr && perf.distance && perf.duration_min) {
-                        const mph = parseFloat(perf.distance) / (parseFloat(perf.duration_min) / 60);
-                        const efficiency = (mph / perf.avg_hr) * 1000;
-                        efficiencyMap[week] = efficiency;
+                        if (vol > 0) {
+                            tonnageMap[weekIdx] = (tonnageMap[weekIdx] || 0) + vol;
+
+                            // CNS Intensity (%1RM Calculation)
+                            const baselineName = mapExerciseToBaseline(log.segment_name);
+                            // Map baseline name to profile key
+                            let profileKey: keyof typeof raw.profile | null = null;
+                            if (baselineName === "Back Squat") profileKey = "squat_max";
+                            else if (baselineName === "Bench Press") profileKey = "bench_max";
+                            else if (baselineName === "Deadlift") profileKey = "deadlift_max";
+                            else if (baselineName === "Overhead Press") profileKey = "ohp_max";
+                            else if (baselineName.toLowerCase().includes("clean")) profileKey = "clean_jerk_max";
+                            else if (baselineName.toLowerCase().includes("snatch")) profileKey = "snatch_max";
+
+                            const baseMax = profileKey ? (raw.profile[profileKey] as number) || 0 : 0;
+
+                            if (baseMax > 0 && avgWeight > 0) {
+                                const relInt = (avgWeight / baseMax) * 100;
+                                if (!intensityMap[weekIdx]) intensityMap[weekIdx] = { sum: 0, count: 0 };
+                                intensityMap[weekIdx].sum += relInt;
+                                intensityMap[weekIdx].count++;
+
+                                // System Stress (Simplified TSS)
+                                const tss = (vol * (relInt / 100)) / 100;
+                                stressMap[weekIdx] = (stressMap[weekIdx] || 0) + tss;
+                            }
+                        }
+
+                        // Aerobic Efficiency
+                        if (perf.avg_hr && perf.distance && perf.duration_min) {
+                            const mph = parseFloat(perf.distance) / (parseFloat(perf.duration_min) / 60);
+                            if (mph > 0) {
+                                const efficiency = (mph / perf.avg_hr) * 1000;
+                                efficiencyMap[weekIdx] = efficiency;
+                            }
+                        }
                     }
                 }
             });
 
-            // 2. Process Sleep & Readiness for Recovery Index
+            // 2. Process Sleep & Readiness for Recovery Index using ANCHOR_DATE
             raw.sleepData.forEach((s: SleepMetric) => {
                 const dateParts = s.date.split('-');
                 const d = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]));
-                const week = Math.floor((d.getTime() - START_DATE.getTime()) / (7 * 24 * 60 * 60 * 1000));
-                if (week >= 0 && week < TOTAL_WEEKS) {
-                    if (!recMap[week]) recMap[week] = { sum: 0, count: 0 };
-                    // Recovery score based on sleep quality (7.5-8.5 hours optimal = 100%)
-                    const optimalSleep = 465; // 7.75 hours
+                const diffTime = d.getTime() - ANCHOR_DATE.getTime();
+                const weekIdx = Math.floor(diffTime / (7 * 24 * 60 * 60 * 1000));
+
+                if (weekIdx >= 0 && weekIdx < TOTAL_WEEKS) {
+                    if (!recMap[weekIdx]) recMap[weekIdx] = { sum: 0, count: 0 };
+                    const optimalSleep = 480;
                     const sleepDiff = Math.abs(s.asleep_minutes - optimalSleep);
-                    const sleepScore = Math.max(0, 100 - (sleepDiff / 6)); // Lose ~1% per 6 mins off optimal
-                    recMap[week].sum += sleepScore;
-                    recMap[week].count++;
+                    const sleepScore = Math.max(20, 100 - (sleepDiff / 4.8));
+                    recMap[weekIdx].sum += sleepScore;
+                    recMap[weekIdx].count++;
                 }
             });
 
             raw.readinessData.forEach((r: ReadinessMetric) => {
                 const dateParts = r.date.split('-');
                 const d = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]));
-                const dayOffset = Math.floor((d.getTime() - START_DATE.getTime()) / (24 * 60 * 60 * 1000));
+                const diffTime = d.getTime() - ANCHOR_DATE.getTime();
+                const dayOffset = Math.floor(diffTime / (24 * 60 * 60 * 1000));
+
                 if (dayOffset >= 0 && dayOffset < 56) {
                     readyDays[dayOffset] = r.readiness_score || 70;
                 }
@@ -185,19 +232,20 @@ export default function AnalyticsPage() {
                 if (recMap[i] && recMap[i].count > 0) {
                     return Math.min(100, Math.max(0, recMap[i].sum / recMap[i].count));
                 }
-                return 0; // No data = 0, not default 80
+                return 0;
             });
             const cnsIntensity = Array.from({ length: TOTAL_WEEKS }, (_, i) => {
-                if (intensityMap[i]) {
-                    return Math.min(100, intensityMap[i].sum / intensityMap[i].count); // Cap at 100%
+                if (intensityMap[i] && intensityMap[i].count > 0) {
+                    return Math.min(100, intensityMap[i].sum / intensityMap[i].count);
                 }
                 return 0;
             });
 
-            // Gap filling
+            // Gap filling and smoothing
             for (let i = 1; i < TOTAL_WEEKS; i++) {
                 if (efficiencyIndex[i] === 0) efficiencyIndex[i] = efficiencyIndex[i - 1] || 60;
                 if (cnsIntensity[i] === 0) cnsIntensity[i] = cnsIntensity[i - 1] || 75;
+                if (recoveryIndex[i] === 0) recoveryIndex[i] = recoveryIndex[i - 1] || 80;
             }
 
             setData({
@@ -209,7 +257,7 @@ export default function AnalyticsPage() {
                 systemStress,
                 cnsIntensity,
                 prs: prMap,
-                currentPhase: profilePhase,
+                currentPhase: raw.profile.currentPhase,
                 currentWeek: profileWeek,
                 readinessHistory: raw.readinessData.map(r => r.readiness_score || 0),
                 activityHeatmap: activeDays,
@@ -229,6 +277,8 @@ export default function AnalyticsPage() {
     const isPhase1 = data.currentPhase === 1;
     const isPhase2 = data.currentPhase === 2;
     const isPhase3 = data.currentPhase === 3;
+    const isPhase4 = data.currentPhase === 4;
+    const isPhase5 = data.currentPhase === 5;
 
     return (
         <div className="max-w-7xl mx-auto space-y-24 pt-32 pb-48 px-4">
@@ -264,6 +314,8 @@ export default function AnalyticsPage() {
                                 {isPhase1 && "Structural Load Optimized"}
                                 {isPhase2 && "CNS Intensity Sustained"}
                                 {isPhase3 && "Peak Power Surfacing"}
+                                {isPhase4 && "Super-Compensation Window"}
+                                {isPhase5 && "Absolute Performance Ceiling"}
                             </h3>
                             <p className="text-muted-foreground text-sm font-light leading-relaxed">
                                 {isPhase1 && (() => {
@@ -280,6 +332,8 @@ export default function AnalyticsPage() {
                                     const avgReady = Math.round(data.readinessHistory.slice(-14).reduce((a, b) => a + b, 0) / 14);
                                     return `Intensity is peaking. Taper initiated. Readiness scores averaging ${avgReady} over last 14 days.`;
                                 })()}
+                                {isPhase4 && "Training volume reduced. Maintaining intensity to sharpen neural recruitment while shedding accumulated fatigue."}
+                                {isPhase5 && "Macro-cycle complete. Comparing absolute performance peaks against structural baselines from Week 1."}
                             </p>
                         </div>
                         <div className="grid grid-cols-2 gap-8 border-t border-border pt-8">
@@ -313,6 +367,8 @@ export default function AnalyticsPage() {
                             {isPhase1 && "Aerobic & Structural Engine"}
                             {isPhase2 && "Neurological Load Tolerance"}
                             {isPhase3 && "Absolute Peak Performance"}
+                            {isPhase4 && "Neural Sharpness (Taper)"}
+                            {isPhase5 && "Master Cycle Completion"}
                         </h2>
                     </div>
                     <div className="flex items-center gap-3 bg-muted/50 px-6 py-3 rounded-full border border-border">
@@ -348,18 +404,10 @@ export default function AnalyticsPage() {
                                         height={300}
                                     />
                                 )}
-                                {isPhase2 && (
+                                {(isPhase2 || isPhase3 || isPhase4 || isPhase5) && (
                                     <PremiumAreaChart
                                         data={data.cnsIntensity}
-                                        color="#1c1917"
-                                        units="%"
-                                        height={300}
-                                    />
-                                )}
-                                {isPhase3 && (
-                                    <PremiumAreaChart
-                                        data={data.cnsIntensity}
-                                        color="#ef4444"
+                                        color={isPhase3 || isPhase5 ? "var(--primary)" : "var(--foreground)"}
                                         units="%"
                                         height={300}
                                     />
@@ -380,11 +428,15 @@ export default function AnalyticsPage() {
                                 {isPhase1 && "Structural Integrity"}
                                 {isPhase2 && "Threshold Drift"}
                                 {isPhase3 && "Peak Preparation"}
+                                {isPhase4 && "Recovery Surplus"}
+                                {isPhase5 && "Benchmark Calibration"}
                             </h4>
                             <p className="text-muted-foreground text-sm leading-relaxed font-light mb-10">
                                 {isPhase1 && "Tracking structural loading. Green markers indicate adaptation-ready sessions."}
                                 {isPhase2 && "Analysis of work capacity at lactic threshold. Average heart rate during 5k splits."}
-                                {isPhase3 && "Building towards PR testing in Phase 5. Current focus: power output density and neural efficiency."}
+                                {isPhase3 && "Building towards PR testing. Current focus: power output density and neural efficiency."}
+                                {isPhase4 && "Recovery exceeds load. Biometrics should reflect high parasitic nervous system dominance."}
+                                {isPhase5 && "Final verification of the 52-week curriculum. Absolute metrics finalized for the next cycle."}
                             </p>
                         </div>
 
@@ -408,12 +460,12 @@ export default function AnalyticsPage() {
                                     ))}
                                 </div>
                             )}
-                            {isPhase3 && (
+                            {(isPhase3 || isPhase4 || isPhase5) && (
                                 <div className="space-y-6">
                                     {[
                                         { label: "Power Density", val: "High", status: "Optimizing" },
                                         { label: "Neural Efficiency", val: "94%", status: "Stable" },
-                                        { label: "PR Testing", val: "Phase 5", status: "Scheduled" }
+                                        { label: "PR Testing", val: isPhase5 ? "Live" : "Scheduled", status: isPhase5 ? "Active" : "Incoming" }
                                     ].map(s => (
                                         <div key={s.label} className="flex justify-between items-end border-b border-border pb-2">
                                             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{s.label}</span>
@@ -459,11 +511,9 @@ export default function AnalyticsPage() {
                     </div>
                 </div>
 
-                <aside className="lg:col-span-1 space-y-8">
-                    <PRHistory />
-
-                    <div className="bg-card rounded-[48px] p-10 border border-border shadow-sm flex flex-col justify-between">
-                        <div className="space-y-8">
+                <aside className="lg:col-span-1 space-y-8 h-fit">
+                    <div className="bg-card rounded-[48px] p-8 md:p-10 border border-border shadow-sm flex flex-col justify-between h-fit min-h-[450px]">
+                        <div className="space-y-6 md:space-y-8">
                             <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center text-indigo-500 border border-indigo-500/20">
                                 <Moon size={24} />
                             </div>
@@ -529,41 +579,62 @@ export default function AnalyticsPage() {
                 sleepData={data.rawSleepData}
             />
 
-            {/* STAGE 4: VOLUME ARCHITECTURE (Always Visible) */}
+            {/* STAGE 4: VOLUME & BENCHMARKS ARCHITECTURE */}
             <section className="space-y-12">
                 <div className="space-y-2">
                     <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Background Architecture</span>
                     <h2 className="text-4xl font-serif text-foreground tracking-tight">Macro-Cycle Progression</h2>
                 </div>
-                <div className="bg-card rounded-[48px] p-16 border border-border shadow-sm">
-                    <div className="flex justify-between items-end mb-12">
-                        <div className="flex gap-12">
-                            <div>
-                                <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-2">Total Tonnage Arc</p>
-                                <p className="text-5xl font-serif text-foreground tracking-tighter">
-                                    {(units === 'metric'
-                                        ? (data.weeklyTonnage.reduce((a, b) => a + b, 0) / 1000 * 0.453592).toFixed(1)
-                                        : (data.weeklyTonnage.reduce((a, b) => a + b, 0) / 1000).toFixed(1)
-                                    )} <span className="text-lg">{units === 'metric' ? 'k/kg' : 'k/lbs'}</span>
-                                </p>
-                            </div>
-                            <div>
-                                <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-2">Work Density</p>
-                                <p className="text-5xl font-serif text-muted-foreground italic tracking-tighter">High</p>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+                    <div className="lg:col-span-2 bg-card rounded-[48px] p-12 md:p-16 border border-border shadow-sm flex flex-col justify-between">
+                        <div className="flex justify-between items-end mb-12">
+                            <div className="flex gap-12">
+                                <div>
+                                    <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-2">Total Tonnage Arc</p>
+                                    <p className="text-5xl font-serif text-foreground tracking-tighter">
+                                        {(units === 'metric'
+                                            ? (data.weeklyTonnage.reduce((a, b) => a + b, 0) / 1000 * 0.453592).toFixed(1)
+                                            : (data.weeklyTonnage.reduce((a, b) => a + b, 0) / 1000).toFixed(1)
+                                        )} <span className="text-lg">{units === 'metric' ? 'k/kg' : 'k/lbs'}</span>
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-2">Work Density</p>
+                                    <p className="text-5xl font-serif text-muted-foreground italic tracking-tighter">High</p>
+                                </div>
                             </div>
                         </div>
+                        <ProgressionBarChart
+                            data={units === 'metric'
+                                ? data.weeklyTonnage.map(v => v * 0.453592)
+                                : data.weeklyTonnage
+                            }
+                            height={250}
+                            color="bg-primary"
+                            units={getUnitLabel(units, 'weight')}
+                        />
                     </div>
-                    <ProgressionBarChart
-                        data={units === 'metric'
-                            ? data.weeklyTonnage.map(v => v * 0.453592)
-                            : data.weeklyTonnage
-                        }
-                        height={250}
-                        color="bg-primary"
-                        units={getUnitLabel(units, 'weight')}
-                    />
+
+                    <div className="lg:col-span-1">
+                        <PRHistory onOpenSpectrum={(history: any[]) => {
+                            setPrHistory(history);
+                            setPrModalOpen(true);
+                        }} />
+                    </div>
                 </div>
             </section>
+
+            {/* Analysis Modals */}
+            <SleepAnalysisModal
+                isOpen={sleepModalOpen}
+                onClose={() => setSleepModalOpen(false)}
+                sleepData={data.rawSleepData}
+            />
+            <PRAnalysisModal
+                isOpen={prModalOpen}
+                onClose={() => setPrModalOpen(false)}
+                prs={prHistory}
+            />
         </div>
     );
 }
