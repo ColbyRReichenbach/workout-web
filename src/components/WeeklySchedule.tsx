@@ -146,15 +146,15 @@ export const DayCard = memo(function DayCard({ day, isToday, isDone, isPast, pha
                         </div>
 
                         {isDone ? (
-                            <div className="h-14 w-14 rounded-[20px] bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20 group-hover:bg-emerald-500 group-hover:text-white transition-colors duration-200">
-                                <Check size={26} />
+                            <div className="h-14 w-14 rounded-[20px] bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20 group-hover:bg-emerald-500 group-hover:text-white transition-colors duration-200 flex-shrink-0">
+                                <CheckCircle size={26} />
                             </div>
                         ) : isPast ? (
-                            <div className="h-14 w-14 rounded-[20px] bg-red-500/5 flex items-center justify-center border border-red-500/10 group-hover:bg-red-500 group-hover:text-white transition-colors duration-200">
+                            <div className="h-14 w-14 rounded-[20px] bg-red-500/5 flex items-center justify-center border border-red-500/10 group-hover:bg-red-500 group-hover:text-white transition-colors duration-200 flex-shrink-0">
                                 <X size={26} />
                             </div>
                         ) : (
-                            <div className={`h-14 w-14 rounded-[20px] flex items-center justify-center transition-transform duration-200 group-hover:scale-105 ${isPrDay
+                            <div className={`h-14 w-14 rounded-[20px] flex items-center justify-center transition-transform duration-200 group-hover:scale-105 flex-shrink-0 ${isPrDay
                                 ? "bg-amber-500/20 border-2 border-amber-400 text-amber-500 shadow-lg shadow-amber-500/20"
                                 : isToday
                                     ? "bg-primary/10 border border-primary/20 text-primary shadow-lg shadow-primary/10"
@@ -288,7 +288,7 @@ export function DayDetailModal({ isOpen, onClose, day, isDone, isToday, logs, cu
                                 </div>
                                 <button
                                     onClick={onClose}
-                                    className="h-12 w-12 rounded-2xl bg-muted hover:bg-muted/80 flex items-center justify-center transition-colors border border-border"
+                                    className="h-12 w-12 rounded-2xl bg-muted hover:bg-muted/80 flex items-center justify-center transition-colors border border-border flex-shrink-0"
                                 >
                                     <X size={20} className="text-muted-foreground" />
                                 </button>
