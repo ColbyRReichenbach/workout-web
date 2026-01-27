@@ -2,13 +2,6 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
-    const pathname = request.nextUrl.pathname
-
-    // Skip middleware for auth callback to avoid interfering with session exchange
-    if (pathname.startsWith('/auth/callback')) {
-        return NextResponse.next()
-    }
-
     let response = NextResponse.next({
         request: {
             headers: request.headers,
@@ -48,29 +41,21 @@ export async function middleware(request: NextRequest) {
     // check for guest mode cookie
     const isGuest = request.cookies.get('guest-mode')?.value === 'true'
 
-    // Debug logging for auth issues
-    if (pathname === '/' || pathname.startsWith('/profile') || pathname.startsWith('/settings')) {
-        console.log('[Middleware]', pathname, '- User:', user?.id ?? 'null', '- Guest:', isGuest)
-    }
-
     // PROTECTED ROUTES
     // Dashboard at / and other protected pages require authentication OR guest mode
-    const isProtectedRoute =
-        pathname === '/' ||
-        pathname.startsWith('/dashboard') ||
-        pathname.startsWith('/analytics') ||
-        pathname.startsWith('/workout') ||
-        pathname.startsWith('/profile') ||
-        pathname.startsWith('/settings')
-
-    if (!user && !isGuest && isProtectedRoute) {
-        console.log('[Middleware] Redirecting unauthenticated user to /login from:', pathname)
+    if (!user && !isGuest &&
+        (request.nextUrl.pathname === '/' ||
+            request.nextUrl.pathname.startsWith('/dashboard') ||
+            request.nextUrl.pathname.startsWith('/analytics') ||
+            request.nextUrl.pathname.startsWith('/workout') ||
+            request.nextUrl.pathname.startsWith('/profile') ||
+            request.nextUrl.pathname.startsWith('/settings'))) {
         return NextResponse.redirect(new URL('/login', request.url))
     }
 
     // LOGIN / ONBOARDING PAGE
     // If user is already logged in OR is guest, redirect to home/dashboard
-    if ((user || isGuest) && (pathname.startsWith('/login') || pathname.startsWith('/onboarding'))) {
+    if ((user || isGuest) && (request.nextUrl.pathname.startsWith('/login') || request.nextUrl.pathname.startsWith('/onboarding'))) {
         return NextResponse.redirect(new URL('/', request.url))
     }
 
