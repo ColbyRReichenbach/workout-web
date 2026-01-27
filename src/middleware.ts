@@ -2,6 +2,13 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
+    const pathname = request.nextUrl.pathname
+
+    // Skip middleware for auth callback to avoid interfering with session exchange
+    if (pathname.startsWith('/auth/callback')) {
+        return NextResponse.next()
+    }
+
     let response = NextResponse.next({
         request: {
             headers: request.headers,
@@ -39,25 +46,31 @@ export async function middleware(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     // check for guest mode cookie
-    const isGuest = request.cookies.get('guest-mode')?.value === 'true';
+    const isGuest = request.cookies.get('guest-mode')?.value === 'true'
+
+    // Debug logging for auth issues
+    if (pathname === '/' || pathname.startsWith('/profile') || pathname.startsWith('/settings')) {
+        console.log('[Middleware]', pathname, '- User:', user?.id ?? 'null', '- Guest:', isGuest)
+    }
 
     // PROTECTED ROUTES
-    // 1. Dashboard, Analytics, Settings -> accessible by Authenticated OR Guest (Demo User)
-    // We check if "user" exists. If not, redirect to /login
-    if (!user && !isGuest &&
-        (request.nextUrl.pathname.startsWith('/dashboard') ||
-            request.nextUrl.pathname.startsWith('/analytics') ||
-            request.nextUrl.pathname.startsWith('/workout') ||
-            request.nextUrl.pathname.startsWith('/profile') ||
-            request.nextUrl.pathname.startsWith('/settings'))) {
+    // Dashboard at / and other protected pages require authentication OR guest mode
+    const isProtectedRoute =
+        pathname === '/' ||
+        pathname.startsWith('/dashboard') ||
+        pathname.startsWith('/analytics') ||
+        pathname.startsWith('/workout') ||
+        pathname.startsWith('/profile') ||
+        pathname.startsWith('/settings')
 
-        // Allow if it's strictly the login/signup page (already handled by !startsWith check above implicitly, but good to be sure)
+    if (!user && !isGuest && isProtectedRoute) {
+        console.log('[Middleware] Redirecting unauthenticated user to /login from:', pathname)
         return NextResponse.redirect(new URL('/login', request.url))
     }
 
     // LOGIN / ONBOARDING PAGE
     // If user is already logged in OR is guest, redirect to home/dashboard
-    if ((user || isGuest) && (request.nextUrl.pathname.startsWith('/login') || request.nextUrl.pathname.startsWith('/onboarding'))) {
+    if ((user || isGuest) && (pathname.startsWith('/login') || pathname.startsWith('/onboarding'))) {
         return NextResponse.redirect(new URL('/', request.url))
     }
 
