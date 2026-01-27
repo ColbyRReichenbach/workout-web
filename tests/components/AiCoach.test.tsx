@@ -12,7 +12,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import React, { useState, FormEvent, ChangeEvent } from 'react'
+import React, { FormEvent, ChangeEvent } from 'react'
 
 // Message type for chat
 interface ChatMessage {

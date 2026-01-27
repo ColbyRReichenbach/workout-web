@@ -15,7 +15,7 @@ import { PRHistory } from "@/components/PRHistory";
 import { SleepAnalysisModal } from "@/components/SleepAnalysisModal";
 import { useSettings } from "@/context/SettingsContext";
 import { getUnitLabel, mapExerciseToBaseline } from "@/lib/conversions";
-import { DEMO_USER_ID } from "@/lib/userSettings";
+
 
 // BASELINE MAXES (from Master Plan) - DEPRECATED (Using Profile now)
 
@@ -60,6 +60,15 @@ interface ReadinessMetric {
     readiness_score?: number;
 }
 
+interface HistoricalPR {
+    id: string;
+    exercise_name: string;
+    value: number;
+    unit: string;
+    pr_type: string;
+    created_at: string;
+}
+
 export default function AnalyticsPage() {
     const [data, setData] = useState<{
         rawLogs: AnalyticsLog[];
@@ -80,7 +89,7 @@ export default function AnalyticsPage() {
         powerDensity: number[];
         readinessSurplus: number[];
         prMagnitude: number[];
-        historicalPRs: any[];
+        historicalPRs: HistoricalPR[];
         runningMaxes: Record<string, number>;
         profileMaxes: {
             squat_max?: number;
@@ -108,7 +117,7 @@ export default function AnalyticsPage() {
 
     const [sleepModalOpen, setSleepModalOpen] = useState(false);
     const [prModalOpen, setPrModalOpen] = useState(false);
-    const [prHistory, setPrHistory] = useState<any[]>([]);
+    const [prHistory, setPrHistory] = useState<HistoricalPR[]>([]);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -157,9 +166,8 @@ export default function AnalyticsPage() {
             const distMap: Record<number, number> = {};
             const durationMap: Record<number, number> = {};
             const powerMap: Record<number, { sum: number, count: number }> = {};
-            const prCountMap: Record<number, number> = {};
             const runningMaxes: Record<string, number> = {};
-            const historicalPRs: any[] = [];
+            const historicalPRs: HistoricalPR[] = [];
 
             // 1. Seed historicalPRs with Profile Baselines (Weight)
             const weightBaselines: Record<string, number | undefined> = {
@@ -940,7 +948,7 @@ export default function AnalyticsPage() {
                         <PRHistory
                             prs={data.historicalPRs}
                             viewMode={viewMode}
-                            onOpenSpectrum={(history: any[]) => {
+                            onOpenSpectrum={(history: HistoricalPR[]) => {
                                 setPrHistory(history);
                                 setPrModalOpen(true);
                             }}

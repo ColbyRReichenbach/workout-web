@@ -3,23 +3,20 @@
 import { motion } from "framer-motion";
 import dynamic from "next/dynamic";
 import {
-  Activity, Calendar, Flame, List, CalendarDays,
-  ArrowRight, HeartPulse, Scale, TrendingUp, Award
+  Activity, Calendar, Flame, CalendarDays,
+  ArrowRight, Scale
 } from "lucide-react";
 import { DayCard, DayDetailModal } from "@/components/WeeklySchedule";
-import { BiometricsModal } from "@/components/BiometricsModal";
 import { TiltCard } from "@/components/TiltCard";
 import { SectionErrorBoundary } from "@/components/ErrorBoundary";
+import { BiometricsModal } from "@/components/BiometricsModal";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useState, useMemo } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { WorkoutDay, ProtocolDay, WorkoutLog } from "@/lib/types";
 import { useSettings } from "@/context/SettingsContext";
-import { getUnitLabel } from "@/lib/conversions";
 import { DEMO_USER_ID } from "@/lib/constants";
-import { CheckpointTestAlert } from "@/components/CheckpointTestAlert";
-import { isCheckpointWeek, getCheckpointData } from "@/lib/checkpointTests";
 
 // Dynamic import for AiCoach with loading skeleton
 const AiCoach = dynamic(() => import("@/components/AiCoach"), {
@@ -220,7 +217,7 @@ export default function Home() {
   };
 
   // Calculate real stats
-  const { streak, totalVolume, totalCompletion } = useMemo(() => {
+  const { streak, totalVolume } = useMemo(() => {
     const vol = allLogs.reduce((acc, log) => {
       const pd = log.performance_data || {};
       if (pd.sets && Array.isArray(pd.sets)) {

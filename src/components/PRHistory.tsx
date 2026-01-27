@@ -6,9 +6,7 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
-import { createClient } from "@/utils/supabase/client";
-import { Award, TrendingUp, Calendar, ChevronRight } from "lucide-react";
+import { Award, Calendar, ChevronRight } from "lucide-react";
 import { useSettings } from "@/context/SettingsContext";
 import { toDisplayWeight, getUnitLabel } from "@/lib/conversions";
 import { Card, CardHeader, CardTitle, CardContent } from "./ui/Card";

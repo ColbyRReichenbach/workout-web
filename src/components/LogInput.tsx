@@ -209,7 +209,7 @@ export function LogCardioBasic({ segment, idx, onLog }: LogProps) {
     const [distance, setDistance] = useState("");
     const [duration, setDuration] = useState(segment.target?.duration_min || "");
     const [hr, setHr] = useState("");
-    const [notes, setNotes] = useState("");
+    const [notes] = useState("");
     const [saved, setSaved] = useState(false);
 
     const handleSave = () => {
