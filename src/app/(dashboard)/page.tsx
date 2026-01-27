@@ -1,24 +1,46 @@
 "use client";
 
 import { motion } from "framer-motion";
+import dynamic from "next/dynamic";
 import {
   Activity, Calendar, Flame, List, CalendarDays,
   ArrowRight, HeartPulse, Scale, TrendingUp, Award
 } from "lucide-react";
-import AiCoach from "@/components/AiCoach";
 import { DayCard, DayDetailModal } from "@/components/WeeklySchedule";
 import { BiometricsModal } from "@/components/BiometricsModal";
 import { TiltCard } from "@/components/TiltCard";
-import { useRouter } from "next/navigation";
+import { SectionErrorBoundary } from "@/components/ErrorBoundary";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useState, useMemo } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { WorkoutDay, ProtocolDay, WorkoutLog } from "@/lib/types";
 import { useSettings } from "@/context/SettingsContext";
 import { getUnitLabel } from "@/lib/conversions";
-import { DEMO_USER_ID } from "@/lib/userSettings";
+import { DEMO_USER_ID } from "@/lib/constants";
 import { CheckpointTestAlert } from "@/components/CheckpointTestAlert";
 import { isCheckpointWeek, getCheckpointData } from "@/lib/checkpointTests";
+
+// Dynamic import for AiCoach with loading skeleton
+const AiCoach = dynamic(() => import("@/components/AiCoach"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex flex-col h-full p-4 animate-pulse">
+      <div className="flex items-center gap-4 mb-8">
+        <div className="h-12 w-12 rounded-2xl bg-muted" />
+        <div className="space-y-2">
+          <div className="h-5 w-24 bg-muted rounded" />
+          <div className="h-3 w-32 bg-muted rounded" />
+        </div>
+      </div>
+      <div className="flex-1 space-y-4">
+        <div className="h-4 w-3/4 bg-muted rounded" />
+        <div className="h-4 w-1/2 bg-muted rounded" />
+      </div>
+      <div className="h-16 w-full bg-muted rounded-3xl mt-auto" />
+    </div>
+  ),
+});
 
 // Types for workout data
 
@@ -35,6 +57,11 @@ const weeklyTemplate = [
   { day: "Saturday", title: "Long Run / Ruck", type: "Endurance" },
   { day: "Sunday", title: "Total Rest", type: "Rest" },
 ];
+
+const getHighestWeek = (logs: WorkoutLog[]) => {
+  if (!logs || logs.length === 0) return 1;
+  return Math.max(...logs.map(l => l.week_number));
+};
 
 export default function Home() {
   const router = useRouter();
@@ -53,9 +80,13 @@ export default function Home() {
 
 
 
+  const searchParams = useSearchParams();
+  const targetWeekParam = searchParams.get('week');
+
   useEffect(() => {
     async function fetchData() {
       const supabase = createClient();
+      console.log("[Dashboard] Fetching data for week:", targetWeekParam);
 
       // Parallelize initial data fetch
       const [
@@ -87,26 +118,69 @@ export default function Home() {
         return;
       }
 
+      // Determine Viewed Week
+      let viewedWeek = profile.current_week || 1;
+      if (targetWeekParam) {
+        const parsed = parseInt(targetWeekParam);
+        if (!isNaN(parsed)) viewedWeek = parsed;
+      }
+
       // Fetch ALL logs for this user to track streak across weeks
       const currentUserId = user?.id || DEMO_USER_ID;
-      const { data: allUserLogs } = await supabase
+      // Fetch recent logs for streak calculation
+      const { data: recentLogsData } = await supabase
         .from('logs')
         .select('*')
         .eq('user_id', currentUserId)
         .order('created_at', { ascending: false })
-        .limit(200);
+        .limit(500);
 
-      const logs = (allUserLogs as WorkoutLog[]) || [];
+      const recentLogs = (recentLogsData as WorkoutLog[]) || [];
 
-      setCurrentWeek(profile.current_week || 1);
-      setCurrentPhase(profile.current_phase || 1);
+      // Fetch logs for the SPECIFIC viewed week (Ensure calendar is correct even for past phases)
+      const { data: weekLogsData } = await supabase
+        .from('logs')
+        .select('*')
+        .eq('user_id', currentUserId)
+        .eq('week_number', viewedWeek);
+
+      const weekLogs = (weekLogsData as WorkoutLog[]) || [];
+
+      // Merge and Dedupe
+      const logMap = new Map<string, WorkoutLog>();
+      recentLogs.forEach(l => logMap.set(l.id, l));
+      weekLogs.forEach(l => logMap.set(l.id, l));
+      const logs = Array.from(logMap.values());
+
+      setCurrentWeek(viewedWeek);
+      // Phase will be recalculated below based on library structure
 
       if (library && library.program_data?.phases) {
         const phases = library.program_data.phases;
-        const phaseIdx = (profile?.current_phase || 1) - 1;
+
+        // Find Phase for Viewed Week
+        let phaseIdx = 0;
+        let weekCount = 0;
+        // Simple iteration to find which phase contains viewedWeek
+        for (let i = 0; i < phases.length; i++) {
+          const pWeeks = phases[i].weeks?.length || 4;
+          if (viewedWeek <= weekCount + pWeeks) {
+            phaseIdx = i;
+            break;
+          }
+          weekCount += pWeeks;
+        }
+
+        console.log(`[Dashboard] Calculated Phase ${phaseIdx + 1} for Week ${viewedWeek}`);
+        setCurrentPhase(phaseIdx + 1);
+
         const phase = phases[phaseIdx] || phases[0];
-        const absWeek = profile?.current_week || 1;
-        const relativeWeekIdx = (absWeek - 1) % (phase.weeks?.length || 4);
+        // Correctly calculate relative index by subtracting potential previous weeks
+        // weekCount holds the sum of weeks from all PREVIOUS phases at this point
+        const relativeWeekIdx = (viewedWeek - 1) - weekCount;
+
+        console.log(`[Dashboard] Phase Start Offset: ${weekCount}, Relative Index: ${relativeWeekIdx}`);
+
         const weekData = phase.weeks?.[relativeWeekIdx];
 
         if (weekData?.days) {
@@ -119,15 +193,15 @@ export default function Home() {
         }
       }
 
-      // Filter for weekly board (Flow)
-      const currentWeekLogs = logs.filter(l => l.week_number === (profile?.current_week || 1));
+      // Filter logs for the VIEWED week
+      const currentWeekLogs = logs.filter(l => l.week_number === viewedWeek);
       const daysWithLogs = new Set<string>(currentWeekLogs.map((l: WorkoutLog) => l.day_name));
       setCompletedDays(daysWithLogs);
       setAllLogs(logs);
       setLoading(false);
     }
     fetchData();
-  }, [router]);
+  }, [router, targetWeekParam]);
 
   // Determine today accurately
   const jsDay = new Date().getDay();
@@ -140,7 +214,9 @@ export default function Home() {
   };
 
   const getLogsForDay = (dayName: string) => {
-    return allLogs.filter(l => l.day_name === dayName);
+    const filtered = allLogs.filter(l => l.day_name === dayName && l.week_number === currentWeek);
+    console.log(`[Dashboard] Filtering logs for ${dayName}, Week ${currentWeek}. Found ${filtered.length} entries.`);
+    return filtered;
   };
 
   // Calculate real stats
@@ -229,6 +305,7 @@ export default function Home() {
         isDone={selectedDay ? completedDays.has(selectedDay.day) : false}
         isToday={selectedDay ? selectedDay.day === todayName : false}
         logs={selectedDay ? getLogsForDay(selectedDay.day) : []}
+        currentWeek={currentWeek}
       />
 
       {/* Hero Section */}
@@ -336,7 +413,9 @@ export default function Home() {
               <DayCard
                 key={day.day}
                 day={day}
-                isToday={todayName === day.day}
+                isToday={todayName === day.day && (!window.location.search.includes('week') || currentWeek === (allLogs.length > 0 ? getHighestWeek(allLogs) : 1))}
+                // Quick hack: If URL has week param, don't show today unless it matches? 
+                // Better: Store 'realCurrentWeek' in state.
                 isDone={completedDays.has(day.day)}
                 isPast={i < todayIndex && !completedDays.has(day.day)}
                 phase={currentPhase}
@@ -356,7 +435,9 @@ export default function Home() {
 
           <div className="glass-card border border-white/40 rounded-[48px] p-2 h-[600px] shadow-2xl relative overflow-hidden group">
             <div className="absolute inset-0 bg-gradient-to-b from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
-            <AiCoach />
+            <SectionErrorBoundary name="AI Coach">
+              <AiCoach />
+            </SectionErrorBoundary>
           </div>
         </div>
       </div>

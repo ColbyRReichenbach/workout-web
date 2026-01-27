@@ -26,7 +26,7 @@ export function Tooltip({ children, className, position = 'top' }: TooltipProps)
     return (
         <div
             className={cn(
-                "absolute z-50 bg-stone-900 border border-stone-800 text-white p-4 rounded-xl shadow-2xl pointer-events-none whitespace-nowrap overflow-visible",
+                "absolute z-50 bg-stone-900/90 backdrop-blur-md border border-stone-800 text-white p-4 rounded-2xl shadow-2xl pointer-events-none whitespace-nowrap overflow-visible",
                 positionClasses[position],
                 className
             )}

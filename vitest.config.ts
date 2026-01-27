@@ -9,6 +9,7 @@ export default defineConfig({
         globals: true,
         setupFiles: ['./tests/setup.ts'],
         include: ['tests/**/*.{test,spec}.{js,ts,tsx}'],
+        exclude: ['tests/e2e/**', 'node_modules/**'],
         coverage: {
             provider: 'v8',
             reporter: ['text', 'json', 'html'],
@@ -16,7 +17,17 @@ export default defineConfig({
                 'node_modules/',
                 '.next/',
                 'tests/setup.ts',
+                'tests/e2e/**',
+                '**/*.config.{ts,js}',
+                '**/types.ts',
             ],
+            thresholds: {
+                // Target 70% coverage
+                lines: 50,
+                functions: 50,
+                branches: 50,
+                statements: 50,
+            },
         },
         testTimeout: 10000,
     },

@@ -1,4 +1,5 @@
 import { createClient } from "@/utils/supabase/server";
+import { DEMO_USER_ID } from "@/lib/constants";
 
 export interface UserSettings {
     id: string;
@@ -23,8 +24,8 @@ const DEFAULT_SETTINGS: Omit<UserSettings, 'id'> = {
     is_demo_account: false,
 };
 
-// Demo user ID for guest mode
-export const DEMO_USER_ID = '00000000-0000-0000-0000-000000000001';
+// Re-export DEMO_USER_ID for backwards compatibility
+export { DEMO_USER_ID };
 
 // Fetch user settings using server-side Supabase client (for Server Components)
 export async function getUserSettingsServer(): Promise<UserSettings> {
@@ -44,8 +45,6 @@ export async function getUserSettingsServer(): Promise<UserSettings> {
         console.error('[getUserSettingsServer] Error fetching settings:', error);
         return { id: userId, ...DEFAULT_SETTINGS };
     }
-
-    console.log('[getUserSettingsServer] Got settings:', { units: data.units, theme: data.theme });
 
     return {
         id: data.id,

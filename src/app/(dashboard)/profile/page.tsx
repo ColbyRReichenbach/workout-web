@@ -10,6 +10,7 @@ import { logout } from "@/app/actions/auth";
 import { useSettings } from "@/context/SettingsContext";
 
 import { UserProfile } from "@/lib/types";
+import { DEMO_USER_ID } from "@/lib/userSettings";
 
 interface PhaseRange {
     min: number;
@@ -87,10 +88,11 @@ export default function ProfilePage() {
     };
 
     // Helpers
-    const secondsToTime = (seconds: number | null) => {
-        if (!seconds) return "";
-        const m = Math.floor(seconds / 60);
-        const s = Math.round(seconds % 60);
+    const secondsToTime = (seconds: number | string | null | undefined) => {
+        if (seconds === null || seconds === undefined || seconds === "") return "";
+        const numSeconds = typeof seconds === 'string' ? parseFloat(seconds) : seconds;
+        const m = Math.floor(numSeconds / 60);
+        const s = Math.round(numSeconds % 60);
         return `${m}:${s < 10 ? '0' : ''}${s}`;
     };
 
@@ -109,7 +111,7 @@ export default function ProfilePage() {
             if (user) {
                 query = query.eq('id', user.id);
             } else {
-                query = query.eq('id', '00000000-0000-0000-0000-000000000001');
+                query = query.eq('id', DEMO_USER_ID);
             }
 
             const { data } = await query.single();
@@ -353,6 +355,10 @@ export default function ProfilePage() {
                                 { label: "Squat", key: "squat_max" },
                                 { label: "Bench", key: "bench_max" },
                                 { label: "Deadlift", key: "deadlift_max" },
+                                { label: "Front Squat", key: "front_squat_max" },
+                                { label: "Overhead Press", key: "ohp_max" },
+                                { label: "Clean & Jerk", key: "clean_jerk_max" },
+                                { label: "Snatch", key: "snatch_max" },
                             ].map((field) => (
                                 <div key={field.key} className="relative group/field">
                                     <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest absolute top-3 left-6 transition-colors group-hover/field:text-primary">
@@ -392,15 +398,19 @@ export default function ProfilePage() {
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8 flex-1">
                         {[
-                            { label: "Mile Run", key: "mile_time" },
-                            { label: "5k Spectrum", key: "k5_time" },
-                            { label: "400m Dash", key: "sprint_400m" },
+                            { label: "Mile Run", key: "mile_time", placeholder: "mm:ss" },
+                            { label: "5k Spectrum", key: "k5_time", placeholder: "mm:ss" },
+                            { label: "400m Dash", key: "sprint_400m", placeholder: "mm:ss" },
+                            { label: "2k Row", key: "row_2k", placeholder: "mm:ss" },
+                            { label: "500m Row", key: "row_500m", placeholder: "mm:ss" },
+                            { label: "Ski Erg 1k", key: "ski_1k", placeholder: "mm:ss" },
+                            { label: "Assault Bike Max", key: "bike_max_watts", placeholder: "Watts" },
                         ].map((field) => (
                             <div key={field.key} className="relative group/field">
                                 <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest absolute top-3 left-6 transition-colors group-hover/field:text-primary">{field.label}</label>
                                 <input
-                                    type="text"
-                                    placeholder="mm:ss"
+                                    type={field.key === "bike_max_watts" ? "number" : "text"}
+                                    placeholder={field.placeholder}
                                     value={form[field.key as keyof ProfileFormState]}
                                     onChange={(e) => setForm({ ...form, [field.key]: e.target.value })}
                                     className={inputClasses}

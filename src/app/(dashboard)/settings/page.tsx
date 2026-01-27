@@ -7,7 +7,9 @@ import { Bell, Moon, Globe, Bot, Shield, Sliders, HeartPulse, Download, Database
 import { TiltCard } from "@/components/TiltCard";
 import { normalizeUnit } from "@/lib/conversions";
 import { useSettings } from "@/context/SettingsContext";
+
 import { exportUserData } from "@/app/actions/export";
+import { DEMO_USER_ID } from "@/lib/userSettings";
 
 interface PreferenceState {
     aiName: string;
@@ -20,7 +22,7 @@ export default function SettingsPage() {
     const { units, theme, setUnits, setTheme } = useSettings();
     const [preferences, setPreferences] = useState<PreferenceState>({
         aiName: "ECHO-P1",
-        aiPersonality: "Stoic",
+        aiPersonality: "Analytic",
         notifications: true,
         dataPrivacy: "Private"
     });
@@ -35,14 +37,14 @@ export default function SettingsPage() {
             if (user) {
                 query = query.eq('id', user.id);
             } else {
-                query = query.eq('id', '00000000-0000-0000-0000-000000000001');
+                query = query.eq('id', DEMO_USER_ID);
             }
 
             const { data } = await query.single();
             if (data) {
                 setPreferences({
                     aiName: data.ai_name || "ECHO-P1",
-                    aiPersonality: data.ai_personality || "Stoic",
+                    aiPersonality: data.ai_personality || "Analytic",
                     notifications: data.notifications_enabled ?? true,
                     dataPrivacy: data.data_privacy || "Private"
                 });
@@ -55,7 +57,8 @@ export default function SettingsPage() {
     const updateDB = async (newPrefs: PreferenceState) => {
         try {
             const { data: { user } } = await supabase.auth.getUser();
-            const userId = user?.id || '00000000-0000-0000-0000-000000000001';
+
+            const userId = user?.id || DEMO_USER_ID;
 
             const { error } = await supabase.from('profiles').update({
                 ai_name: newPrefs.aiName,
@@ -76,7 +79,8 @@ export default function SettingsPage() {
     const updateUnitsDB = async (newUnits: string) => {
         try {
             const { data: { user } } = await supabase.auth.getUser();
-            const userId = user?.id || '00000000-0000-0000-0000-000000000001';
+
+            const userId = user?.id || DEMO_USER_ID;
 
             console.log('[Settings] Updating units to:', newUnits, 'for user:', userId);
 
@@ -98,7 +102,8 @@ export default function SettingsPage() {
     const updateThemeDB = async (newTheme: string) => {
         try {
             const { data: { user } } = await supabase.auth.getUser();
-            const userId = user?.id || '00000000-0000-0000-0000-000000000001';
+
+            const userId = user?.id || DEMO_USER_ID;
 
             console.log('[Settings] Updating theme to:', newTheme, 'for user:', userId);
 
@@ -120,6 +125,24 @@ export default function SettingsPage() {
         const newPrefs = { ...preferences, [key]: value } as PreferenceState;
         setPreferences(newPrefs);
         await updateDB(newPrefs);
+    };
+
+    const handleExport = async () => {
+        try {
+            const data = await exportUserData();
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `pulse_data_export_${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error("Export failed:", error);
+            alert("Export failed. Please try again.");
+        }
     };
 
     const categories = [
@@ -289,8 +312,8 @@ export default function SettingsPage() {
 
                                         <div className="space-y-6">
                                             <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-6">Cognitive Mode</label>
-                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                                {['Motivational', 'Stoic', 'Clinical', 'Direct'].map(p => (
+                                            <div className="grid grid-cols-2 gap-4">
+                                                {['Analytic', 'Coach'].map(p => (
                                                     <button
                                                         key={p}
                                                         onClick={() => handleSelect('aiPersonality', p)}

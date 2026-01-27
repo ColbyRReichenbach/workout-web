@@ -12,25 +12,79 @@ import PrCelebration from "@/components/PrCelebration";
 import { TiltCard } from "@/components/TiltCard";
 import { useSettings } from "@/context/SettingsContext";
 import { getUnitLabel, toDisplayWeight } from "@/lib/conversions";
-import { DEMO_USER_ID } from "@/lib/userSettings";
+import { DEMO_USER_ID } from "@/lib/constants";
+import { calculate5kDerivedPaces, calculate2kRowDerivedPaces, calculate400mPaceFromMile, formatPacePerUnit } from "@/lib/calculations/paceZones";
+
 import { calculateWorkingSet } from "@/lib/calculations/percentages";
 import { getCheckpointData } from "@/lib/checkpointTests";
 import { generateCheckpointWorkout } from "@/lib/checkpointWorkouts";
+
+// Helper to render dynamic details
+const renderSegmentDetails = (segment: WorkoutSegment, profile: UserProfile | null) => {
+    if (!segment.details) return null;
+
+    let displayDetails = segment.details;
+    let dynamicTip: React.ReactNode = null;
+
+    if (profile) {
+        // Paces
+        const k5Paces = profile.k5_time_sec ? calculate5kDerivedPaces(profile.k5_time_sec) : null;
+        const rowPaces = profile.row_2k_sec ? calculate2kRowDerivedPaces(profile.row_2k_sec) : null;
+        const sprintPace = profile.mile_time_sec ? calculate400mPaceFromMile(profile.mile_time_sec) : null;
+
+        // Replace tokens
+        if (k5Paces) {
+            displayDetails = displayDetails.replace(/{{threshold_pace_mile}}/g, formatPacePerUnit(k5Paces.tempoPacePerMile, 'mile'));
+            displayDetails = displayDetails.replace(/{{tempo_pace_mile}}/g, formatPacePerUnit(k5Paces.tempoPacePerMile, 'mile'));
+            displayDetails = displayDetails.replace(/{{zone_2_pace_mile}}/g, formatPacePerUnit(k5Paces.zone2PacePerMile, 'mile'));
+        }
+        if (rowPaces) {
+            displayDetails = displayDetails.replace(/{{row_interval_pace_500m}}/g, formatPacePerUnit(rowPaces.aerobicInterval500m, '500m'));
+        }
+        if (sprintPace) {
+            displayDetails = displayDetails.replace(/{{track_repeat_pace_400m}}/g, formatPacePerUnit(sprintPace, '400m'));
+        }
+
+        displayDetails = displayDetails.replace(/{{zone_1_hr}}/g, "Zone 1");
+        displayDetails = displayDetails.replace(/{{zone_2_hr}}/g, "Zone 2");
+
+        // Legacy dynamic tips (fallback for non-tokenized strings)
+        if (segment.details.includes('rate') || segment.name.toLowerCase().includes('pace')) {
+            // Only show if we didn't already replace a token? 
+            // For now, we'll keep the specialized logic below as it handles "Zone 2" text matching which is still useful for old data.
+        }
+    }
+
+    if (!profile) return <p className="text-muted-foreground text-sm leading-relaxed italic">"{segment.details}"</p>;
+
+    // 1. Running Paces (Based on 5k or Mile) - LEGACY SUPPORT
+    const name = segment.name.toLowerCase();
+    if (profile.k5_time_sec && !displayDetails.includes('/mile')) { // Simple check to avoid double showing
+        const paces = calculate5kDerivedPaces(profile.k5_time_sec);
+        if (name.includes('zone 2') || name.includes('easy')) {
+            // dynamicTip = ... (Skip if token replaced)
+        }
+    }
+
+    return (
+        <div className="bg-muted/30 rounded-xl p-6 border border-border">
+            <p className="text-muted-foreground text-sm leading-relaxed italic">"{displayDetails}"</p>
+            {/* Render dynamicTip if needed (omitted for cleaner UI with tokens) */}
+        </div>
+    );
+};
+
+// ... inside component render loop:
+// {renderSegmentDetails(segment, profile)}
 
 // Helper for type-based styling
 const getSegmentIcon = (type: string, name: string = "", dayName: string = "") => {
     const lower = name.toLowerCase();
     const lowerDay = dayName.toLowerCase();
-
-    // Global Overrides
     if (lowerDay === 'sunday' || lower.includes('rest')) return Moon;
-
-    // Semantic Keyword Detection
     if (lower.includes('run') || lower.includes('sprint') || lower.includes('jog') || lower.includes('tempo') || lower.includes('ruck')) return Footprints;
     if (lower.includes('yoga') || lower.includes('stretch') || lower.includes('mobility') || lower.includes('flow')) return Flower2;
     if (lower.includes('rest') || lower.includes('sleep') || lower.includes('recovery day')) return Moon;
-
-    // Fallback to Protocol Type
     switch (type) {
         case 'MAIN_LIFT': return Zap;
         case 'ACCESSORY': return Activity;
@@ -40,36 +94,22 @@ const getSegmentIcon = (type: string, name: string = "", dayName: string = "") =
     }
 };
 
-// Animation Variants
-const container = {
-    hidden: { opacity: 0 },
-    show: {
-        opacity: 1,
-        transition: {
-            staggerChildren: 0.1
-        }
-    }
-};
-
-// Day name mapping (Monday-indexed to match workout_library)
+const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.1 } } };
 const dayNames = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 export default function WorkoutPage() {
     const [loading, setLoading] = useState(true);
-    const [todaysWorkout, setTodaysWorkout] = useState<ProgramData['phases'][0]['weeks'][0]['days'][0] | null>(null);
+    const [todaysWorkout, setTodaysWorkout] = useState<any>(null);
     const [segments, setSegments] = useState<WorkoutSegment[]>([]);
     const [profile, setProfile] = useState<UserProfile | null>(null);
+    const [currentWeek, setCurrentWeek] = useState(1);
+    const [currentPhase, setCurrentPhase] = useState(1);
     const [actualDayName, setActualDayName] = useState("");
     const { units } = useSettings();
 
-    // Flight State
     const [showPostFlight, setShowPostFlight] = useState(false);
     const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
-
-    // Logged segments tracking (indices of segments already logged)
     const [loggedSegments, setLoggedSegments] = useState<Set<number>>(new Set());
-
-    // PR State
     const [prCelebration, setPrCelebration] = useState<{ show: boolean, value: number, unit: string }>({ show: false, value: 0, unit: '' });
 
     useEffect(() => {
@@ -77,30 +117,13 @@ export default function WorkoutPage() {
             const supabase = createClient();
             const searchParams = new URLSearchParams(window.location.search);
             const targetDay = searchParams.get('day');
+            const targetWeekParam = searchParams.get('week');
 
             const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-            // Determine which profile to fetch
             const isGuestMode = !user || authError;
-            const profileId = isGuestMode ? '00000000-0000-0000-0000-000000000001' : user.id;
+            const profileId = isGuestMode ? DEMO_USER_ID : user.id;
 
-            console.log("[Workout] Auth mode:", isGuestMode ? "GUEST" : "AUTHENTICATED", "Profile ID:", profileId);
-
-            const { data: profileData, error: profileError } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', profileId)
-                .single();
-
-            if (profileError) {
-                console.error("[Workout] Profile fetch error:", profileError);
-            }
-            console.log("[Workout] Loaded profile:", profileData?.id, "with max lifts:", {
-                squat: profileData?.squat_max,
-                bench: profileData?.bench_max,
-                deadlift: profileData?.deadlift_max
-            });
-
+            const { data: profileData } = await supabase.from('profiles').select('*').eq('id', profileId).single();
             setProfile(profileData);
 
             let workoutDayIndex;
@@ -110,7 +133,6 @@ export default function WorkoutPage() {
                 setActualDayName(targetDay);
             } else {
                 const jsDay = new Date().getDay();
-                // Convert JS day (0=Sun) to library index (0=Mon)
                 const libraryDayIndex = jsDay === 0 ? 6 : jsDay - 1;
                 setActualDayName(dayNames[libraryDayIndex]);
                 workoutDayIndex = libraryDayIndex;
@@ -120,95 +142,64 @@ export default function WorkoutPage() {
 
             if (library && library.program_data?.phases) {
                 const phases = library.program_data.phases;
-                const absWeek = profileData?.current_week || 1;
-                const phaseIdx = (profileData?.current_phase || 1) - 1;
+                let absWeek = profileData?.current_week || 1;
+                if (targetWeekParam) {
+                    const parsed = parseInt(targetWeekParam);
+                    if (!isNaN(parsed)) absWeek = parsed;
+                }
+                setCurrentWeek(absWeek);
+
+                setCurrentWeek(absWeek);
+
+                let phaseIdx = 0;
+                let weekCount = 0;
+
+                // Always calculate phase and offset based on absolute week
+                for (let i = 0; i < phases.length; i++) {
+                    const phaseLen = phases[i].weeks?.length || 4;
+                    if (absWeek <= weekCount + phaseLen) {
+                        phaseIdx = i;
+                        break;
+                    }
+                    weekCount += phaseLen;
+                }
+                setCurrentPhase(phaseIdx + 1);
 
                 const phase = phases[phaseIdx] || phases[0];
-
-                // Map absolute week to available relative week templates (usually 1-4)
-                const relativeWeekIdx = (absWeek - 1) % (phase.weeks?.length || 4);
+                // Correctly calculate relative index by subtracting potential previous weeks
+                // weekCount holds the sum of weeks from all PREVIOUS phases at this point
+                const relativeWeekIdx = (absWeek - 1) - weekCount;
                 const week = phase.weeks[relativeWeekIdx] || phase.weeks[0];
                 let todayData = week.days[workoutDayIndex] || week.days[0];
-
-                // Get day name once for reuse
                 const todayDayName = targetDay || dayNames[workoutDayIndex];
 
-                // CHECKPOINT OVERRIDE: Replace workout with actual PR tests if it's a checkpoint week Saturday
                 if (todayDayName === "Saturday") {
                     const checkpointData = getCheckpointData(absWeek);
                     if (checkpointData) {
-                        console.log(`[Workout] CHECKPOINT WEEK ${absWeek} - Overriding with PR tests`);
-
-                        // Generate checkpoint workout segments
-                        const checkpointSegments = generateCheckpointWorkout(absWeek);
-
-                        // Override the workout data
-                        todayData = {
-                            day: todayDayName,
-                            title: "Checkpoint Testing",
-                            segments: checkpointSegments
-                        };
+                        todayData = { day: todayDayName, title: "Checkpoint Testing", segments: generateCheckpointWorkout(absWeek) };
                     }
                 }
 
                 setTodaysWorkout(todayData);
                 setSegments(todayData.segments || []);
 
-                // Fetch existing logs for today's workout to prevent duplicate submissions
-                const { data: existingLogs } = await supabase
-                    .from('logs')
-                    .select('segment_name')
-                    .eq('user_id', profileId)
-                    .eq('week_number', absWeek)
-                    .eq('day_name', todayDayName);
-
+                const { data: existingLogs } = await supabase.from('logs').select('segment_name').eq('user_id', profileId).eq('week_number', absWeek).eq('day_name', todayDayName);
                 if (existingLogs && existingLogs.length > 0) {
-                    // Map existing logs to segment indices
-                    const segmentNames = todayData.segments?.map((s: { name: string }) => s.name) || [];
+                    const segmentNames = todayData.segments?.map((s: any) => s.name) || [];
                     const alreadyLogged = new Set<number>();
-
                     existingLogs.forEach(log => {
                         const idx = segmentNames.indexOf(log.segment_name);
-                        if (idx !== -1) {
-                            alreadyLogged.add(idx);
-                        }
+                        if (idx !== -1) alreadyLogged.add(idx);
                     });
-
-                    console.log("[Workout] Found existing logs for segments:", [...alreadyLogged]);
                     setLoggedSegments(alreadyLogged);
+                }
 
-                    // If logs exist, check if there's an active session
-                    const { data: session } = await supabase
-                        .from('workout_sessions')
-                        .select('id')
-                        .eq('user_id', profileId)
-                        .eq('day_name', todayDayName)
-                        .eq('week_number', absWeek)
-                        .order('created_at', { ascending: false })
-                        .limit(1)
-                        .single();
-
-                    if (session) {
-                        setActiveSessionId(session.id);
-                    } else {
-                        // Create a session automatically if none exists
-                        const { data: newSession } = await supabase
-                            .from('workout_sessions')
-                            .insert({
-                                user_id: profileId,
-                                day_name: todayDayName,
-                                week_number: absWeek,
-                                phase_id: phaseIdx + 1,
-                                session_title: todayData.title,
-                                start_time: new Date().toISOString()
-                            })
-                            .select()
-                            .single();
-
-                        if (newSession) {
-                            setActiveSessionId(newSession.id);
-                        }
-                    }
+                const { data: session } = await supabase.from('workout_sessions').select('id').eq('user_id', profileId).eq('day_name', todayDayName).eq('week_number', absWeek).order('created_at', { ascending: false }).limit(1).maybeSingle();
+                if (session) {
+                    setActiveSessionId(session.id);
+                } else {
+                    const { data: newSession } = await supabase.from('workout_sessions').insert({ user_id: profileId, day_name: todayDayName, week_number: absWeek, phase_id: phaseIdx + 1, session_title: todayData.title, start_time: new Date().toISOString() }).select().single();
+                    if (newSession) setActiveSessionId(newSession.id);
                 }
             }
             setLoading(false);
@@ -216,265 +207,199 @@ export default function WorkoutPage() {
         fetchData();
     }, []);
 
-
     const handleFinishWorkout = async (data: PostFlightData) => {
         const supabase = createClient();
         if (activeSessionId) {
-            const { error } = await supabase
-                .from('workout_sessions')
-                .update({
-                    perceived_exertion: data.rpe,
-                    notes: data.notes,
-                    tags: data.tags,
-                    end_time: new Date().toISOString()
-                })
-                .eq('id', activeSessionId);
-
-            if (error) console.error("Failed to update session:", error);
-        } else {
-            // Fallback for sessions not started with PreFlight
-            const { data: { user } } = await supabase.auth.getUser();
-            await supabase.from('workout_sessions').insert({
-                user_id: user?.id || DEMO_USER_ID,
-                day_name: actualDayName,
-                week_number: profile?.current_week || 1,
-                perceived_exertion: data.rpe,
-                notes: data.notes,
-                tags: data.tags
-            });
+            await supabase.from('workout_sessions').update({ perceived_exertion: data.rpe, notes: data.notes, tags: data.tags, end_time: new Date().toISOString() }).eq('id', activeSessionId);
         }
-        window.location.href = "/";
+        window.location.href = "/?week=" + currentWeek;
     };
 
     const calcWeight = (segmentName: string, percent: number) => {
-        if (!profile) {
-            console.warn("[calcWeight] No profile loaded");
-            return 0;
-        }
-
-        // Use the new comprehensive calculation utility
+        if (!profile) return 0;
         const targetLbs = calculateWorkingSet(segmentName, percent, profile);
-
-        // Round to nearest 5 lbs for imperial, 2.5 kg for metric
-        if (units === 'metric') {
-            const targetKg = targetLbs * 0.453592;
-            return Math.round(targetKg / 2.5) * 2.5;
-        }
+        if (units === 'metric') return Math.round((targetLbs * 0.453592) / 2.5) * 2.5;
         return Math.round(targetLbs / 5) * 5;
     };
 
     const estimate1RM = (weight: number, reps: number) => Math.round(weight / (1.0278 - (0.0278 * reps)));
 
-    const checkPr = async (segmentName: string, weight: number, reps: number) => {
+    const checkPr = async (segmentName: string, val1: number, val2: number) => {
+        // val1 is weight (LBS) or duration (min) or watts?
+        // Wait, for Cardio, LogCardioBasic passes { duration_min, avg_hr, ... }. 
+        // We need to adjust how checkPr is CALLED for Cardio segments first.
+        // But assuming we fix the call site below:
+
         if (!profile) return;
         const name = segmentName.toLowerCase();
-        let type: 'squat_max' | 'deadlift_max' | 'bench_max' | null = null;
+        const startValue = val1; // Weight (lbs) usually
+        const reps = val2;
 
-        if (name.includes('squat')) type = 'squat_max';
-        else if (name.includes('deadlift') || name.includes('rdl')) type = 'deadlift_max';
-        else if (name.includes('bench')) type = 'bench_max';
+        let type: keyof UserProfile | null = null;
+        let isTime = false;
+        let isWatts = false;
 
-        if (type && weight > 0 && reps > 0) {
-            const estimatedMax = estimate1RM(weight, reps);
-            if (estimatedMax > (profile[type] || 0)) {
-                // estimatedMax is in LBS. Convert to user units for display.
-                const displayVal = toDisplayWeight(estimatedMax, units);
-                const displayUnit = getUnitLabel(units, 'weight');
+        // --- Strength Maxes ---
+        if (reps > 0) {
+            // Only estimate 1RM if reps are involved (Strength)
+            if (name.includes('front squat')) type = 'front_squat_max';
+            else if (name.includes('back squat') || (name.includes('squat') && !name.includes('split'))) type = 'squat_max';
+            else if (name.includes('clean') && name.includes('jerk')) type = 'clean_jerk_max';
+            else if (name.includes('snatch')) type = 'snatch_max';
+            else if (name.includes('overhead') || name.includes('ohp') || name.includes('press') && !name.includes('bench') && !name.includes('leg')) type = 'ohp_max';
+            else if (name.includes('bench')) type = 'bench_max';
+            else if (name.includes('deadlift') && !name.includes('rdl') && !name.includes('stiff')) type = 'deadlift_max';
+        }
 
-                setPrCelebration({ show: true, value: Number(displayVal), unit: displayUnit });
-                const supabase = createClient();
+        // --- Cardio Benchmarks (Time-based or Watts) ---
+        // For cardio, we expect checkPr to be called with (TimeInSeconds, 0) or (Watts, 0) maybe?
+        // I need to update the call sites first to pass correct data for cardio.
+        // I'll handle the logic here assuming I pass Seconds or Watts as val1.
+
+        if (name.includes('mile run')) { type = 'mile_time_sec'; isTime = true; }
+        else if (name.includes('5k')) { type = 'k5_time_sec'; isTime = true; }
+        else if (name.includes('400m')) { type = 'sprint_400m_sec'; isTime = true; }
+        else if (name.includes('2k') && name.includes('row')) { type = 'row_2k_sec'; isTime = true; }
+        else if (name.includes('500m') && name.includes('row')) { type = 'row_500m_sec'; isTime = true; }
+        else if (name.includes('ski') && name.includes('1k')) { type = 'ski_1k_sec'; isTime = true; }
+        else if (name.includes('bike') && name.includes('max watts')) { type = 'bike_max_watts'; isWatts = true; }
+
+        if (type) {
+            const supabase = createClient();
+
+            // Calculate Comparison Value
+            let newValue = startValue;
+            if (!isTime && !isWatts && reps > 0) {
+                // Estimate 1RM
+                newValue = estimate1RM(startValue, reps);
+            }
+
+            const currentMax = Number(profile[type]) || 0;
+            let isPr = false;
+
+            if (isTime) {
+                // Lower is better. If currentMax is 0 (untested), it's a PR.
+                if (currentMax === 0 || newValue < currentMax) isPr = true;
+            } else {
+                // Higher is better (Weight or Watts)
+                if (newValue > currentMax) isPr = true;
+            }
+
+            if (isPr) {
+                // 1. Celebrate
+                const displayVal = isTime
+                    ? newValue // Seconds will be formatted by Celebration component if needed? No, Celebration expects number.
+                    : (isWatts ? newValue : Number(toDisplayWeight(newValue, units)));
+
+                const unitLabel = isTime ? 's' : (isWatts ? 'w' : getUnitLabel(units, 'weight'));
+
+                // Ideally we format time for celebration... but for now simple value
+                setPrCelebration({ show: true, value: displayVal, unit: unitLabel });
+
+                // 2. Update DB Profile
+                await supabase.from('profiles').update({ [type]: newValue }).eq('id', profile.id);
+
+                // 3. Update Local Profile State so calculation logic uses new max immediately
+                setProfile(prev => prev ? ({ ...prev, [type]: newValue }) : null);
+
+                // 4. Log to PR History
                 await supabase.from('pr_history').insert({
                     user_id: profile.id,
                     exercise_name: segmentName,
-                    value: estimatedMax,
-                    unit: 'lb',
-                    pr_type: '1RM (Est)'
+                    value: newValue,
+                    unit: isTime ? 'sec' : (isWatts ? 'watts' : 'lbs'),
+                    pr_type: isTime ? 'Time Trial' : (isWatts ? 'Max Watts' : (reps === 1 ? '1RM' : '1RM (Est)'))
                 });
             }
         }
     };
 
-    const logSegment = async (segment: WorkoutSegment, idx: number, data: Record<string, unknown>) => {
+    const logSegment = async (segment: WorkoutSegment, idx: number, data: Record<string, any>) => {
         const el = document.getElementById(`status-${idx}`);
         if (el) el.classList.remove('hidden');
 
-        // Check for PRs in sets or individual weight/reps
+        // Strength / Watts PRs (Weight or Watts passed as val1)
         if (data.sets && Array.isArray(data.sets) && data.sets.length > 0) {
-            // Find best set (highest weight) to check for PR
-            const sets = data.sets as Record<string, number | undefined>[];
-            const bestSet = sets.reduce((prev, current) => {
-                const prevWeight = prev.weight || 0;
-                const currWeight = current.weight || 0;
-                return currWeight > prevWeight ? current : prev;
-            }, sets[0]);
-
-            if (bestSet && bestSet.weight && bestSet.reps) {
-                await checkPr(segment.name, bestSet.weight, bestSet.reps);
-            }
-        } else if (data.weight && typeof data.weight === 'number' && data.reps && typeof data.reps === 'number') {
+            const bestSet = data.sets.reduce((prev: any, current: any) => (current.weight || 0) > (prev.weight || 0) ? current : prev, data.sets[0]);
+            if (bestSet && bestSet.weight && bestSet.reps) await checkPr(segment.name, bestSet.weight, bestSet.reps);
+        } else if (data.weight && data.reps) {
             await checkPr(segment.name, data.weight, data.reps);
+        }
+
+        // Cardio Time PRs (Duration passed as time)
+        // LogCardioBasic returns duration_min. LogMetcon returns time_min.
+        const durationStr = data.duration_min || data.time_min;
+        if (durationStr) {
+            const minutes = parseFloat(durationStr) || 0;
+            const seconds = minutes * 60;
+            if (seconds > 0) {
+                await checkPr(segment.name, seconds, 0);
+            }
         }
 
         const supabase = createClient();
         const { data: { user } } = await supabase.auth.getUser();
-        const currentUserId = user?.id || '00000000-0000-0000-0000-000000000001';
+        const currentUserId = user?.id || DEMO_USER_ID;
 
-        // Delete any existing log for this segment (to allow upsert/overwrite)
-        await supabase.from('logs')
-            .delete()
-            .eq('user_id', currentUserId)
-            .eq('segment_name', segment.name)
-            .eq('week_number', profile?.current_week || 1)
-            .eq('day_name', actualDayName);
-
-        // Insert new log data
-        await supabase.from('logs').insert({
-            user_id: currentUserId,
-            session_id: activeSessionId,
-            segment_name: segment.name,
-            segment_type: segment.type,
-            tracking_mode: segment.tracking_mode,
-            performance_data: data,
-            phase_id: profile?.current_phase || 1,
-            week_number: profile?.current_week || 1,
-            day_name: actualDayName
-        });
-
-        // Track that this segment was logged
+        await supabase.from('logs').delete().eq('user_id', currentUserId).eq('segment_name', segment.name).eq('week_number', currentWeek).eq('day_name', actualDayName);
+        await supabase.from('logs').insert({ user_id: currentUserId, session_id: activeSessionId, segment_name: segment.name, segment_type: segment.type, tracking_mode: segment.tracking_mode, performance_data: data, phase_id: currentPhase, week_number: currentWeek, day_name: actualDayName });
         setLoggedSegments(prev => new Set([...prev, idx]));
     };
 
-    // Enable edit mode: just show the form again without deleting the log
-    // When the user re-submits, logSegment will upsert (delete + insert)
     const enableEditMode = (idx: number) => {
-        setLoggedSegments(prev => {
-            const updated = new Set([...prev]);
-            updated.delete(idx);
-            return updated;
-        });
+        setLoggedSegments(prev => { const updated = new Set([...prev]); updated.delete(idx); return updated; });
     };
 
-    if (loading) {
-        return (
-            <div className="flex h-[60vh] items-center justify-center text-muted-foreground font-serif animate-pulse text-xl">
-                Preparing Pulse Environment...
-            </div>
-        );
-    }
+    if (loading) return <div className="flex h-[60vh] items-center justify-center text-muted-foreground font-serif animate-pulse text-xl">Preparing Pulse Environment...</div>;
 
     return (
         <div className="max-w-5xl mx-auto space-y-16 pb-32">
             <PostFlightModal isOpen={showPostFlight} onClose={() => setShowPostFlight(false)} onFinish={handleFinishWorkout} />
-
-            <PrCelebration
-                show={prCelebration.show}
-                value={prCelebration.value}
-                unit={prCelebration.unit}
-                onComplete={() => setPrCelebration({ ...prCelebration, show: false })}
-            />
-
+            <PrCelebration show={prCelebration.show} value={prCelebration.value} unit={prCelebration.unit} onComplete={() => setPrCelebration({ ...prCelebration, show: false })} />
             <motion.div variants={container} initial="hidden" animate="show" className="space-y-12">
-                {/* Header */}
                 <header className="space-y-4">
-                    <div className="flex items-center gap-2 text-primary">
-                        <HeartPulse size={16} className="animate-pulse" />
-                        <span className="text-[10px] font-bold uppercase tracking-[0.4em] opacity-60">Live Pulse Session</span>
-                    </div>
+                    <div className="flex items-center gap-2 text-primary"><HeartPulse size={16} className="animate-pulse" /><span className="text-[10px] font-bold uppercase tracking-[0.4em] opacity-60">Live Pulse Session</span></div>
                     <h1 className="font-serif text-6xl md:text-8xl text-foreground leading-[0.85] tracking-tight">{todaysWorkout?.title}</h1>
-                    <p className="text-muted-foreground text-xl font-light italic max-w-2xl">
-                        Calibrate your output. Maintain the protocol&apos;s intensity spectrum.
-                    </p>
+                    <p className="text-muted-foreground text-xl font-light italic max-w-2xl">{todaysWorkout?.description || "Calibrate your output. Maintain the protocol's intensity spectrum."}</p>
                 </header>
-
-                {/* Workout Cards */}
                 <div className="space-y-8">
                     {segments.map((segment, idx) => {
                         const Icon = getSegmentIcon(segment.type, segment.name, actualDayName);
+                        const details = renderSegmentDetails(segment, profile);
                         return (
-                            <TiltCard
-                                key={idx}
-                                glowColor={segment.type === 'MAIN_LIFT' ? "shadow-primary/10" : "shadow-muted-foreground/5"}
-                                className="group rounded-[48px] p-10 overflow-hidden"
-                            >
-                                {/* Background Icon Watermark */}
-                                <div className={`absolute -right-12 -bottom-12 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity duration-300 pointer-events-none ${segment.type === 'MAIN_LIFT' ? 'text-primary' : 'text-muted-foreground'}`} style={{ willChange: 'opacity' }}>
-                                    <Icon size={180} strokeWidth={1} />
-                                </div>
-
+                            <TiltCard key={idx} glowColor={segment.type === 'MAIN_LIFT' ? "shadow-primary/10" : "shadow-muted-foreground/5"} className="group rounded-[48px] p-10 overflow-hidden">
+                                <div className={`absolute -right-12 -bottom-12 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity duration-300 pointer-events-none ${segment.type === 'MAIN_LIFT' ? 'text-primary' : 'text-muted-foreground'}`}><Icon size={180} strokeWidth={1} /></div>
                                 <div className="flex flex-col md:flex-row md:items-start justify-between gap-10 relative z-10">
                                     <div className="flex-1 space-y-8">
                                         <div className="flex items-center gap-4">
-                                            <span className={`px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all ${segment.type === 'MAIN_LIFT' ? 'bg-primary/5 text-primary' : 'bg-muted text-muted-foreground'
-                                                }`}>
-                                                {segment.type.replace('_', ' ')}
-                                            </span>
-                                            <h2 className="font-serif text-4xl text-foreground tracking-tight italic">
-                                                {segment.name}
-                                            </h2>
-                                            <span id={`status-${idx}`} className="text-emerald-500 hidden drop-shadow-[0_0_15px_rgba(16,185,129,0.3)]">
-                                                <CheckCircle size={32} />
-                                            </span>
+                                            <span className={`px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest ${segment.type === 'MAIN_LIFT' ? 'bg-primary/5 text-primary' : 'bg-muted text-muted-foreground'}`}>{segment.type.replace('_', ' ')}</span>
+                                            <h2 className="font-serif text-4xl text-foreground tracking-tight italic">{segment.name}</h2>
+                                            <span id={`status-${idx}`} className={`text-emerald-500 ${loggedSegments.has(idx) ? '' : 'hidden'} drop-shadow-[0_0_15px_rgba(16,185,129,0.3)]`}><CheckCircle size={32} /></span>
                                         </div>
-
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                            <div className="space-y-5">
-                                                {segment.target?.sets && (
-                                                    <div className="flex items-center gap-4 text-foreground">
-                                                        <div className="w-12 h-12 rounded-xl bg-muted border border-border flex items-center justify-center text-muted-foreground transition-transform duration-200 group-hover:scale-105">
-                                                            <Target size={20} />
-                                                        </div>
-                                                        <span className="font-serif text-3xl italic tracking-tight">
-                                                            {segment.target.sets} <span className="text-muted-foreground font-sans text-sm not-italic uppercase tracking-widest font-bold mx-1">sets of</span> {segment.target.reps}
-                                                        </span>
-                                                    </div>
-                                                )}
-                                                {segment.target?.percent_1rm && (
-                                                    <div className="flex items-center gap-4">
-                                                        <div className="w-12 h-12 rounded-xl bg-primary/5 border border-primary/10 flex items-center justify-center text-primary transition-transform duration-200 group-hover:scale-105">
-                                                            <Zap size={20} />
-                                                        </div>
-                                                        <span className="text-muted-foreground text-xl font-light">
-                                                            Load: <span className="font-serif text-3xl text-foreground italic tracking-tight">{calcWeight(segment.name, segment.target.percent_1rm)}{getUnitLabel(units, 'weight')}</span>
-                                                            <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-primary/40 ml-4">@{segment.target.percent_1rm * 100}%</span>
-                                                        </span>
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            {segment.details && (
-                                                <div className="bg-muted/30 rounded-xl p-6 border border-border transition-colors duration-200 group-hover:bg-muted/50">
-                                                    <p className="text-muted-foreground text-sm leading-relaxed italic">
-                                                        &quot;{segment.details}&quot;
-                                                    </p>
+                                        <div className="space-y-5">
+                                            {segment.target?.sets && (
+                                                <div className="flex items-center gap-4 text-foreground">
+                                                    <div className="w-12 h-12 rounded-xl bg-muted border border-border flex items-center justify-center text-muted-foreground"><Target size={20} /></div>
+                                                    <span className="font-serif text-3xl italic tracking-tight">{segment.target.sets} <span className="text-muted-foreground font-sans text-sm not-italic uppercase tracking-widest font-bold mx-1">sets of</span> {segment.target.reps}</span>
+                                                </div>
+                                            )}
+                                            {segment.target?.percent_1rm && (
+                                                <div className="flex items-center gap-4">
+                                                    <div className="w-12 h-12 rounded-xl bg-primary/5 border border-primary/10 flex items-center justify-center text-primary"><Zap size={20} /></div>
+                                                    <span className="text-muted-foreground text-xl font-light">Load: <span className="font-serif text-3xl text-foreground italic tracking-tight">{calcWeight(segment.name, segment.target.percent_1rm)}{getUnitLabel(units, 'weight')}</span><span className="text-[10px] font-bold uppercase tracking-[0.3em] text-primary/40 ml-4">@{segment.target.percent_1rm * 100}%</span></span>
                                                 </div>
                                             )}
                                         </div>
                                     </div>
-
                                     <div className="w-full md:w-auto flex items-center justify-end">
                                         {loggedSegments.has(idx) ? (
                                             <div className="flex flex-col items-center gap-3">
-                                                <div className="flex items-center gap-3 bg-emerald-500/5 border border-emerald-500/10 rounded-xl px-6 py-4">
-                                                    <CheckCircle className="text-emerald-500" size={20} />
-                                                    <span className="text-emerald-600 font-bold text-xs uppercase tracking-widest">Synchronized</span>
-                                                </div>
-                                                <button
-                                                    onClick={() => enableEditMode(idx)}
-                                                    className="text-xs text-muted-foreground hover:text-primary underline transition-colors"
-                                                >
-                                                    Edit Entry
-                                                </button>
+                                                <div className="flex items-center gap-3 bg-emerald-500/5 border border-emerald-500/10 rounded-xl px-6 py-4"><CheckCircle className="text-emerald-500" size={20} /><span className="text-emerald-600 font-bold text-xs uppercase tracking-widest">Synchronized</span></div>
+                                                <button onClick={() => enableEditMode(idx)} className="text-xs text-muted-foreground hover:text-primary underline">Edit Entry</button>
                                             </div>
                                         ) : (
                                             <>
-                                                {segment.tracking_mode === 'CHECKBOX' && (
-                                                    <button
-                                                        onClick={() => logSegment(segment, idx, { completed: true })}
-                                                        className="h-24 w-24 rounded-xl bg-primary/5 border border-primary/10 flex items-center justify-center hover:bg-primary hover:text-white transition-colors duration-200 btn-pro hover:shadow-primary/30 group/btn"
-                                                    >
-                                                        <CheckCircle size={36} className="transition-transform group-hover/btn:scale-110 group-hover/btn:rotate-6" />
-                                                    </button>
-                                                )}
+                                                {segment.tracking_mode === 'CHECKBOX' && <button onClick={() => logSegment(segment, idx, { completed: true })} className="h-24 w-24 rounded-xl bg-primary/5 border border-primary/10 flex items-center justify-center hover:bg-primary hover:text-white transition-all"><CheckCircle size={36} /></button>}
                                                 {segment.tracking_mode === 'STRENGTH_SETS' && <LogStrengthSets segment={segment} idx={idx} onLog={logSegment} calculatedWeight={segment.target?.percent_1rm ? calcWeight(segment.name, segment.target.percent_1rm) : undefined} />}
                                                 {segment.tracking_mode === 'METCON' && <LogMetcon segment={segment} idx={idx} onLog={logSegment} />}
                                                 {segment.tracking_mode === 'CARDIO_BASIC' && <LogCardioBasic segment={segment} idx={idx} onLog={logSegment} />}
@@ -482,19 +407,12 @@ export default function WorkoutPage() {
                                         )}
                                     </div>
                                 </div>
+                                {details && <div className="mt-8 relative z-10">{details}</div>}
                             </TiltCard>
                         );
                     })}
                 </div>
-
-                <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => setShowPostFlight(true)}
-                    className="w-full py-10 rounded-[48px] bg-foreground text-background text-3xl font-serif italic flex items-center justify-center gap-6 shadow-2xl transition-all btn-pro hover:bg-primary hover:text-primary-foreground hover:shadow-primary/30"
-                >
-                    Complete Pulse Sequence <ArrowRight size={28} />
-                </motion.button>
+                <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => setShowPostFlight(true)} className="w-full py-10 rounded-[48px] bg-foreground text-background text-3xl font-serif italic flex items-center justify-center gap-6 shadow-2xl transition-all hover:bg-primary hover:text-primary-foreground">Complete Pulse Sequence <ArrowRight size={28} /></motion.button>
             </motion.div>
         </div>
     );

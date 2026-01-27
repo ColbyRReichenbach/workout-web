@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { X, CheckCircle, Dumbbell, Clock, Flame, HeartPulse, Target, Activity, Zap, TrendingUp, Flower2, Footprints, Moon, Trophy, LucideIcon } from "lucide-react";
+import { X, CheckCircle, Check, Dumbbell, Clock, Flame, HeartPulse, Target, Activity, Zap, TrendingUp, Flower2, Footprints, Moon, Trophy, LucideIcon } from "lucide-react";
 import { memo, useEffect, createElement } from "react";
 import { TiltCard } from "./TiltCard";
 import { useSettings } from "@/context/SettingsContext";
@@ -81,18 +81,26 @@ const DayIcon = memo(function DayIcon({ day, phase, ...props }: { day: ProtocolD
 });
 
 export const DayCard = memo(function DayCard({ day, isToday, isDone, isPast, phase = 1, currentWeek, onClick }: DayCardProps) {
-    // Checkpoint Detection: Is this Saturday in a checkpoint week?
-    const isCheckpointDay = currentWeek && isCheckpointWeek(currentWeek) && day.day === "Saturday";
-    const checkpointData = isCheckpointDay ? getCheckpointData(currentWeek) : null;
+    // Checkpoint Detection: Is this a testing week?
+    const isTestingWeek = currentWeek && isCheckpointWeek(currentWeek);
 
-    // Override style for checkpoint days with BRIGHTER amber styling
-    const style = isCheckpointDay
+    // Saturday specific logic (Title override & Subtitle data)
+    const isSaturdayTest = isTestingWeek && day.day === "Saturday";
+    const checkpointData = isSaturdayTest ? getCheckpointData(currentWeek) : null;
+
+    // "Golden Day" logic: Saturday OR any Max effort day in testing week
+    const isPrDay = isTestingWeek && (isSaturdayTest || day.title.includes("Maxes"));
+
+    // Override style for PR days with BRIGHTER amber styling
+    const style = isPrDay
         ? { bg: "bg-amber-400/20", text: "text-amber-500", shadow: "shadow-amber-500/40", tint: "bg-amber-400/20", icon: Trophy }
         : TYPE_STYLES[day.type] || TYPE_STYLES["Strength"];
 
-    // Override title for checkpoint days
-    const displayTitle = isCheckpointDay ? "Checkpoint Testing" : day.title;
-    const displaySubtitle = isCheckpointDay && checkpointData
+    // Override title for Saturday Checkpoint specifically
+    const displayTitle = isSaturdayTest ? "Checkpoint Testing" : day.title;
+
+    // Subtitle only for Saturday Checkpoint
+    const displaySubtitle = isSaturdayTest && checkpointData
         ? checkpointData.tests.slice(0, 2).map(t => t.name).join(" • ")
         : null;
 
@@ -101,15 +109,15 @@ export const DayCard = memo(function DayCard({ day, isToday, isDone, isPast, pha
             glowColor={style.shadow}
             className={`
                 relative p-8 rounded-[48px] cursor-pointer overflow-hidden group 
-                ${isCheckpointDay ? "bg-gradient-to-br from-amber-500/10 to-amber-600/5 border-2 border-amber-400 shadow-xl shadow-amber-500/30" : "bg-card border border-border"}
+                ${isPrDay ? "bg-gradient-to-br from-amber-500/10 to-amber-600/5 border-2 border-amber-400 shadow-xl shadow-amber-500/30" : "bg-card border border-border"}
                 ${isToday ? "ring-2 ring-primary/20 ring-offset-4" : ""}
                 ${isDone ? "opacity-100" : isPast ? "opacity-60" : ""}
             `}
         >
             <div onClick={onClick}>
-                {/* Background Icon Watermark - Use Trophy for checkpoint days */}
+                {/* Background Icon Watermark - Use Trophy for PR days */}
                 <div className={`absolute -right-8 -bottom-8 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity duration-300 pointer-events-none ${style.text}`} style={{ willChange: 'opacity' }}>
-                    {isCheckpointDay ? (
+                    {isPrDay ? (
                         <Trophy size={160} strokeWidth={1} />
                     ) : (
                         <DayIcon day={day} phase={phase} size={160} strokeWidth={1} />
@@ -121,11 +129,11 @@ export const DayCard = memo(function DayCard({ day, isToday, isDone, isPast, pha
                     <div className="flex justify-between items-start mb-6">
                         <div>
                             <div className="flex items-center gap-2 mb-2">
-                                <span className={`text-[10px] font-bold uppercase tracking-[0.3em] ${isCheckpointDay ? "text-amber-500" : isToday ? "text-primary" : "text-muted-foreground"}`}>
+                                <span className={`text-[10px] font-bold uppercase tracking-[0.3em] ${isPrDay ? "text-amber-500" : isToday ? "text-primary" : "text-muted-foreground"}`}>
                                     {day.day}
                                 </span>
                                 {isToday && <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />}
-                                {isCheckpointDay && <Trophy size={12} className="text-amber-500 animate-pulse" />}
+                                {isPrDay && <Trophy size={12} className="text-amber-500 animate-pulse" />}
                             </div>
                             <h4 className="font-serif text-3xl text-foreground leading-tight">
                                 {displayTitle}
@@ -138,21 +146,21 @@ export const DayCard = memo(function DayCard({ day, isToday, isDone, isPast, pha
                         </div>
 
                         {isDone ? (
-                            <div className="h-14 w-14 rounded-[20px] bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20 group-hover:bg-emerald-500 group-hover:text-white transition-colors duration-200">
-                                <CheckCircle size={28} />
+                            <div className="h-14 w-14 rounded-[20px] bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20 group-hover:bg-emerald-500 group-hover:text-white transition-colors duration-200 flex-shrink-0">
+                                <CheckCircle size={26} />
                             </div>
                         ) : isPast ? (
-                            <div className="h-14 w-14 rounded-[20px] bg-red-500/5 flex items-center justify-center border border-red-500/10 group-hover:bg-red-500 group-hover:text-white transition-colors duration-200">
-                                <X size={24} />
+                            <div className="h-14 w-14 rounded-[20px] bg-red-500/5 flex items-center justify-center border border-red-500/10 group-hover:bg-red-500 group-hover:text-white transition-colors duration-200 flex-shrink-0">
+                                <X size={26} />
                             </div>
                         ) : (
-                            <div className={`h-14 w-14 rounded-2xl flex items-center justify-center transition-transform duration-200 group-hover:scale-105 ${isCheckpointDay
-                                    ? "bg-amber-500/20 border-2 border-amber-400 text-amber-500 shadow-lg shadow-amber-500/20"
-                                    : isToday
-                                        ? "bg-primary/10 border border-primary/20 text-primary shadow-lg shadow-primary/10"
-                                        : "bg-card border border-border text-muted-foreground shadow-sm"
+                            <div className={`h-14 w-14 rounded-[20px] flex items-center justify-center transition-transform duration-200 group-hover:scale-105 flex-shrink-0 ${isPrDay
+                                ? "bg-amber-500/20 border-2 border-amber-400 text-amber-500 shadow-lg shadow-amber-500/20"
+                                : isToday
+                                    ? "bg-primary/10 border border-primary/20 text-primary shadow-lg shadow-primary/10"
+                                    : "bg-card border border-border text-muted-foreground shadow-sm"
                                 }`}>
-                                {isCheckpointDay ? (
+                                {isPrDay ? (
                                     <Trophy size={26} className="animate-[pulse_2s_infinite]" />
                                 ) : (
                                     <DayIcon day={day} phase={phase} size={26} className={isToday ? "animate-[pulse_2s_infinite]" : ""} />
@@ -163,7 +171,7 @@ export const DayCard = memo(function DayCard({ day, isToday, isDone, isPast, pha
 
                     <div className="flex items-center gap-4">
                         <span className={`px-4 py-1.5 ${style.tint} ${style.text} rounded-full text-[10px] font-bold uppercase tracking-widest`}>
-                            {isCheckpointDay ? "PR Testing" : day.type.replace('_', ' ')} Protocol
+                            {isPrDay ? "PR Testing" : day.type.replace('_', ' ')} Protocol
                         </span>
                         {isDone && (
                             <span className="text-emerald-500 text-[10px] font-bold uppercase tracking-widest flex items-center gap-1">
@@ -186,9 +194,10 @@ interface DayDetailModalProps {
     isDone: boolean;
     isToday: boolean;
     logs: WorkoutLog[];
+    currentWeek: number;
 }
 
-export function DayDetailModal({ isOpen, onClose, day, isDone, isToday, logs }: DayDetailModalProps) {
+export function DayDetailModal({ isOpen, onClose, day, isDone, isToday, logs, currentWeek }: DayDetailModalProps) {
     const { units } = useSettings();
 
     useEffect(() => {
@@ -202,11 +211,13 @@ export function DayDetailModal({ isOpen, onClose, day, isDone, isToday, logs }: 
 
     if (!day) return null;
 
-    const isCardio = day.type === "Cardio" || day.type === "Endurance" || day.type === "Recovery";
+    const normalizedType = day.type.toUpperCase();
+    const isCardio = normalizedType.includes("CARDIO") || normalizedType.includes("ENDURANCE") || normalizedType.includes("RECOVERY");
+
     const weightLabel = getUnitLabel(units, 'weight');
     const distLabel = getUnitLabel(units, 'distance');
 
-    // Calculate real stats from logs
+    // Calculate real stats from logs - Filtered to current day/segment names to avoid leaks
     const totalSets = logs.reduce((acc, log) => {
         const pd = log.performance_data || {};
         if (pd.sets && Array.isArray(pd.sets)) return acc + pd.sets.length;
@@ -218,19 +229,16 @@ export function DayDetailModal({ isOpen, onClose, day, isDone, isToday, logs }: 
     const totalTime = logs.reduce((acc, log) => acc + (Number(log.performance_data?.duration_min) || 0), 0);
     const totalCals = logs.reduce((acc, log) => {
         const pd = log.performance_data || {};
-        return acc + (Number(pd.calories) || Number(pd.rounds) || 0); // Use rounds as a proxy for 'effort units' if cals missing
+        return acc + (Number(pd.calories) || Number(pd.rounds) || 0);
     }, 0);
 
     // For Strength: Sum volume
     const totalVolume = logs.reduce((acc, log) => {
         const pd = log.performance_data || {};
         if (pd.sets && Array.isArray(pd.sets)) {
-            const setVolume = pd.sets.reduce((sAcc: number, s: SetData) => sAcc + ((Number(s.weight) || 0) * (Number(s.reps) || 0)), 0);
-            return acc + setVolume;
+            return acc + pd.sets.reduce((sAcc: number, s: SetData) => sAcc + ((Number(s.weight) || 0) * (Number(s.reps) || 0)), 0);
         }
-        const weight = Number(pd.weight) || 0;
-        const reps = Number(pd.reps) || 0;
-        return acc + (weight * reps);
+        return acc + ((Number(pd.weight) || 0) * (Number(pd.reps) || 0));
     }, 0);
 
     const avgRpe = logs.length > 0
@@ -280,7 +288,7 @@ export function DayDetailModal({ isOpen, onClose, day, isDone, isToday, logs }: 
                                 </div>
                                 <button
                                     onClick={onClose}
-                                    className="h-12 w-12 rounded-2xl bg-muted hover:bg-muted/80 flex items-center justify-center transition-colors border border-border"
+                                    className="h-12 w-12 rounded-2xl bg-muted hover:bg-muted/80 flex items-center justify-center transition-colors border border-border flex-shrink-0"
                                 >
                                     <X size={20} className="text-muted-foreground" />
                                 </button>
@@ -377,7 +385,7 @@ export function DayDetailModal({ isOpen, onClose, day, isDone, isToday, logs }: 
                                         {/* Edit Workout Button */}
                                         <div className="pt-4 border-t border-border">
                                             <button
-                                                onClick={() => window.location.href = `/workout?retroactive=true&day=${day.day}`}
+                                                onClick={() => window.location.href = `/workout?retroactive=true&day=${day.day}&week=${currentWeek}`}
                                                 className="w-full py-4 rounded-2xl bg-muted text-muted-foreground hover:bg-primary hover:text-primary-foreground font-bold text-sm uppercase tracking-widest transition-all flex items-center justify-center gap-3"
                                             >
                                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
@@ -399,7 +407,7 @@ export function DayDetailModal({ isOpen, onClose, day, isDone, isToday, logs }: 
                                         <div className="space-y-4 pt-6">
                                             {isToday && (
                                                 <button
-                                                    onClick={() => window.location.href = "/workout"}
+                                                    onClick={() => window.location.href = `/workout?week=${currentWeek}`}
                                                     className="w-full py-8 rounded-[36px] bg-primary text-primary-foreground font-bold text-2xl transition-all btn-pro shadow-[0_20px_40px_-10px_rgba(239,68,68,0.3)] hover:shadow-[0_25px_50px_-12px_rgba(239,68,68,0.5)] flex items-center justify-center gap-4"
                                                 >
                                                     Initiate Pulse Protocol
@@ -409,7 +417,7 @@ export function DayDetailModal({ isOpen, onClose, day, isDone, isToday, logs }: 
 
                                             {!day.isFuture ? (
                                                 <button
-                                                    onClick={() => window.location.href = "/workout?retroactive=true&day=" + day.day}
+                                                    onClick={() => window.location.href = `/workout?retroactive=true&day=${day.day}&week=${currentWeek}`}
                                                     className="w-full py-6 rounded-[32px] bg-muted text-muted-foreground font-bold text-sm tracking-widest uppercase hover:text-foreground hover:bg-muted/80 transition-all border border-border"
                                                 >
                                                     Manual Back-Fill {isToday ? "(Missed)" : ""}
