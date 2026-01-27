@@ -136,19 +136,24 @@ export async function POST(req: Request) {
         const supabase = await createClient();
         const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-        // Allow demo user (guest mode) - they have a specific ID from constants
-        const isGuestMode = !user; // In guest mode, user is null but we use demo data
+        // Check for guest mode cookie - only use demo data if cookie is explicitly set
+        const cookieHeader = req.headers.get('cookie') || '';
+        const isGuestMode = cookieHeader.includes('guest-mode=true');
 
-        // For non-guest mode, require authentication
-        if (!isGuestMode && authError) {
+        // Determine user ID based on auth state
+        if (user) {
+            // Authenticated user - use their ID
+            userId = user.id;
+        } else if (isGuestMode) {
+            // Guest mode with cookie - use demo ID
+            userId = DEMO_USER_ID;
+        } else {
+            // Not authenticated and not guest mode - require auth
             return NextResponse.json(
                 { error: { code: 'UNAUTHORIZED', message: 'Authentication required' } },
                 { status: 401 }
             );
         }
-
-        // Use user ID or demo ID for rate limiting
-        userId = user?.id || DEMO_USER_ID;
 
         // 2. RATE LIMITING - Protect against abuse
         const rateLimit = await checkRateLimit(userId);

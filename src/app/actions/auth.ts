@@ -73,8 +73,8 @@ async function checkAuthRateLimit(identifier: string): Promise<{ allowed: boolea
 async function getClientIp(): Promise<string> {
     const headersList = await headers();
     return headersList.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-           headersList.get('x-real-ip') ||
-           'unknown';
+        headersList.get('x-real-ip') ||
+        'unknown';
 }
 
 // ============================================
@@ -154,6 +154,11 @@ export async function loginWithOAuth(provider: 'google' | 'apple') {
         return { error: 'Too many login attempts. Please wait a moment before trying again.' };
     }
 
+    // Clear guest mode cookie BEFORE starting OAuth flow
+    // This ensures we don't have stale guest state competing with the real login
+    const cookieStore = await cookies()
+    cookieStore.delete(GUEST_MODE_COOKIE.name)
+
     const supabase = await createClient()
     const origin = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
 
@@ -202,6 +207,10 @@ export async function signInWithEmail(formData: FormData): Promise<{ error?: str
         return { error: 'Invalid email or password' }
     }
 
+    // Clear guest mode cookie on successful login
+    const cookieStore = await cookies()
+    cookieStore.delete(GUEST_MODE_COOKIE.name)
+
     redirect('/')
 }
 
@@ -243,6 +252,10 @@ export async function signUpWithEmail(formData: FormData): Promise<{ error?: str
 
     // If user already exists and is confirmed, they're logged in immediately
     if (data.session) {
+        // Clear guest mode cookie on successful signup
+        const cookieStore = await cookies()
+        cookieStore.delete(GUEST_MODE_COOKIE.name)
+
         redirect('/onboarding')
     }
 

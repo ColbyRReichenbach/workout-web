@@ -28,12 +28,20 @@ const DEFAULT_SETTINGS: Omit<UserSettings, 'id'> = {
 export { DEMO_USER_ID };
 
 // Get the current user ID (demo or authenticated)
-export async function getCurrentUserId(): Promise<string> {
+export async function getCurrentUserId(): Promise<string | null> {
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
-    // If no authenticated user, use demo account
-    return user?.id || DEMO_USER_ID;
+    if (user) return user.id;
+
+    // Only fallback to demo if guest cookie is explicitly present
+    const isGuest = typeof document !== 'undefined' &&
+        document.cookie.split(';').some(c => c.trim().startsWith('guest-mode=true'));
+
+    if (isGuest) return DEMO_USER_ID;
+
+    // If no user and no guest cookie, return null
+    return null;
 }
 
 // Check if current user is in demo mode
@@ -43,9 +51,15 @@ export async function isGuestMode(): Promise<boolean> {
 }
 
 // Fetch user settings
-export async function getUserSettings(): Promise<UserSettings> {
+export async function getUserSettings(): Promise<UserSettings | null> {
     const supabase = createClient();
     const userId = await getCurrentUserId();
+
+    // If no user ID (not authenticated and not guest), return null
+    if (!userId) {
+        console.log('[getUserSettings] No user ID - user is unauthenticated');
+        return null;
+    }
 
     const { data, error } = await supabase
         .from('profiles')
@@ -54,7 +68,7 @@ export async function getUserSettings(): Promise<UserSettings> {
         .single();
 
     if (error || !data) {
-        console.error('Error fetching settings:', error);
+        console.error('[getUserSettings] Error fetching settings:', error);
         return { id: userId, ...DEFAULT_SETTINGS };
     }
 
