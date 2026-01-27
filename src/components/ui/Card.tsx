@@ -23,7 +23,7 @@ interface CardProps {
 
 const variantStyles: Record<CardVariant, string> = {
     default: 'bg-card border border-border shadow-sm',
-    glass: 'bg-card/50 border border-border backdrop-blur-xl shadow-lg',
+    glass: 'bg-card/50 border border-border backdrop-blur-xl shadow-lg shadow-black/5',
     outline: 'bg-transparent border-2 border-border',
     elevated: 'bg-card border border-border shadow-xl shadow-black/5',
 }
@@ -38,9 +38,9 @@ const sizeStyles: Record<CardSize, string> = {
 const radiusStyles: Record<CardRadius, string> = {
     md: 'rounded-xl',
     lg: 'rounded-2xl',
-    xl: 'rounded-3xl',
-    '2xl': 'rounded-[32px]',
-    '3xl': 'rounded-[48px]',
+    xl: 'rounded-3xl',      /* 24px */
+    '2xl': 'rounded-[32px]', /* 32px - Refined Squircle */
+    '3xl': 'rounded-[48px]', /* 48px - Macro Container */
     full: 'rounded-full',
 }
 

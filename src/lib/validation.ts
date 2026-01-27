@@ -77,6 +77,8 @@ export const emailSchema = z
     .email('Invalid email address')
     .transform((v) => v.toLowerCase().trim())
 
+import { COMMON_PASSWORDS } from '@/lib/constants';
+
 export const passwordSchema = z
     .string()
     .min(BOUNDS.PASSWORD_MIN_LENGTH, `Password must be at least ${BOUNDS.PASSWORD_MIN_LENGTH} characters`)
@@ -84,6 +86,11 @@ export const passwordSchema = z
     .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
     .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
     .regex(/[0-9]/, 'Password must contain at least one number')
+    .regex(/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/, 'Password must contain at least one special character (!@#$%^&*)')
+    .refine(
+        (password) => !COMMON_PASSWORDS.has(password.toLowerCase()),
+        'This password is too common. Please choose a stronger password.'
+    )
 
 export const uuidSchema = z.string().uuid('Invalid UUID format')
 
@@ -293,17 +300,59 @@ export const readinessLogSchema = z.object({
 // AI CHAT SCHEMAS
 // ============================================
 
+// AI SDK v6 uses parts array for message content
+const textPartSchema = z.object({
+    type: z.literal('text'),
+    text: z.string(),
+})
+
+const filePartSchema = z.object({
+    type: z.literal('file'),
+    url: z.string().optional(),
+    mimeType: z.string().optional(),
+    name: z.string().optional(),
+})
+
+const messagePartSchema = z.discriminatedUnion('type', [
+    textPartSchema,
+    filePartSchema,
+])
+
+// Support both legacy content string and new parts array format
 export const chatMessageSchema = z.object({
+    id: z.string().optional(),
     role: z.enum(['user', 'assistant', 'system']),
+    // Legacy format: content as string
     content: z
         .string()
-        .min(1, 'Message cannot be empty')
-        .max(BOUNDS.MESSAGE_MAX_LENGTH, `Message cannot exceed ${BOUNDS.MESSAGE_MAX_LENGTH} characters`),
-})
+        .max(BOUNDS.MESSAGE_MAX_LENGTH, `Message cannot exceed ${BOUNDS.MESSAGE_MAX_LENGTH} characters`)
+        .optional(),
+    // AI SDK v6 format: parts array
+    parts: z.array(messagePartSchema).optional(),
+}).refine(
+    (msg) => msg.content || (msg.parts && msg.parts.length > 0),
+    { message: 'Message must have either content or parts' }
+)
 
 export const chatRequestSchema = z.object({
     messages: z.array(chatMessageSchema).min(1).max(50),
 })
+
+/**
+ * Extract text content from a message (handles both legacy and v6 formats)
+ */
+export function extractMessageContent(message: { content?: string; parts?: Array<{ type: string; text?: string }> }): string {
+    if (message.content) {
+        return message.content;
+    }
+    if (message.parts) {
+        return message.parts
+            .filter((p): p is { type: 'text'; text: string } => p.type === 'text' && typeof p.text === 'string')
+            .map(p => p.text)
+            .join('\n');
+    }
+    return '';
+}
 
 // ============================================
 // UTILITY FUNCTIONS

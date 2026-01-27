@@ -24,6 +24,7 @@ export interface WorkoutSegment {
 export interface WorkoutDay {
     day: string;
     title: string;
+    description?: string;
     segments: WorkoutSegment[];
 }
 
@@ -53,7 +54,7 @@ export interface UserProfile {
     id: string;
     email?: string;
     full_name?: string;
-    height?: number;
+    height?: number; // Height in total inches (normalized storage)
     weight_lbs?: number;
 
     // Powerlifting Maxes

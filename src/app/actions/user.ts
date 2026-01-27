@@ -4,11 +4,13 @@ import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { cookies } from 'next/headers'
+import { formValuesToInches, parseHeightString } from '@/lib/conversions'
+import { GUEST_MODE_COOKIE } from '@/lib/constants'
 
 export async function updateOnboardingData(formData: FormData) {
     const supabase = await createClient()
     const cookieStore = await cookies()
-    const isGuest = cookieStore.get('guest-mode')?.value === 'true'
+    const isGuest = cookieStore.get(GUEST_MODE_COOKIE.name)?.value === GUEST_MODE_COOKIE.value
 
     const { data: { user } } = await supabase.auth.getUser()
 
@@ -21,21 +23,18 @@ export async function updateOnboardingData(formData: FormData) {
     }
 
     const fullName = formData.get('full_name') as string
-    const units = formData.get('units') as string
+    const units = (formData.get('units') as string) === 'metric' ? 'metric' : 'imperial'
     const weightVal = parseFloat(formData.get('weight') as string)
 
     // Normalize weight to lbs for DB
     const weightLbs = units === 'metric' ? Math.round(weightVal * 2.20462) : weightVal
 
-    // Reconstruct Height
-    let height = ""
-    if (units === 'imperial') {
-        const ft = formData.get('height_ft') || "0"
-        const inch = formData.get('height_in') || "0"
-        height = `${ft}'${inch}"`
-    } else {
-        height = `${formData.get('height_cm')} cm`
-    }
+    // Convert height to total inches for normalized storage
+    const heightInches = formValuesToInches(units, {
+        feet: formData.get('height_ft') as string,
+        inches: formData.get('height_in') as string,
+        cm: formData.get('height_cm') as string,
+    })
 
     const squatMax = parseFloat(formData.get('squat_max') as string) || 0
     const benchMax = parseFloat(formData.get('bench_max') as string) || 0
@@ -55,7 +54,7 @@ export async function updateOnboardingData(formData: FormData) {
         .upsert({
             id: user.id,
             full_name: fullName,
-            height,
+            height: heightInches, // Stored as total inches (numeric)
             weight_lbs: weightLbs,
             units,
             squat_max: squatLbs,

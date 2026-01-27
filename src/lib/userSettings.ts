@@ -1,4 +1,5 @@
 import { createClient } from "@/utils/supabase/client";
+import { DEMO_USER_ID } from "@/lib/constants";
 
 export interface UserSettings {
     id: string;
@@ -23,8 +24,8 @@ const DEFAULT_SETTINGS: Omit<UserSettings, 'id'> = {
     is_demo_account: false,
 };
 
-// Demo user ID for guest mode
-export const DEMO_USER_ID = '00000000-0000-0000-0000-000000000001';
+// Re-export DEMO_USER_ID for backwards compatibility
+export { DEMO_USER_ID };
 
 // Get the current user ID (demo or authenticated)
 export async function getCurrentUserId(): Promise<string> {

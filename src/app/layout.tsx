@@ -6,6 +6,7 @@ import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { SettingsProvider } from "@/context/SettingsContext";
 import { getUserSettingsServer } from "@/lib/userSettingsServer";
+import { Toaster } from "sonner";
 
 const inter = Inter({ subsets: ["latin"] });
 const playfair = Playfair_Display({ subsets: ["latin"], variable: '--font-serif' });
@@ -30,10 +31,10 @@ export default async function RootLayout({
   const settings = await getUserSettingsServer();
 
   // Determine dark mode from server-side settings to prevent flash
-  const isDark = settings.theme?.toLowerCase().includes('dark');
+  const isDark = settings?.theme?.toLowerCase().includes('dark') ?? false;
 
   return (
-    <html lang="en" className={isDark ? 'dark' : ''}>
+    <html lang="en" className={isDark ? 'dark' : ''} suppressHydrationWarning={true}>
       <body className={`${inter.className} ${playfair.variable} bg-background text-foreground antialiased selection:bg-primary/20 selection:text-primary-foreground`}>
         <SettingsProvider initialSettings={{ units: settings.units, theme: settings.theme }}>
           <div className="min-h-screen flex flex-col relative overflow-hidden">
@@ -55,6 +56,7 @@ export default async function RootLayout({
           {/* Vercel Analytics & Speed Insights */}
           <Analytics />
           <SpeedInsights />
+          <Toaster />
         </SettingsProvider>
       </body>
     </html>

@@ -18,28 +18,27 @@
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --radius-2xl: calc(var(--radius) + 8px);
-  --radius-3xl: calc(var(--radius) + 12px);
+  /* Elevating the radius system for that 'Hardware' feel */
+  --radius-xl: 1.5rem;
+  --radius-2xl: 2rem;
+  /* 32px - The Squircle Standard */
+  --radius-3xl: 3rem;
+  /* 48px - Container Standard */
   --radius-4xl: calc(var(--radius) + 16px);
 }
 
 :root {
   --radius: 1.5rem;
+  /* Softening the light mode background to a more 'Gallery' feel */
+  --background: #fbfbfd;
+  --card: rgba(255, 255, 255, 0.65);
 
-  /* Light Mode (Tan/Pulse Light) */
-  --background: #f5f2ed;
   --foreground: #1c1917;
-
-  --card: rgba(255, 254, 252, 0.7);
   --card-foreground: #1c1917;
-
   --primary: #ef4444;
   --primary-foreground: #ffffff;
-
   --muted: #e7e5e4;
   --muted-foreground: #78716c;
-
   --border: rgba(0, 0, 0, 0.05);
 }
 
@@ -47,16 +46,12 @@
   /* Dark Mode (Pulse Dark/Midnight) */
   --background: #09090b;
   --foreground: #fafafa;
-
   --card: rgba(24, 24, 27, 0.6);
   --card-foreground: #fafafa;
-
   --primary: #ef4444;
   --primary-foreground: #ffffff;
-
   --muted: #27272a;
   --muted-foreground: #a1a1aa;
-
   --border: rgba(255, 255, 255, 0.1);
 }
 
@@ -130,12 +125,16 @@
   /* Apple-Pro Design System */
   .glass-pro {
     background: var(--card);
-    backdrop-filter: blur(12px) saturate(150%);
-    -webkit-backdrop-filter: blur(12px) saturate(150%);
-    border: 1px solid var(--border);
-    box-shadow:
-      inset 0 0 0 1px rgba(255, 255, 255, 0.1),
-      0 10px 30px -10px rgba(0, 0, 0, 0.05);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 0.5px solid var(--border);
+    /* Thinner, more precise borders */
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.04);
+  }
+
+  /* Sophisticated Spring Transition Utility */
+  .spring-transition {
+    transition: all 0.5s cubic-bezier(0.32, 0.72, 0, 1);
   }
 
   .dark .glass-pro {

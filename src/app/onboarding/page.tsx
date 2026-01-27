@@ -5,11 +5,31 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Ruler, Weight, Activity, ChevronRight, User, Globe, Bot, Dumbbell, Sparkles, CheckCircle2 } from "lucide-react";
 import { updateOnboardingData } from "@/app/actions/user";
 import { logout } from "@/app/actions/auth";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/utils/supabase/client";
+import { GUEST_MODE_COOKIE } from "@/lib/constants";
+
+/**
+ * Parse a specific cookie value from document.cookie string
+ * Returns null if cookie is not found or not accessible (httpOnly)
+ */
+function getCookieValue(name: string): string | null {
+    if (typeof document === "undefined") return null;
+    const cookies = document.cookie.split(';');
+    for (const cookie of cookies) {
+        const [cookieName, cookieValue] = cookie.trim().split('=');
+        if (cookieName === name) {
+            return decodeURIComponent(cookieValue);
+        }
+    }
+    return null;
+}
 
 export default function OnboardingPage() {
     const [step, setStep] = useState(1);
     const [isGuest, setIsGuest] = useState(false);
     const [units, setUnits] = useState<"imperial" | "metric">("imperial");
+    const router = useRouter();
 
     // Form data state - persisted across all steps
     const [formState, setFormState] = useState({
@@ -30,28 +50,35 @@ export default function OnboardingPage() {
     };
 
     useEffect(() => {
-        const checkGuest = () => {
-            if (typeof document !== "undefined") {
-                setIsGuest(document.cookie.includes("guest-mode=true"));
-                if (document.cookie.includes("guest-mode=true")) {
-                    setUnits("imperial");
-                    // Set default values for guest
-                    setFormState({
-                        full_name: "Colby Reichenbach",
-                        height_ft: "6",
-                        height_in: "2",
-                        height_cm: "",
-                        weight: "195",
-                        squat_max: "345",
-                        bench_max: "245",
-                        deadlift_max: "405",
-                        ai_name: "ECHO-P1",
-                        ai_personality: "Stoic"
-                    });
-                }
+        const checkGuestMode = async () => {
+            // Primary check: no authenticated user means guest mode
+            const supabase = createClient();
+            const { data: { user } } = await supabase.auth.getUser();
+
+            // Secondary check: cookie value (if not httpOnly)
+            const guestCookie = getCookieValue(GUEST_MODE_COOKIE.name);
+            const isGuestMode = !user || guestCookie === GUEST_MODE_COOKIE.value;
+
+            setIsGuest(isGuestMode);
+
+            if (isGuestMode) {
+                setUnits("imperial");
+                // Set default values for guest
+                setFormState({
+                    full_name: "Colby Reichenbach",
+                    height_ft: "6",
+                    height_in: "2",
+                    height_cm: "",
+                    weight: "195",
+                    squat_max: "345",
+                    bench_max: "245",
+                    deadlift_max: "405",
+                    ai_name: "ECHO-P1",
+                    ai_personality: "Stoic"
+                });
             }
         };
-        checkGuest();
+        checkGuestMode();
     }, []);
 
 
@@ -103,6 +130,13 @@ export default function OnboardingPage() {
                         if (step !== 5) {
                             return;
                         }
+
+                        if (isGuest) {
+                            // Guests don't need to hit the DB, just go to dashboard
+                            router.push('/');
+                            return;
+                        }
+
                         // On step 5, let the server action handle it
                         const formData = new FormData(e.currentTarget);
                         await updateOnboardingData(formData);
@@ -439,7 +473,14 @@ export default function OnboardingPage() {
                                 </div>
 
                                 <button
-                                    type="submit"
+                                    type={isGuest ? "button" : "submit"}
+                                    onClick={(e) => {
+                                        if (isGuest) {
+                                            e.preventDefault();
+                                            console.log("Guest mode finalize clicked - forcing redirect");
+                                            window.location.href = '/'; // Hard redirect to clear any state/history
+                                        }
+                                    }}
                                     className="w-full bg-rose-600 text-white h-20 rounded-[32px] font-bold text-lg mt-4 flex items-center justify-center gap-3 shadow-2xl shadow-rose-600/20 hover:bg-rose-500 transition-all active:scale-[0.98]"
                                 >
                                     {isGuest ? "Finalize Preview" : "Complete Synchronization"} <Activity size={20} className="animate-pulse" />
