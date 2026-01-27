@@ -215,6 +215,7 @@ export function LogCardioBasic({ segment, idx, onLog }: LogProps) {
     const handleSave = () => {
         onLog(segment, idx, {
             distance: toStorageDistance(distance, units),
+            unit: getUnitLabel(units, 'distance'), // Pass the unit context for validation
             duration_min: duration,
             avg_hr: hr,
             notes

@@ -7,6 +7,7 @@ import { NextResponse } from 'next/server';
 import { detectIntent, buildDynamicContext } from '@/lib/ai/contextRouter';
 import { DEMO_USER_ID, RATE_LIMITS } from '@/lib/constants';
 import { logRequest, createRequestTimer, ApiErrors } from '@/lib/api/helpers';
+import * as Sentry from '@sentry/nextjs';
 
 export const maxDuration = 30;
 
@@ -14,72 +15,14 @@ export const maxDuration = 30;
 // RATE LIMITING
 // ============================================
 
-import { Ratelimit } from '@upstash/ratelimit';
-import { Redis } from '@upstash/redis';
-
-// ============================================
-// RATE LIMITING (Distributed via Upstash)
-// ============================================
+import { checkRateLimit } from '@/lib/redis';
 
 // Use centralized rate limit configuration
 const RATE_LIMIT = RATE_LIMITS.CHAT;
 
-// Initialize Redis and Ratelimit
-// Fallback to null if env vars are missing (dev mode safety)
-const redis = (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN)
-    ? new Redis({
-        url: process.env.UPSTASH_REDIS_REST_URL,
-        token: process.env.UPSTASH_REDIS_REST_TOKEN,
-    })
-    : null;
-
-const ratelimit = redis
-    ? new Ratelimit({
-        redis: redis,
-        limiter: Ratelimit.slidingWindow(RATE_LIMIT.requests, "1 m"),
-        analytics: true,
-        prefix: "@upstash/ratelimit",
-    })
-    : null;
-
-// Helper: In-memory fallback for Dev/Missing Keys
-const localRateLimitMap = new Map<string, { count: number; resetTime: number }>();
-function checkLocalRateLimit(identifier: string): { allowed: boolean; remaining: number } {
-    const now = Date.now();
-    const record = localRateLimitMap.get(identifier);
-    if (localRateLimitMap.size > 1000) { // Simple infinite growth protection
-        for (const [key, value] of localRateLimitMap.entries()) {
-            if (now > value.resetTime) localRateLimitMap.delete(key);
-        }
-    }
-    if (!record || now > record.resetTime) {
-        localRateLimitMap.set(identifier, { count: 1, resetTime: now + RATE_LIMIT.windowMs });
-        return { allowed: true, remaining: RATE_LIMIT.requests - 1 };
-    }
-    if (record.count >= RATE_LIMIT.requests) return { allowed: false, remaining: 0 };
-    record.count++;
-    return { allowed: true, remaining: RATE_LIMIT.requests - record.count };
-}
-
-async function checkRateLimit(identifier: string): Promise<{ allowed: boolean; remaining: number }> {
-    // 1. Production Mode: Use Upstash
-    if (ratelimit) {
-        try {
-            const { success, remaining } = await ratelimit.limit(identifier);
-            return { allowed: success, remaining };
-        } catch (error) {
-            console.error('[RateLimit] Upstash error, falling back to local', error);
-            // Fallthrough to local on Redis error
-        }
-    } else {
-        // Warning only once per cold boot to avoid log spam
-        if (process.env.NODE_ENV === 'production') {
-            console.warn('[RateLimit] UPSTASH_REDIS_REST_URL not set. Using in-memory fallback (unsafe for serverless).');
-        }
-    }
-
-    // 2. Dev/Fallback Mode: Use In-Memory
-    return checkLocalRateLimit(identifier);
+// Helper wrapper to match expected signature if needed, or just use checkRateLimit directly
+async function checkRateLimitWrapper(identifier: string): Promise<{ allowed: boolean; remaining: number }> {
+    return checkRateLimit(identifier, RATE_LIMIT);
 }
 
 // ============================================
@@ -120,6 +63,7 @@ export async function POST(req: Request) {
         const apiKey = process.env.OPENAI_API_KEY;
 
         if (!apiKey) {
+            Sentry.captureException(new Error('Missing OPENAI_API_KEY'));
             console.error('[API/Chat] Missing OPENAI_API_KEY');
             logRequest({
                 method: 'POST',
@@ -156,7 +100,7 @@ export async function POST(req: Request) {
         }
 
         // 2. RATE LIMITING - Protect against abuse
-        const rateLimit = await checkRateLimit(userId);
+        const rateLimit = await checkRateLimitWrapper(userId);
         if (!rateLimit.allowed) {
             return NextResponse.json(
                 {
@@ -347,11 +291,13 @@ export async function POST(req: Request) {
             return response;
         } catch (streamError) {
             console.error('[API/Chat] Stream creation failed:', streamError);
+            Sentry.captureException(streamError);
             throw streamError;
         }
 
     } catch (error) {
         console.error('[AI Chat Error]', error);
+        Sentry.captureException(error);
 
         // Log failed request
         logRequest({

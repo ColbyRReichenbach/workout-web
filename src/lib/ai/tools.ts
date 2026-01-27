@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { createClient } from '@/utils/supabase/server';
 import { tool } from 'ai';
+import * as Sentry from '@sentry/nextjs';
 import {
     MAX_TOOL_RESULT_TOKENS,
     estimateJsonTokens,
@@ -136,6 +137,7 @@ export const getRecentLogs = tool({
             return JSON.stringify(result, null, 2);
         } catch (error) {
             console.error('[AI Tool Error] getRecentLogs:', error);
+            Sentry.captureException(error);
             return 'An error occurred while fetching workout logs.';
         }
     },
@@ -208,6 +210,7 @@ export const getBiometrics = tool({
             return JSON.stringify(result, null, 2);
         } catch (error) {
             console.error('[AI Tool Error] getBiometrics:', error);
+            Sentry.captureException(error);
             return 'An error occurred while fetching biometric data.';
         }
     },
