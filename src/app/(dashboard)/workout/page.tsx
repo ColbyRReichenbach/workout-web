@@ -187,14 +187,22 @@ export default function WorkoutPage() {
 
     const estimate1RM = (weight: number, reps: number) => Math.round(weight / (1.0278 - (0.0278 * reps)));
 
-    const checkPr = async (segmentName: string, val1: number, val2: number) => {
-        // val1 is weight (LBS) or duration (min) or watts?
-        // Wait, for Cardio, LogCardioBasic passes { duration_min, avg_hr, ... }. 
-        // We need to adjust how checkPr is CALLED for Cardio segments first.
-        // But assuming we fix the call site below:
+    const checkPr = async (segmentName: string, segmentType: string, val1: number, val2: number) => {
+        // Exclude Accessories, Warmups, and Skills from PR entitlement
+        if (segmentType === 'ACCESSORY' || segmentType === 'WARMUP' || segmentType === 'SKILL') return;
 
         if (!profile) return;
         const name = segmentName.toLowerCase();
+
+        // Strict exclusion for DB/Dumbbell on main lifts unless it's a specific variation we track (none currently)
+        if (name.includes('db') || name.includes('dumbbell') || name.includes('kettlebell') || name.includes('kb')) {
+            if (!name.includes('snatch')) { // Allow KB Snatch if that becomes a thing? For now, safer to exclude all DB variants from Barbell Maxes.
+                // Actually, let's just rely on the specific string matches below + segmentType. 
+                // If a user names their main lift "DB Squat" and marks it MAIN_LIFT, should it update Squat Max? PROBABLY NOT.
+                // So let's add a guard against "DB/Dumbbell" for the strength types.
+            }
+        }
+
         const startValue = val1; // Weight (lbs) usually
         const reps = val2;
 
@@ -203,15 +211,20 @@ export default function WorkoutPage() {
         let isWatts = false;
 
         // --- Strength Maxes ---
-        if (reps > 0) {
+        if (reps > 0 && segmentType === 'MAIN_LIFT') {
             // Only estimate 1RM if reps are involved (Strength)
-            if (name.includes('front squat')) type = 'front_squat_max';
-            else if (name.includes('back squat') || (name.includes('squat') && !name.includes('split'))) type = 'squat_max';
-            else if (name.includes('clean') && name.includes('jerk')) type = 'clean_jerk_max';
-            else if (name.includes('snatch')) type = 'snatch_max';
-            else if (name.includes('overhead') || name.includes('ohp') || name.includes('press') && !name.includes('bench') && !name.includes('leg')) type = 'ohp_max';
-            else if (name.includes('bench')) type = 'bench_max';
-            else if (name.includes('deadlift') && !name.includes('rdl') && !name.includes('stiff')) type = 'deadlift_max';
+            // Explicitly exclude non-barbell keywords for safety
+            const isBarbell = !name.includes('db') && !name.includes('dumbbell') && !name.includes('kb') && !name.includes('kettlebell') && !name.includes('machine') && !name.includes('cable');
+
+            if (isBarbell) {
+                if (name.includes('front squat')) type = 'front_squat_max';
+                else if (name.includes('back squat') || (name.includes('squat') && !name.includes('split'))) type = 'squat_max';
+                else if (name.includes('clean') && name.includes('jerk')) type = 'clean_jerk_max';
+                else if (name.includes('snatch')) type = 'snatch_max';
+                else if (name.includes('overhead') || name.includes('ohp') || name.includes('press') && !name.includes('bench') && !name.includes('leg')) type = 'ohp_max';
+                else if (name.includes('bench')) type = 'bench_max';
+                else if (name.includes('deadlift') && !name.includes('rdl') && !name.includes('stiff')) type = 'deadlift_max';
+            }
         }
 
         // --- Cardio Benchmarks (Time-based or Watts) ---
@@ -285,9 +298,9 @@ export default function WorkoutPage() {
         if (data.sets && Array.isArray(data.sets) && data.sets.length > 0) {
             const sets = data.sets as { weight?: number; reps?: number }[];
             const bestSet = sets.reduce((prev, current) => (current.weight || 0) > (prev.weight || 0) ? current : prev, sets[0]);
-            if (bestSet && bestSet.weight && bestSet.reps) await checkPr(segment.name, bestSet.weight, bestSet.reps);
+            if (bestSet && bestSet.weight && bestSet.reps) await checkPr(segment.name, segment.type, bestSet.weight, bestSet.reps);
         } else if (data.weight && data.reps) {
-            await checkPr(segment.name, Number(data.weight), Number(data.reps));
+            await checkPr(segment.name, segment.type, Number(data.weight), Number(data.reps));
         }
 
         // Cardio Time PRs (Duration passed as time)
@@ -297,7 +310,7 @@ export default function WorkoutPage() {
             const minutes = parseFloat(durationStr) || 0;
             const seconds = minutes * 60;
             if (seconds > 0) {
-                await checkPr(segment.name, seconds, 0);
+                await checkPr(segment.name, segment.type, seconds, 0);
             }
         }
 

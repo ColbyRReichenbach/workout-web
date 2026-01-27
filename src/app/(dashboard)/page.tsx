@@ -16,6 +16,7 @@ import { useEffect, useState, useMemo } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { WorkoutDay, ProtocolDay, WorkoutLog } from "@/lib/types";
 import { useSettings } from "@/context/SettingsContext";
+import { getUnitLabel } from "@/lib/conversions";
 import { DEMO_USER_ID } from "@/lib/constants";
 
 // Dynamic import for AiCoach with loading skeleton
@@ -181,11 +182,29 @@ export default function Home() {
         const weekData = phase.weeks?.[relativeWeekIdx];
 
         if (weekData?.days) {
-          const dynamicProtocol = weekData.days.map((d: WorkoutDay) => ({
-            day: d.day,
-            title: d.title,
-            type: d.segments?.[0]?.type || "Training"
-          }));
+          // Calculate today's index for future detection
+          const localJsDay = new Date().getDay();
+          const localTodayIndex = localJsDay === 0 ? 6 : localJsDay - 1;
+          const actualCurrentWeek = profile.current_week || 1;
+
+          const dynamicProtocol = weekData.days.map((d: WorkoutDay, i: number) => {
+            let isFuture = false;
+            // logic: If viewing a FUTURE week, all days are future.
+            // If viewing CURRENT week, only days after today are future.
+            // If viewing PAST week, no days are "future" (locked).
+            if (viewedWeek > actualCurrentWeek) {
+              isFuture = true;
+            } else if (viewedWeek === actualCurrentWeek) {
+              isFuture = i > localTodayIndex;
+            }
+
+            return {
+              day: d.day,
+              title: d.title,
+              type: d.segments?.[0]?.type || "Training",
+              isFuture: isFuture
+            };
+          });
           setProtocol(dynamicProtocol);
         }
       }
