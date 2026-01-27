@@ -6,6 +6,7 @@ import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { SettingsProvider } from "@/context/SettingsContext";
 import { getUserSettingsServer } from "@/lib/userSettingsServer";
+import { Toaster } from "sonner";
 
 const inter = Inter({ subsets: ["latin"] });
 const playfair = Playfair_Display({ subsets: ["latin"], variable: '--font-serif' });
@@ -55,6 +56,7 @@ export default async function RootLayout({
           {/* Vercel Analytics & Speed Insights */}
           <Analytics />
           <SpeedInsights />
+          <Toaster />
         </SettingsProvider>
       </body>
     </html>

@@ -50,6 +50,7 @@ interface AnalyticsLog {
         weight?: number;
         reps?: number;
         rpe?: number;
+        avg_watts?: string;
     };
     segment_name: string;
 }

@@ -45,8 +45,6 @@ export async function getUserSettingsServer(): Promise<UserSettings> {
         return { id: userId, ...DEFAULT_SETTINGS };
     }
 
-    console.log('[getUserSettingsServer] Got settings:', { units: data.units, theme: data.theme });
-
     return {
         id: data.id,
         full_name: data.full_name,

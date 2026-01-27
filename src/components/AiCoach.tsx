@@ -11,11 +11,62 @@ interface AIProfile {
 }
 
 export default function AiCoach() {
-    // We use any here because different versions of the AI SDK have slightly different return types for useChat
-    // and we want to ensure compatibility with the runtime while satisfying the linter.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat() as any;
+    const chatHelpers = useChat({
+        onError: (error) => {
+            console.error('[AiCoach] Error:', error);
+        }
+    }) as any;
+
+    const { messages, status, append, setInput: setHookInput, handleSubmit: handleHookSubmit } = chatHelpers;
+
+    // Manual input state to prevent "read-only" errors if hook fails
+    const [input, setInput] = useState('');
+    const isLoading = status === 'streaming' || status === 'submitted';
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setInput(e.target.value);
+    };
+
     const [profile, setProfile] = useState<AIProfile | null>(null);
+
+    // Debugging hooks
+    useEffect(() => {
+        console.log('[AiCoach] State:', {
+            status,
+            isLoading,
+            inputLen: input.length,
+            messagesLen: messages?.length,
+            hasAppend: typeof append === 'function'
+        });
+    }, [status, isLoading, input, messages, append]);
+
+    const handleSubmitManual = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!input.trim()) return;
+
+        console.log('[AiCoach] Submitting...', { hasAppend: !!append, hasSubmit: !!handleHookSubmit });
+
+        try {
+            if (append) {
+                await append({
+                    role: 'user',
+                    content: input
+                });
+            } else if (handleHookSubmit && setHookInput) {
+                console.warn('[AiCoach] Fallback: using setInput+handleSubmit');
+                setHookInput(input);
+                // Allow state propagation
+                setTimeout(() => {
+                    handleHookSubmit(e);
+                }, 0);
+            } else {
+                console.error('[AiCoach] Critical: No release method available');
+            }
+            setInput('');
+        } catch (err) {
+            console.error('[AiCoach] Send failed:', err);
+        }
+    };
 
     useEffect(() => {
         async function fetchProfile() {
@@ -63,14 +114,13 @@ export default function AiCoach() {
                     </div>
                 )}
 
-                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                 {messages.map((m: any) => (
                     <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                         <div className={`max-w-[90%] rounded-[24px] px-6 py-4 text-sm leading-relaxed ${m.role === 'user'
                             ? 'bg-foreground text-background rounded-br-none shadow-xl'
                             : 'bg-muted text-foreground rounded-bl-none border border-border shadow-lg shadow-black/5'
                             }`}>
-                            {m.content}
+                            {m.content || m.text || (m.parts && m.parts[0] && m.parts[0].text)}
                         </div>
                     </div>
                 ))}
@@ -85,9 +135,9 @@ export default function AiCoach() {
             </div>
 
             {/* Input Overlay */}
-            <form onSubmit={handleSubmit} className="relative mt-auto">
+            <form onSubmit={handleSubmitManual} className="relative mt-auto">
                 <input
-                    value={input}
+                    value={input || ''}
                     onChange={handleInputChange}
                     placeholder="Inquire about performance..."
                     className="w-full bg-muted border border-border rounded-[24px] py-6 pl-6 pr-16 text-sm italic font-serif focus:outline-none focus:bg-card focus:ring-4 focus:ring-primary/5 transition-all text-foreground placeholder:text-muted-foreground shadow-inner"
@@ -95,7 +145,6 @@ export default function AiCoach() {
                 />
                 <button
                     type="submit"
-                    disabled={isLoading || !input}
                     className="absolute right-2 top-2 bottom-2 w-12 bg-primary rounded-[18px] flex items-center justify-center text-primary-foreground hover:bg-foreground hover:text-background disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-xl shadow-primary/20"
                 >
                     <Send size={18} />

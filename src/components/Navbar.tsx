@@ -23,6 +23,8 @@ const navigation = [
     { name: "Gear", href: "/settings", icon: Settings },
 ];
 
+const MotionLink = motion(Link);
+
 export function Navbar() {
     const pathname = usePathname();
     const [scrolled, setScrolled] = useState(false);
@@ -53,40 +55,48 @@ export function Navbar() {
                     : "border-white/10 shadow-none bg-background/30"
             )}>
                 {/* Logo */}
-                <Link href="/" className="flex items-center gap-3 group relative z-20 magnetic-scale">
+                <MotionLink
+                    href="/"
+                    className="flex items-center gap-3 group relative z-20"
+                    whileHover={{ y: -2 }}
+                    whileTap={{ scale: 0.97 }}
+                >
                     <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-primary-foreground shadow-lg shadow-primary/20 group-hover:shadow-primary/40 transition-all">
                         <HeartPulse size={24} />
                     </div>
                     <span className="font-serif text-2xl font-bold tracking-tighter text-foreground group-hover:text-primary transition-colors">
                         Pulse
                     </span>
-                </Link>
+                </MotionLink>
 
                 {/* Desktop Nav */}
                 <nav className="hidden md:flex items-center gap-2 relative z-20">
                     {navigation.map((item) => {
                         const isActive = pathname === item.href;
                         return (
-                            <Link
+                            <MotionLink
                                 key={item.name}
                                 href={item.href}
                                 className={cn(
-                                    "relative px-5 py-2.5 text-[13px] font-bold uppercase tracking-widest rounded-xl transition-all flex items-center gap-2 group",
+                                    "relative px-5 py-2.5 text-[13px] font-bold uppercase tracking-widest rounded-xl transition-colors flex items-center gap-2 group",
                                     isActive
                                         ? "text-primary"
-                                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                                        : "text-muted-foreground hover:text-foreground"
                                 )}
+                                whileHover={{ y: -2 }}
+                                whileTap={{ scale: 0.97 }}
+                                transition={{ type: "spring", stiffness: 400, damping: 30 }}
                             >
                                 {isActive && (
                                     <motion.div
                                         layoutId="nav-pill"
                                         className="absolute inset-0 bg-primary/5 rounded-xl border border-primary/10"
-                                        transition={{ type: "spring", bounce: 0.25, duration: 0.5 }}
+                                        transition={{ type: "spring", stiffness: 300, damping: 30 }}
                                     />
                                 )}
                                 <item.icon size={15} className={cn("transition-transform group-hover:scale-110", isActive && "text-primary")} />
                                 <span className="relative z-10">{item.name}</span>
-                            </Link>
+                            </MotionLink>
                         );
                     })}
                 </nav>

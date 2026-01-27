@@ -53,15 +53,17 @@ function sanitizeBiometricForAI(bio: Record<string, unknown>): Record<string, un
 }
 
 export const getRecentLogs = tool({
-    description: 'Get the workout logs for the user for the last N days. Use this to check compliance, performance, and recent activity.',
+    description: 'Get the workout logs for the user for the last N days. Use this to check compliance, performance, and recent activity. Can optionally filter for a specific exercise.',
     inputSchema: z.object({
         days: z.number()
             .min(MIN_DAYS, `Days must be at least ${MIN_DAYS}`)
             .max(MAX_DAYS, `Days cannot exceed ${MAX_DAYS}`)
             .default(DEFAULT_DAYS)
             .describe('Number of days to look back'),
+        filter: z.string().optional()
+            .describe('Optional keyword to filter logs (e.g., "Squat", "Run", "Benchmark"). Case insensitive.'),
     }),
-    execute: async ({ days }) => {
+    execute: async ({ days, filter }) => {
         try {
             const supabase = await createClient();
 
@@ -91,12 +93,28 @@ export const getRecentLogs = tool({
                 return 'No workout logs found for this period.';
             }
 
+            // Client-side filtering for simplicity (Postgres Text Search is overkill for small user logs)
+            let filteredLogs = logs;
+            if (filter) {
+                const term = filter.toLowerCase();
+                filteredLogs = logs.filter(log =>
+                    (log.segment_name && log.segment_name.toLowerCase().includes(term)) ||
+                    (log.segment_type && log.segment_type.toLowerCase().includes(term)) ||
+                    JSON.stringify(log.performance_data).toLowerCase().includes(term)
+                );
+            }
+
+            if (filteredLogs.length === 0) {
+                return `No logs found containing "${filter}" in the last ${days} days.`;
+            }
+
             // Sanitize and format logs for AI consumption
-            const sanitizedLogs = logs.map(log => sanitizeLogForAI(log));
+            const sanitizedLogs = filteredLogs.map(log => sanitizeLogForAI(log));
 
             return JSON.stringify({
                 period: `Last ${days} days`,
                 count: sanitizedLogs.length,
+                filterApplied: filter || null,
                 logs: sanitizedLogs
             }, null, 2);
         } catch (error) {
