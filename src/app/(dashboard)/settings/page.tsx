@@ -256,22 +256,26 @@ export default function SettingsPage() {
                                         </div>
                                     </div>
 
-                                    <div className="flex justify-between items-center py-4 rounded-xl transition-colors hover:bg-muted/30 pr-4">
+                                    {/* Synchronized Alerts (Locked) */}
+                                    <div className="flex justify-between items-center py-4 rounded-xl transition-colors pr-4 opacity-60">
                                         <div className="flex items-center gap-6">
                                             <div className="w-14 h-14 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-500"><Bell size={28} /></div>
                                             <div>
-                                                <h3 className="text-2xl font-serif text-foreground">Synchronized Alerts</h3>
+                                                <div className="flex items-center gap-3">
+                                                    <h3 className="text-2xl font-serif text-foreground">Synchronized Alerts</h3>
+                                                    <span className="px-2 py-0.5 bg-primary/10 text-primary rounded text-[8px] font-bold uppercase tracking-widest border border-primary/20">Coming Soon</span>
+                                                </div>
                                                 <p className="text-muted-foreground text-sm font-light italic">Real-time pulse notifications.</p>
                                             </div>
                                         </div>
-                                        <div className="flex bg-muted rounded-full p-1 border border-border">
+                                        <div className="flex bg-muted rounded-full p-1 border border-border cursor-not-allowed">
                                             {['Off', 'On'].map((state) => (
                                                 <button
                                                     key={state}
-                                                    onClick={() => handleSelect('notifications', state === 'On')}
-                                                    className={`px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all ${(state === 'On' && preferences.notifications) || (state === 'Off' && !preferences.notifications)
-                                                        ? "bg-background text-foreground shadow-sm"
-                                                        : "text-muted-foreground hover:text-foreground"
+                                                    disabled
+                                                    className={`px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all ${state === 'Off'
+                                                        ? "bg-background text-foreground shadow-sm" // Default to Off visually
+                                                        : "text-muted-foreground"
                                                         }`}
                                                 >
                                                     {state}
@@ -350,12 +354,40 @@ export default function SettingsPage() {
                                         </div>
 
                                         <div className="space-y-4 pt-6">
-                                            {['HealthKit Sync', 'Agent Data Review', 'Biometric Lock'].map(item => (
-                                                <div key={item} className="flex justify-between items-center p-6 bg-muted/20 rounded-xl hover:bg-muted/40 transition-all cursor-pointer group">
-                                                    <span className="text-foreground font-serif text-xl">{item}</span>
-                                                    <div className="w-12 h-7 bg-muted rounded-full relative transition-colors group-hover:bg-muted-foreground/30">
-                                                        <div className="w-5 h-5 bg-background rounded-full absolute top-1 left-1 shadow-sm" />
+                                            {[
+                                                {
+                                                    id: 'healthkit',
+                                                    label: 'HealthKit Sync',
+                                                    desc: 'Synchronize activity rings and heart rate data with Apple Health.',
+                                                    locked: true
+                                                },
+                                                {
+                                                    id: 'agent_review',
+                                                    label: 'Agent Data Review',
+                                                    desc: 'Allow Pulse AI to analyze your session logs to improve coaching algorithms.',
+                                                    locked: false
+                                                }
+                                            ].map(item => (
+                                                <div key={item.id} className={`flex justify-between items-center p-6 ${item.locked ? "bg-muted/10 opacity-60 cursor-not-allowed" : "bg-muted/20 hover:bg-muted/40 cursor-pointer"} rounded-xl transition-all group`}>
+                                                    <div>
+                                                        <div className="flex items-center gap-3">
+                                                            <span className="text-foreground font-serif text-xl">{item.label}</span>
+                                                            {item.locked && (
+                                                                <span className="px-2 py-0.5 bg-primary/10 text-primary rounded text-[8px] font-bold uppercase tracking-widest border border-primary/20">Coming Soon</span>
+                                                            )}
+                                                        </div>
+                                                        <p className="text-muted-foreground text-xs mt-1 font-light leading-relaxed max-w-md">{item.desc}</p>
                                                     </div>
+
+                                                    {item.locked ? (
+                                                        <div className="w-12 h-7 bg-muted/50 rounded-full relative">
+                                                            <div className="w-5 h-5 bg-muted-foreground/20 rounded-full absolute top-1 left-1" />
+                                                        </div>
+                                                    ) : (
+                                                        <div className="w-12 h-7 bg-muted rounded-full relative transition-colors group-hover:bg-muted-foreground/30">
+                                                            <div className="w-5 h-5 bg-background rounded-full absolute top-1 left-1 shadow-sm" />
+                                                        </div>
+                                                    )}
                                                 </div>
                                             ))}
                                         </div>

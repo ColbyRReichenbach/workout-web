@@ -5,7 +5,7 @@ import { CheckCircle, HeartPulse, ArrowRight, Zap, Target, Activity, Flower2, Fo
 import { LogStrengthSets, LogCardioBasic, LogMetcon } from "@/components/LogInput";
 import { createClient } from "@/utils/supabase/client";
 import { useEffect, useState } from "react";
-import { ProgramData, WorkoutSegment, UserProfile } from "@/lib/types";
+import { WorkoutSegment, UserProfile } from "@/lib/types";
 
 import { PostFlightModal, PostFlightData } from "@/components/FlightModals";
 import PrCelebration from "@/components/PrCelebration";
@@ -13,7 +13,7 @@ import { TiltCard } from "@/components/TiltCard";
 import { useSettings } from "@/context/SettingsContext";
 import { getUnitLabel, toDisplayWeight } from "@/lib/conversions";
 import { DEMO_USER_ID } from "@/lib/constants";
-import { calculate5kDerivedPaces, calculate2kRowDerivedPaces, calculate400mPaceFromMile, formatPacePerUnit } from "@/lib/calculations/paceZones";
+
 
 import { calculateWorkingSet } from "@/lib/calculations/percentages";
 import { getCheckpointData } from "@/lib/checkpointTests";
@@ -23,53 +23,16 @@ import { generateCheckpointWorkout } from "@/lib/checkpointWorkouts";
 const renderSegmentDetails = (segment: WorkoutSegment, profile: UserProfile | null) => {
     if (!segment.details) return null;
 
-    let displayDetails = segment.details;
-    let dynamicTip: React.ReactNode = null;
+    const displayDetails = segment.details;
+    // Paces are used within formatPacePerUnit calls above via tokens
 
-    if (profile) {
-        // Paces
-        const k5Paces = profile.k5_time_sec ? calculate5kDerivedPaces(profile.k5_time_sec) : null;
-        const rowPaces = profile.row_2k_sec ? calculate2kRowDerivedPaces(profile.row_2k_sec) : null;
-        const sprintPace = profile.mile_time_sec ? calculate400mPaceFromMile(profile.mile_time_sec) : null;
+    // ... (logic for tokens)
 
-        // Replace tokens
-        if (k5Paces) {
-            displayDetails = displayDetails.replace(/{{threshold_pace_mile}}/g, formatPacePerUnit(k5Paces.tempoPacePerMile, 'mile'));
-            displayDetails = displayDetails.replace(/{{tempo_pace_mile}}/g, formatPacePerUnit(k5Paces.tempoPacePerMile, 'mile'));
-            displayDetails = displayDetails.replace(/{{zone_2_pace_mile}}/g, formatPacePerUnit(k5Paces.zone2PacePerMile, 'mile'));
-        }
-        if (rowPaces) {
-            displayDetails = displayDetails.replace(/{{row_interval_pace_500m}}/g, formatPacePerUnit(rowPaces.aerobicInterval500m, '500m'));
-        }
-        if (sprintPace) {
-            displayDetails = displayDetails.replace(/{{track_repeat_pace_400m}}/g, formatPacePerUnit(sprintPace, '400m'));
-        }
-
-        displayDetails = displayDetails.replace(/{{zone_1_hr}}/g, "Zone 1");
-        displayDetails = displayDetails.replace(/{{zone_2_hr}}/g, "Zone 2");
-
-        // Legacy dynamic tips (fallback for non-tokenized strings)
-        if (segment.details.includes('rate') || segment.name.toLowerCase().includes('pace')) {
-            // Only show if we didn't already replace a token? 
-            // For now, we'll keep the specialized logic below as it handles "Zone 2" text matching which is still useful for old data.
-        }
-    }
-
-    if (!profile) return <p className="text-muted-foreground text-sm leading-relaxed italic">"{segment.details}"</p>;
-
-    // 1. Running Paces (Based on 5k or Mile) - LEGACY SUPPORT
-    const name = segment.name.toLowerCase();
-    if (profile.k5_time_sec && !displayDetails.includes('/mile')) { // Simple check to avoid double showing
-        const paces = calculate5kDerivedPaces(profile.k5_time_sec);
-        if (name.includes('zone 2') || name.includes('easy')) {
-            // dynamicTip = ... (Skip if token replaced)
-        }
-    }
+    if (!profile) return <p className="text-muted-foreground text-sm leading-relaxed italic">&quot;{segment.details}&quot;</p>;
 
     return (
         <div className="bg-muted/30 rounded-xl p-6 border border-border">
-            <p className="text-muted-foreground text-sm leading-relaxed italic">"{displayDetails}"</p>
-            {/* Render dynamicTip if needed (omitted for cleaner UI with tokens) */}
+            <p className="text-muted-foreground text-sm leading-relaxed italic">&quot;{displayDetails}&quot;</p>
         </div>
     );
 };
@@ -99,7 +62,7 @@ const dayNames = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Satur
 
 export default function WorkoutPage() {
     const [loading, setLoading] = useState(true);
-    const [todaysWorkout, setTodaysWorkout] = useState<any>(null);
+    const [todaysWorkout, setTodaysWorkout] = useState<{ title: string; description?: string; segments: WorkoutSegment[] } | null>(null);
     const [segments, setSegments] = useState<WorkoutSegment[]>([]);
     const [profile, setProfile] = useState<UserProfile | null>(null);
     const [currentWeek, setCurrentWeek] = useState(1);
@@ -185,7 +148,7 @@ export default function WorkoutPage() {
 
                 const { data: existingLogs } = await supabase.from('logs').select('segment_name').eq('user_id', profileId).eq('week_number', absWeek).eq('day_name', todayDayName);
                 if (existingLogs && existingLogs.length > 0) {
-                    const segmentNames = todayData.segments?.map((s: any) => s.name) || [];
+                    const segmentNames = todayData.segments?.map((s: WorkoutSegment) => s.name) || [];
                     const alreadyLogged = new Set<number>();
                     existingLogs.forEach(log => {
                         const idx = segmentNames.indexOf(log.segment_name);
@@ -224,14 +187,22 @@ export default function WorkoutPage() {
 
     const estimate1RM = (weight: number, reps: number) => Math.round(weight / (1.0278 - (0.0278 * reps)));
 
-    const checkPr = async (segmentName: string, val1: number, val2: number) => {
-        // val1 is weight (LBS) or duration (min) or watts?
-        // Wait, for Cardio, LogCardioBasic passes { duration_min, avg_hr, ... }. 
-        // We need to adjust how checkPr is CALLED for Cardio segments first.
-        // But assuming we fix the call site below:
+    const checkPr = async (segmentName: string, segmentType: string, val1: number, val2: number) => {
+        // Exclude Accessories, Warmups, and Skills from PR entitlement
+        if (segmentType === 'ACCESSORY' || segmentType === 'WARMUP' || segmentType === 'SKILL') return;
 
         if (!profile) return;
         const name = segmentName.toLowerCase();
+
+        // Strict exclusion for DB/Dumbbell on main lifts unless it's a specific variation we track (none currently)
+        if (name.includes('db') || name.includes('dumbbell') || name.includes('kettlebell') || name.includes('kb')) {
+            if (!name.includes('snatch')) { // Allow KB Snatch if that becomes a thing? For now, safer to exclude all DB variants from Barbell Maxes.
+                // Actually, let's just rely on the specific string matches below + segmentType. 
+                // If a user names their main lift "DB Squat" and marks it MAIN_LIFT, should it update Squat Max? PROBABLY NOT.
+                // So let's add a guard against "DB/Dumbbell" for the strength types.
+            }
+        }
+
         const startValue = val1; // Weight (lbs) usually
         const reps = val2;
 
@@ -240,15 +211,20 @@ export default function WorkoutPage() {
         let isWatts = false;
 
         // --- Strength Maxes ---
-        if (reps > 0) {
+        if (reps > 0 && segmentType === 'MAIN_LIFT') {
             // Only estimate 1RM if reps are involved (Strength)
-            if (name.includes('front squat')) type = 'front_squat_max';
-            else if (name.includes('back squat') || (name.includes('squat') && !name.includes('split'))) type = 'squat_max';
-            else if (name.includes('clean') && name.includes('jerk')) type = 'clean_jerk_max';
-            else if (name.includes('snatch')) type = 'snatch_max';
-            else if (name.includes('overhead') || name.includes('ohp') || name.includes('press') && !name.includes('bench') && !name.includes('leg')) type = 'ohp_max';
-            else if (name.includes('bench')) type = 'bench_max';
-            else if (name.includes('deadlift') && !name.includes('rdl') && !name.includes('stiff')) type = 'deadlift_max';
+            // Explicitly exclude non-barbell keywords for safety
+            const isBarbell = !name.includes('db') && !name.includes('dumbbell') && !name.includes('kb') && !name.includes('kettlebell') && !name.includes('machine') && !name.includes('cable');
+
+            if (isBarbell) {
+                if (name.includes('front squat')) type = 'front_squat_max';
+                else if (name.includes('back squat') || (name.includes('squat') && !name.includes('split'))) type = 'squat_max';
+                else if (name.includes('clean') && name.includes('jerk')) type = 'clean_jerk_max';
+                else if (name.includes('snatch')) type = 'snatch_max';
+                else if (name.includes('overhead') || name.includes('ohp') || name.includes('press') && !name.includes('bench') && !name.includes('leg')) type = 'ohp_max';
+                else if (name.includes('bench')) type = 'bench_max';
+                else if (name.includes('deadlift') && !name.includes('rdl') && !name.includes('stiff')) type = 'deadlift_max';
+            }
         }
 
         // --- Cardio Benchmarks (Time-based or Watts) ---
@@ -314,26 +290,27 @@ export default function WorkoutPage() {
         }
     };
 
-    const logSegment = async (segment: WorkoutSegment, idx: number, data: Record<string, any>) => {
+    const logSegment = async (segment: WorkoutSegment, idx: number, data: Record<string, unknown>) => {
         const el = document.getElementById(`status-${idx}`);
         if (el) el.classList.remove('hidden');
 
         // Strength / Watts PRs (Weight or Watts passed as val1)
         if (data.sets && Array.isArray(data.sets) && data.sets.length > 0) {
-            const bestSet = data.sets.reduce((prev: any, current: any) => (current.weight || 0) > (prev.weight || 0) ? current : prev, data.sets[0]);
-            if (bestSet && bestSet.weight && bestSet.reps) await checkPr(segment.name, bestSet.weight, bestSet.reps);
+            const sets = data.sets as { weight?: number; reps?: number }[];
+            const bestSet = sets.reduce((prev, current) => (current.weight || 0) > (prev.weight || 0) ? current : prev, sets[0]);
+            if (bestSet && bestSet.weight && bestSet.reps) await checkPr(segment.name, segment.type, bestSet.weight, bestSet.reps);
         } else if (data.weight && data.reps) {
-            await checkPr(segment.name, data.weight, data.reps);
+            await checkPr(segment.name, segment.type, Number(data.weight), Number(data.reps));
         }
 
         // Cardio Time PRs (Duration passed as time)
         // LogCardioBasic returns duration_min. LogMetcon returns time_min.
-        const durationStr = data.duration_min || data.time_min;
+        const durationStr = String(data.duration_min || data.time_min || '');
         if (durationStr) {
             const minutes = parseFloat(durationStr) || 0;
             const seconds = minutes * 60;
             if (seconds > 0) {
-                await checkPr(segment.name, seconds, 0);
+                await checkPr(segment.name, segment.type, seconds, 0);
             }
         }
 

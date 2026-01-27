@@ -4,7 +4,7 @@ import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { cookies } from 'next/headers'
-import { formValuesToInches, parseHeightString } from '@/lib/conversions'
+import { formValuesToInches } from '@/lib/conversions'
 import { GUEST_MODE_COOKIE } from '@/lib/constants'
 
 export async function updateOnboardingData(formData: FormData) {

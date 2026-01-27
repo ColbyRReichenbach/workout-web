@@ -32,7 +32,7 @@ export async function withRetry<T>(
 ): Promise<T> {
     const { retries, baseDelay, maxDelay, factor } = { ...DEFAULT_OPTIONS, ...options };
 
-    let lastError: any;
+    let lastError: unknown;
 
     for (let attempt = 0; attempt <= retries; attempt++) {
         try {

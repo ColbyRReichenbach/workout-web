@@ -15,7 +15,7 @@ import { PRHistory } from "@/components/PRHistory";
 import { SleepAnalysisModal } from "@/components/SleepAnalysisModal";
 import { useSettings } from "@/context/SettingsContext";
 import { getUnitLabel, mapExerciseToBaseline } from "@/lib/conversions";
-import { DEMO_USER_ID } from "@/lib/userSettings";
+
 
 // BASELINE MAXES (from Master Plan) - DEPRECATED (Using Profile now)
 
@@ -60,6 +60,15 @@ interface ReadinessMetric {
     readiness_score?: number;
 }
 
+interface HistoricalPR {
+    id: string;
+    exercise_name: string;
+    value: number;
+    unit: string;
+    pr_type: string;
+    created_at: string;
+}
+
 export default function AnalyticsPage() {
     const [data, setData] = useState<{
         rawLogs: AnalyticsLog[];
@@ -80,7 +89,7 @@ export default function AnalyticsPage() {
         powerDensity: number[];
         readinessSurplus: number[];
         prMagnitude: number[];
-        historicalPRs: any[];
+        historicalPRs: HistoricalPR[];
         runningMaxes: Record<string, number>;
         profileMaxes: {
             squat_max?: number;
@@ -108,7 +117,7 @@ export default function AnalyticsPage() {
 
     const [sleepModalOpen, setSleepModalOpen] = useState(false);
     const [prModalOpen, setPrModalOpen] = useState(false);
-    const [prHistory, setPrHistory] = useState<any[]>([]);
+    const [prHistory, setPrHistory] = useState<HistoricalPR[]>([]);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -157,9 +166,8 @@ export default function AnalyticsPage() {
             const distMap: Record<number, number> = {};
             const durationMap: Record<number, number> = {};
             const powerMap: Record<number, { sum: number, count: number }> = {};
-            const prCountMap: Record<number, number> = {};
             const runningMaxes: Record<string, number> = {};
-            const historicalPRs: any[] = [];
+            const historicalPRs: HistoricalPR[] = [];
 
             // 1. Seed historicalPRs with Profile Baselines (Weight)
             const weightBaselines: Record<string, number | undefined> = {
@@ -583,281 +591,334 @@ export default function AnalyticsPage() {
             </header>
 
             {/* STAGE 2: PHASE-DYNAMIC INTELLIGENCE */}
-            <section className="space-y-12">
-                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 px-2">
-                    <div className="space-y-2">
-                        <span className="text-[10px] font-bold text-primary uppercase tracking-widest">Dynamic Focus</span>
-                        <h2 className="text-5xl font-serif text-foreground tracking-tight">
-                            {isPhase1 && "Aerobic & Structural Engine"}
-                            {isPhase2 && "Neurological Load Tolerance"}
-                            {isPhase3 && "Absolute Peak Performance"}
-                            {isPhase4 && "Neural Sharpness (Taper)"}
-                            {isPhase5 && "Master Cycle Completion"}
-                        </h2>
-                    </div>
-                    <div className="flex items-center gap-3 bg-muted/50 px-6 py-3 rounded-full border border-border">
-                        <div className="h-2 w-2 rounded-full bg-green-500" />
-                        <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Phase-Specific Metrics Locked</span>
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    {/* Primary Graph Container */}
-                    <div className="lg:col-span-2 bg-card rounded-[48px] p-12 border border-border shadow-sm relative group overflow-visible">
-                        <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none">
-                            <Zap size={100} />
-                        </div>
-                        <div className="relative z-10 h-full flex flex-col justify-between">
-                            <div className="mb-8">
-                                <h4 className="text-xl font-serif text-foreground">
-                                    {isPhase1 && "Aerobic efficiency (Pace/HR)"}
-                                    {isPhase2 && "CNS Intensity Progression (%1RM)"}
-                                    {isPhase3 && "Power Density Index (Work/Time)"}
-                                    {isPhase4 && "Readiness Surplus (Super-Compensation)"}
-                                    {isPhase5 && "Performance Baseline Delta (P1 vs P5)"}
-                                </h4>
-                                <p className="text-muted-foreground text-xs font-light italic mt-1">
-                                    {isPhase1 && "Visualizing physiological adaptation: maintaining higher output at lower cardiovascular costs."}
-                                    {isPhase2 && "Tracking relative load tolerance as we transition into heavier strength blocks."}
-                                    {isPhase3 && "Peak performance window: measuring the density of work capacity at maximum recursive intensity."}
-                                    {isPhase4 && "Recovery must exceed load. Tracking the accumulation of physiological resources for the final peak."}
-                                    {isPhase5 && "The full evolution: Comparing absolute performance peaks against your Week 1 structural baselines."}
-                                </p>
-                            </div>
-
-                            <div className="flex-grow min-h-[300px]">
-                                {isPhase1 && (
-                                    <PremiumAreaChart
-                                        data={data.efficiencyIndex}
-                                        color="#ef4444"
-                                        units=" Ef."
-                                        height={300}
-                                    />
-                                )}
-                                {isPhase2 && (
-                                    <PremiumAreaChart
-                                        data={data.cnsIntensity}
-                                        color="var(--foreground)"
-                                        units="%"
-                                        height={300}
-                                    />
-                                )}
-                                {isPhase3 && (
-                                    <PremiumAreaChart
-                                        data={data.powerDensity}
-                                        color="#fbbf24"
-                                        units=" Pwr"
-                                        height={300}
-                                    />
-                                )}
-                                {isPhase4 && (
-                                    <PremiumAreaChart
-                                        data={data.readinessSurplus}
-                                        color="#0ea5e9"
-                                        units="%"
-                                        height={300}
-                                    />
-                                )}
-                                {isPhase5 && (
-                                    <PremiumAreaChart
-                                        data={data.prMagnitude}
-                                        color="var(--primary)"
-                                        units=" Mag."
-                                        height={300}
-                                    />
-                                )}
-                            </div>
+            {data.rawLogs.length === 0 ? (
+                <section className="space-y-12">
+                    <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 px-2">
+                        <div className="space-y-2 opacity-50">
+                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Dynamic Focus</span>
+                            <h2 className="text-5xl font-serif text-muted-foreground tracking-tight">Signal Lost</h2>
                         </div>
                     </div>
 
-                    {/* Secondary Context Box */}
-                    <div className="bg-card rounded-[48px] p-12 border border-border shadow-sm flex flex-col justify-between">
-                        <div>
-                            <div className="w-12 h-12 rounded-2xl bg-muted shadow-sm flex items-center justify-center text-primary mb-8 border border-border">
-                                {isPhase1 && <Shield size={24} />}
-                                {isPhase2 && <Flame size={24} />}
-                                {isPhase3 && <Target size={24} />}
-                            </div>
-                            <h4 className="text-2xl font-serif text-foreground mb-4">
-                                {isPhase1 && "Structural Integrity"}
-                                {isPhase2 && "Threshold Stability"}
-                                {isPhase3 && "PR Proximity"}
-                                {isPhase4 && "Taper Readiness"}
-                                {isPhase5 && "Mastery Check"}
-                            </h4>
-                            <p className="text-muted-foreground text-sm leading-relaxed font-light mb-10">
-                                {isPhase1 && "Consistency is the primary driver. Green markers represent high-readiness structural loading sessions."}
-                                {isPhase2 && "Cardiovascular stability during metabolic stress. Are you holding pace as the weight gets heavier?"}
-                                {isPhase3 && "Tracking the delta between your current capabilities and your 52-week peak objectives."}
-                                {isPhase4 && "Parasympathetic dominance is required. HRV stability should be surfacing as systemic stress drops."}
-                                {isPhase5 && "Relative strength evolution. Visualizing the absolute shift in neurological recruitment since Cycle 1."}
+                    <div className="bg-card/50 border border-border/50 border-dashed rounded-[48px] p-24 text-center space-y-8 flex flex-col items-center justify-center min-h-[400px]">
+                        <div className="w-24 h-24 rounded-full bg-muted flex items-center justify-center animate-pulse">
+                            <Activity size={48} className="text-muted-foreground opacity-50" />
+                        </div>
+                        <div className="max-w-xl mx-auto space-y-4">
+                            <h3 className="text-3xl font-serif text-foreground">Neural Engine Standby</h3>
+                            <p className="text-muted-foreground font-light text-lg">
+                                The Pulse algorithm requires biometric performance data to initialize.
+                                Complete your first training session to calibrate the telemetry grid.
                             </p>
                         </div>
+                        <a href="/workout" className="px-8 py-4 bg-primary text-primary-foreground rounded-full font-bold uppercase tracking-widest text-xs hover:scale-105 transition-transform">
+                            Initiate First Protocol
+                        </a>
+                    </div>
+                </section>
+            ) : (
+                <>
+                    <section className="space-y-12">
+                        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 px-2">
+                            <div className="space-y-2">
+                                <span className="text-[10px] font-bold text-primary uppercase tracking-widest">Dynamic Focus</span>
+                                <h2 className="text-5xl font-serif text-foreground tracking-tight">
+                                    {isPhase1 && "Aerobic & Structural Engine"}
+                                    {isPhase2 && "Neurological Load Tolerance"}
+                                    {isPhase3 && "Absolute Peak Performance"}
+                                    {isPhase4 && "Neural Sharpness (Taper)"}
+                                    {isPhase5 && "Master Cycle Completion"}
+                                </h2>
+                            </div>
+                            <div className="flex items-center gap-3 bg-muted/50 px-6 py-3 rounded-full border border-border">
+                                <div className="h-2 w-2 rounded-full bg-green-500" />
+                                <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Phase-Specific Metrics Locked</span>
+                            </div>
+                        </div>
 
-                        <div className="mt-auto">
-                            {isPhase1 && (
-                                <StructuralHeatmap
-                                    data={data.activityHeatmap}
-                                    readiness={data.readinessHeatmap}
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                            {/* Primary Graph Container */}
+                            <div className="lg:col-span-2 bg-card rounded-[48px] p-12 border border-border shadow-sm relative group overflow-visible">
+                                <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none">
+                                    <Zap size={100} />
+                                </div>
+                                <div className="relative z-10 h-full flex flex-col justify-between">
+                                    <div className="mb-8">
+                                        <h4 className="text-xl font-serif text-foreground">
+                                            {isPhase1 && "Aerobic efficiency (Pace/HR)"}
+                                            {isPhase2 && "CNS Intensity Progression (%1RM)"}
+                                            {isPhase3 && "Power Density Index (Work/Time)"}
+                                            {isPhase4 && "Readiness Surplus (Super-Compensation)"}
+                                            {isPhase5 && "Performance Baseline Delta (P1 vs P5)"}
+                                        </h4>
+                                        <p className="text-muted-foreground text-xs font-light italic mt-1">
+                                            {isPhase1 && "Visualizing physiological adaptation: maintaining higher output at lower cardiovascular costs."}
+                                            {isPhase2 && "Tracking relative load tolerance as we transition into heavier strength blocks."}
+                                            {isPhase3 && "Peak performance window: measuring the density of work capacity at maximum recursive intensity."}
+                                            {isPhase4 && "Recovery must exceed load. Tracking the accumulation of physiological resources for the final peak."}
+                                            {isPhase5 && "The full evolution: Comparing absolute performance peaks against your Week 1 structural baselines."}
+                                        </p>
+                                    </div>
+
+                                    <div className="flex-grow min-h-[300px]">
+                                        {isPhase1 && (
+                                            <PremiumAreaChart
+                                                data={data.efficiencyIndex}
+                                                color="#ef4444"
+                                                units=" Ef."
+                                                height={300}
+                                            />
+                                        )}
+                                        {isPhase2 && (
+                                            <PremiumAreaChart
+                                                data={data.cnsIntensity}
+                                                color="var(--foreground)"
+                                                units="%"
+                                                height={300}
+                                            />
+                                        )}
+                                        {isPhase3 && (
+                                            <PremiumAreaChart
+                                                data={data.powerDensity}
+                                                color="#fbbf24"
+                                                units=" Pwr"
+                                                height={300}
+                                            />
+                                        )}
+                                        {isPhase4 && (
+                                            <PremiumAreaChart
+                                                data={data.readinessSurplus}
+                                                color="#0ea5e9"
+                                                units="%"
+                                                height={300}
+                                            />
+                                        )}
+                                        {isPhase5 && (
+                                            <PremiumAreaChart
+                                                data={data.prMagnitude}
+                                                color="var(--primary)"
+                                                units=" Mag."
+                                                height={300}
+                                            />
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Secondary Context Box */}
+                            <div className="bg-card rounded-[48px] p-12 border border-border shadow-sm flex flex-col justify-between">
+                                <div>
+                                    <div className="w-12 h-12 rounded-2xl bg-muted shadow-sm flex items-center justify-center text-primary mb-8 border border-border">
+                                        {isPhase1 && <Shield size={24} />}
+                                        {isPhase2 && <Flame size={24} />}
+                                        {isPhase3 && <Target size={24} />}
+                                    </div>
+                                    <h4 className="text-2xl font-serif text-foreground mb-4">
+                                        {isPhase1 && "Structural Integrity"}
+                                        {isPhase2 && "Threshold Stability"}
+                                        {isPhase3 && "PR Proximity"}
+                                        {isPhase4 && "Taper Readiness"}
+                                        {isPhase5 && "Mastery Check"}
+                                    </h4>
+                                    <p className="text-muted-foreground text-sm leading-relaxed font-light mb-10">
+                                        {isPhase1 && "Consistency is the primary driver. Green markers represent high-readiness structural loading sessions."}
+                                        {isPhase2 && "Cardiovascular stability during metabolic stress. Are you holding pace as the weight gets heavier?"}
+                                        {isPhase3 && "Tracking the delta between your current capabilities and your 52-week peak objectives."}
+                                        {isPhase4 && "Parasympathetic dominance is required. HRV stability should be surfacing as systemic stress drops."}
+                                        {isPhase5 && "Relative strength evolution. Visualizing the absolute shift in neurological recruitment since Cycle 1."}
+                                    </p>
+                                </div>
+
+                                <div className="mt-auto">
+                                    {isPhase1 && (
+                                        <StructuralHeatmap
+                                            data={data.activityHeatmap}
+                                            readiness={data.readinessHeatmap}
+                                        />
+                                    )}
+                                    {isPhase2 && (
+                                        <div className="space-y-6">
+                                            {[
+                                                { label: "Lactic Stability", val: 92, unit: " pts" },
+                                                { label: "Pace Std Dev", val: -5.4, unit: "%" },
+                                                { label: "HR Decay Rate", val: "Optimal", status: "Active" }
+                                            ].map(s => (
+                                                <div key={s.label} className="flex justify-between items-end border-b border-border pb-2">
+                                                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{s.label}</span>
+                                                    <div className="text-right">
+                                                        <span className="text-xl font-serif text-foreground">{s.val}{s.unit}</span>
+                                                        {s.status && <span className="text-[8px] text-muted-foreground uppercase ml-2">{s.status}</span>}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                    {isPhase3 && (
+                                        <div className="space-y-6">
+                                            <PRProximityChart
+                                                label="Squat Objective"
+                                                current={data.runningMaxes["Back Squat"] || 315}
+                                                target={data.profileMaxes.squat_max ? data.profileMaxes.squat_max * 1.1 : 405}
+                                            />
+                                            <PRProximityChart
+                                                label="Engine Capacity"
+                                                current={Math.max(...data.efficiencyIndex)}
+                                                target={Math.max(...data.efficiencyIndex) * 1.2 || 100}
+                                                units="pts"
+                                            />
+                                        </div>
+                                    )}
+                                    {isPhase4 && (
+                                        <div className="space-y-4">
+                                            {[
+                                                { label: "HRV Stability", val: Math.round(data.rawSleepData.slice(-7).reduce((a, b) => a + (b.hrv_ms || 0), 0) / 7) || 65, unit: "ms" },
+                                                { label: "Deep Sleep Avg", val: `${Math.round(data.rawSleepData.slice(-7).reduce((a, b) => a + (b.deep_sleep_minutes || 0), 0) / 7)}m`, unit: "" },
+                                                { label: "Stress Clearance", val: data.readinessSurplus[data.currentWeek - 1] > 20 ? "High" : "Stable", status: "Optimizing" }
+                                            ].map(s => (
+                                                <div key={s.label} className="flex justify-between items-end border-b border-border pb-2">
+                                                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{s.label}</span>
+                                                    <div className="text-right">
+                                                        <span className="text-xl font-serif text-foreground">{s.val}{s.unit}</span>
+                                                        {s.status && <span className="text-[8px] text-muted-foreground uppercase ml-2">{s.status}</span>}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                    {isPhase5 && (
+                                        <div className="space-y-6">
+                                            {[
+                                                { label: "Cycle Comparison", val: "+" + Math.round(((Math.max(...data.weeklyTonnage) - data.weeklyTonnage[0]) / (data.weeklyTonnage[0] || 1)) * 100), unit: "%" },
+                                                { label: "Absolute Peak", val: Math.max(...data.cnsIntensity).toFixed(1), unit: "%" },
+                                                { label: "Baselines Met", val: "100", unit: "%" }
+                                            ].map(s => (
+                                                <div key={s.label} className="flex justify-between items-end border-b border-border pb-2">
+                                                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{s.label}</span>
+                                                    <span className="text-xl font-serif text-foreground">{s.val}{s.unit}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* STAGE 3: UNIVERSAL RECOVERY DEBT & STRESS */}
+                    <section className="grid grid-cols-1 lg:grid-cols-4 gap-12">
+                        <div className="lg:col-span-3 space-y-10">
+                            <div className="flex items-end justify-between px-2">
+                                <div className="space-y-2">
+                                    <span className="text-[10px] font-bold text-sky-500 uppercase tracking-widest">Biological Stability</span>
+                                    <h2 className="text-4xl font-serif text-foreground tracking-tight">Recovery Debt Index</h2>
+                                    <p className="text-muted-foreground text-xs font-light italic">Universal Stress (Red) vs Recovery Status (Blue)</p>
+                                </div>
+                                <div className="bg-card p-4 rounded-2xl border border-border flex gap-10 shadow-sm">
+                                    <div>
+                                        <p className="text-[8px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Stress (TSS avg)</p>
+                                        <p className="text-xl font-serif text-red-500">{Math.round(data.systemStress[data.currentWeek - 1] || 0)}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[8px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Recov Stability</p>
+                                        <p className="text-xl font-serif text-sky-500">{Math.round(data.recoveryIndex.slice(-4).reduce((a, b) => a + b, 0) / 4) || 0}%</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="bg-card rounded-[48px] p-12 border border-border shadow-sm overflow-visible">
+                                <RecoveryIndexChart
+                                    stress={data.systemStress}
+                                    recovery={data.recoveryIndex}
+                                    height={320}
                                 />
-                            )}
-                            {isPhase2 && (
+                            </div>
+
+                            <div className="space-y-8">
+                                <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest border-b border-border pb-4">Baseline Maxes</h3>
                                 <div className="space-y-6">
-                                    {[
-                                        { label: "Lactic Stability", val: 92, unit: " pts" },
-                                        { label: "Pace Std Dev", val: -5.4, unit: "%" },
-                                        { label: "HR Decay Rate", val: "Optimal", status: "Active" }
-                                    ].map(s => (
-                                        <div key={s.label} className="flex justify-between items-end border-b border-border pb-2">
-                                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{s.label}</span>
-                                            <div className="text-right">
-                                                <span className="text-xl font-serif text-foreground">{s.val}{s.unit}</span>
-                                                {s.status && <span className="text-[8px] text-muted-foreground uppercase ml-2">{s.status}</span>}
+                                    {Object.entries(data.runningMaxes).map(([name, val]) => (
+                                        <div key={name} className="group cursor-pointer hover:bg-muted/10 p-3 -mx-3 rounded-xl transition-colors">
+                                            <div className="flex justify-between items-baseline mb-1">
+                                                <span className="font-serif text-lg text-foreground group-hover:text-primary transition-colors">{name}</span>
+                                                <span className="text-xl font-bold font-sans">
+                                                    {name.toLowerCase().includes("pace") || name.toLowerCase().includes("time") || name.toLowerCase().includes("row")
+                                                        ? (typeof val === 'number' ? new Date(val * 1000).toISOString().substr(14, 5) : val)
+                                                        : val}
+                                                    <span className="text-[10px] text-muted-foreground ml-1 font-normal uppercase">
+                                                        {name.includes("Watts") ? 'w' : (name.includes("Pace") || name.includes("Time") ? '' : 'lbs')}
+                                                    </span>
+                                                </span>
+                                            </div>
+                                            <div className="w-full bg-muted h-1 rounded-full overflow-hidden">
+                                                <div className="h-full bg-primary/20 w-3/4 group-hover:bg-primary transition-colors" />
                                             </div>
                                         </div>
                                     ))}
                                 </div>
-                            )}
-                            {isPhase3 && (
-                                <div className="space-y-6">
-                                    <PRProximityChart
-                                        label="Squat Objective"
-                                        current={data.runningMaxes["Back Squat"] || 315}
-                                        target={data.profileMaxes.squat_max ? data.profileMaxes.squat_max * 1.1 : 405}
-                                    />
-                                    <PRProximityChart
-                                        label="Engine Capacity"
-                                        current={Math.max(...data.efficiencyIndex)}
-                                        target={Math.max(...data.efficiencyIndex) * 1.2 || 100}
-                                        units="pts"
-                                    />
+                            </div>
+                        </div>
+
+                        <aside className="lg:col-span-1 space-y-8 h-fit">
+                            <div className="bg-card rounded-[48px] p-8 md:p-10 border border-border shadow-sm flex flex-col justify-between h-fit min-h-[450px]">
+                                <div className="space-y-6 md:space-y-8">
+                                    <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center text-indigo-500 border border-indigo-500/20">
+                                        <Moon size={24} />
+                                    </div>
+                                    <h3 className="text-3xl font-serif text-foreground leading-tight">Sleep Stability Archive</h3>
+                                    <div className="space-y-4">
+                                        {(() => {
+                                            const recent = data.rawSleepData.slice(-14);
+                                            const avg = (arr: number[]) => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+
+                                            const avgDeep = avg(recent.map(s => s.deep_sleep_minutes || 0).filter(v => v > 0));
+                                            const avgHrv = avg(recent.map(s => s.hrv_ms || 0).filter(v => v > 0));
+                                            const avgRhr = avg(recent.map(s => s.resting_hr || 0).filter(v => v > 0));
+
+                                            const formatDur = (m: number) => `${Math.floor(m / 60)}h ${Math.round(m % 60)}m`;
+
+                                            return [
+                                                {
+                                                    label: "Deep Sleep Avg",
+                                                    val: avgDeep > 0 ? formatDur(avgDeep) : "—",
+                                                    status: avgDeep >= 60 ? "Optimal" : avgDeep >= 45 ? "Good" : "Low"
+                                                },
+                                                {
+                                                    label: "HRV Baseline",
+                                                    val: avgHrv > 0 ? `${Math.round(avgHrv)} ms` : "—",
+                                                    status: avgHrv >= 50 ? "Athletic" : avgHrv >= 35 ? "Stable" : "Recovery"
+                                                },
+                                                {
+                                                    label: "Resting Heart",
+                                                    val: avgRhr > 0 ? `${Math.round(avgRhr)} bpm` : "—",
+                                                    status: avgRhr < 55 ? "Athletic" : avgRhr < 65 ? "Normal" : "Elevated"
+                                                }
+                                            ].map(item => (
+                                                <div key={item.label} className="group">
+                                                    <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-1 group-hover:text-indigo-500 transition-colors">{item.label}</p>
+                                                    <div className="flex justify-between items-end">
+                                                        <span className="text-xl font-serif text-foreground">{item.val}</span>
+                                                        <span className={`text-[8px] font-bold uppercase ${item.status === "Optimal" || item.status === "Athletic" ? "text-green-500" :
+                                                            item.status === "Good" || item.status === "Stable" || item.status === "Normal" ? "text-amber-500" :
+                                                                "text-red-500"
+                                                            }`}>{item.status}</span>
+                                                    </div>
+                                                </div>
+                                            ));
+                                        })()}
+                                    </div>
                                 </div>
-                            )}
-                            {isPhase4 && (
-                                <div className="space-y-4">
-                                    {[
-                                        { label: "HRV Stability", val: Math.round(data.rawSleepData.slice(-7).reduce((a, b) => a + (b.hrv_ms || 0), 0) / 7) || 65, unit: "ms" },
-                                        { label: "Deep Sleep Avg", val: `${Math.round(data.rawSleepData.slice(-7).reduce((a, b) => a + (b.deep_sleep_minutes || 0), 0) / 7)}m`, unit: "" },
-                                        { label: "Stress Clearance", val: data.readinessSurplus[data.currentWeek - 1] > 20 ? "High" : "Stable", status: "Optimizing" }
-                                    ].map(s => (
-                                        <div key={s.label} className="flex justify-between items-end border-b border-border pb-2">
-                                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{s.label}</span>
-                                            <div className="text-right">
-                                                <span className="text-xl font-serif text-foreground">{s.val}{s.unit}</span>
-                                                {s.status && <span className="text-[8px] text-muted-foreground uppercase ml-2">{s.status}</span>}
-                                            </div>
-                                        </div>
-                                    ))}
+                                <div className="pt-12">
+                                    <button
+                                        onClick={() => setSleepModalOpen(true)}
+                                        className="w-full py-5 rounded-[24px] bg-primary text-primary-foreground text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-primary/90 transition-all duration-500 shadow-xl active:scale-95"
+                                    >
+                                        Analyze Sleep Depth
+                                    </button>
                                 </div>
-                            )}
-                            {isPhase5 && (
-                                <div className="space-y-6">
-                                    {[
-                                        { label: "Cycle Comparison", val: "+" + Math.round(((Math.max(...data.weeklyTonnage) - data.weeklyTonnage[0]) / (data.weeklyTonnage[0] || 1)) * 100), unit: "%" },
-                                        { label: "Absolute Peak", val: Math.max(...data.cnsIntensity).toFixed(1), unit: "%" },
-                                        { label: "Baselines Met", val: "100", unit: "%" }
-                                    ].map(s => (
-                                        <div key={s.label} className="flex justify-between items-end border-b border-border pb-2">
-                                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{s.label}</span>
-                                            <span className="text-xl font-serif text-foreground">{s.val}{s.unit}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            {/* STAGE 3: UNIVERSAL RECOVERY DEBT & STRESS */}
-            <section className="grid grid-cols-1 lg:grid-cols-4 gap-12">
-                <div className="lg:col-span-3 space-y-10">
-                    <div className="flex items-end justify-between px-2">
-                        <div className="space-y-2">
-                            <span className="text-[10px] font-bold text-sky-500 uppercase tracking-widest">Biological Stability</span>
-                            <h2 className="text-4xl font-serif text-foreground tracking-tight">Recovery Debt Index</h2>
-                            <p className="text-muted-foreground text-xs font-light italic">Universal Stress (Red) vs Recovery Status (Blue)</p>
-                        </div>
-                        <div className="bg-card p-4 rounded-2xl border border-border flex gap-10 shadow-sm">
-                            <div>
-                                <p className="text-[8px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Stress (TSS avg)</p>
-                                <p className="text-xl font-serif text-red-500">{Math.round(data.systemStress[data.currentWeek - 1] || 0)}</p>
                             </div>
-                            <div>
-                                <p className="text-[8px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Recov Stability</p>
-                                <p className="text-xl font-serif text-sky-500">{Math.round(data.recoveryIndex.slice(-4).reduce((a, b) => a + b, 0) / 4) || 0}%</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="bg-card rounded-[48px] p-12 border border-border shadow-sm overflow-visible">
-                        <RecoveryIndexChart
-                            stress={data.systemStress}
-                            recovery={data.recoveryIndex}
-                            height={300}
-                        />
-                    </div>
-                </div>
-
-                <aside className="lg:col-span-1 space-y-8 h-fit">
-                    <div className="bg-card rounded-[48px] p-8 md:p-10 border border-border shadow-sm flex flex-col justify-between h-fit min-h-[450px]">
-                        <div className="space-y-6 md:space-y-8">
-                            <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center text-indigo-500 border border-indigo-500/20">
-                                <Moon size={24} />
-                            </div>
-                            <h3 className="text-3xl font-serif text-foreground leading-tight">Sleep Stability Archive</h3>
-                            <div className="space-y-4">
-                                {(() => {
-                                    const recent = data.rawSleepData.slice(-14);
-                                    const avg = (arr: number[]) => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
-
-                                    const avgDeep = avg(recent.map(s => s.deep_sleep_minutes || 0).filter(v => v > 0));
-                                    const avgHrv = avg(recent.map(s => s.hrv_ms || 0).filter(v => v > 0));
-                                    const avgRhr = avg(recent.map(s => s.resting_hr || 0).filter(v => v > 0));
-
-                                    const formatDur = (m: number) => `${Math.floor(m / 60)}h ${Math.round(m % 60)}m`;
-
-                                    return [
-                                        {
-                                            label: "Deep Sleep Avg",
-                                            val: avgDeep > 0 ? formatDur(avgDeep) : "—",
-                                            status: avgDeep >= 60 ? "Optimal" : avgDeep >= 45 ? "Good" : "Low"
-                                        },
-                                        {
-                                            label: "HRV Baseline",
-                                            val: avgHrv > 0 ? `${Math.round(avgHrv)} ms` : "—",
-                                            status: avgHrv >= 50 ? "Athletic" : avgHrv >= 35 ? "Stable" : "Recovery"
-                                        },
-                                        {
-                                            label: "Resting Heart",
-                                            val: avgRhr > 0 ? `${Math.round(avgRhr)} bpm` : "—",
-                                            status: avgRhr < 55 ? "Athletic" : avgRhr < 65 ? "Normal" : "Elevated"
-                                        }
-                                    ].map(item => (
-                                        <div key={item.label} className="group">
-                                            <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-1 group-hover:text-indigo-500 transition-colors">{item.label}</p>
-                                            <div className="flex justify-between items-end">
-                                                <span className="text-xl font-serif text-foreground">{item.val}</span>
-                                                <span className={`text-[8px] font-bold uppercase ${item.status === "Optimal" || item.status === "Athletic" ? "text-green-500" :
-                                                    item.status === "Good" || item.status === "Stable" || item.status === "Normal" ? "text-amber-500" :
-                                                        "text-red-500"
-                                                    }`}>{item.status}</span>
-                                            </div>
-                                        </div>
-                                    ));
-                                })()}
-                            </div>
-                        </div>
-                        <div className="pt-12">
-                            <button
-                                onClick={() => setSleepModalOpen(true)}
-                                className="w-full py-5 rounded-[24px] bg-primary text-primary-foreground text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-primary/90 transition-all duration-500 shadow-xl active:scale-95"
-                            >
-                                Analyze Sleep Depth
-                            </button>
-                        </div>
-                    </div>
-                </aside>
-            </section>
+                        </aside>
+                    </section>
+                </>
+            )}
 
             {/* Sleep Analysis Modal */}
             <SleepAnalysisModal
@@ -940,7 +1001,7 @@ export default function AnalyticsPage() {
                         <PRHistory
                             prs={data.historicalPRs}
                             viewMode={viewMode}
-                            onOpenSpectrum={(history: any[]) => {
+                            onOpenSpectrum={(history: HistoricalPR[]) => {
                                 setPrHistory(history);
                                 setPrModalOpen(true);
                             }}

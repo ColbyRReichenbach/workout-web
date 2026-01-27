@@ -8,7 +8,7 @@
  * - Redirect logic
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 
 // ============================================
 // MIDDLEWARE LOGIC TESTS
@@ -283,8 +283,7 @@ describe('Cookie Handling', () => {
 // ============================================
 
 describe('Middleware Matcher', () => {
-    const matcherPattern =
-        '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'
+
 
     const shouldMatchPath = (pathname: string): boolean => {
         // Simplified check - actual middleware uses Next.js internal matching

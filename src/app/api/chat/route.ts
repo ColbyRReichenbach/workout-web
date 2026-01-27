@@ -134,7 +134,7 @@ export async function POST(req: Request) {
 
         // 1. AUTHENTICATION - Verify user is logged in
         const supabase = await createClient();
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        const { data: { user } } = await supabase.auth.getUser();
 
         // Check for guest mode cookie - only use demo data if cookie is explicitly set
         const cookieHeader = req.headers.get('cookie') || '';

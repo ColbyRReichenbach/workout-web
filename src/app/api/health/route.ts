@@ -68,7 +68,7 @@ export async function GET() {
                 latency: dbLatency,
             };
         }
-    } catch (error) {
+    } catch {
         healthStatus.checks.database = {
             status: 'error',
             latency: 0,
@@ -85,7 +85,7 @@ export async function GET() {
         },
         {
             status: healthStatus.status === 'healthy' ? 200 :
-                    healthStatus.status === 'degraded' ? 200 : 503,
+                healthStatus.status === 'degraded' ? 200 : 503,
             headers: {
                 'Cache-Control': 'no-cache, no-store, must-revalidate',
             },

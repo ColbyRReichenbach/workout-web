@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { X, CheckCircle, Check, Dumbbell, Clock, Flame, HeartPulse, Target, Activity, Zap, TrendingUp, Flower2, Footprints, Moon, Trophy, LucideIcon } from "lucide-react";
+import { X, CheckCircle, Dumbbell, Clock, Flame, HeartPulse, Target, Activity, Zap, TrendingUp, Flower2, Footprints, Moon, Trophy, LucideIcon } from "lucide-react";
 import { memo, useEffect, createElement } from "react";
 import { TiltCard } from "./TiltCard";
 import { useSettings } from "@/context/SettingsContext";

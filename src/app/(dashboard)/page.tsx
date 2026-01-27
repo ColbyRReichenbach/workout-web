@@ -3,13 +3,13 @@
 import { motion } from "framer-motion";
 import dynamic from "next/dynamic";
 import {
-  Activity, Calendar, Flame, List, CalendarDays,
-  ArrowRight, HeartPulse, Scale, TrendingUp, Award
+  Activity, Calendar, Flame, CalendarDays,
+  ArrowRight, Scale
 } from "lucide-react";
 import { DayCard, DayDetailModal } from "@/components/WeeklySchedule";
-import { BiometricsModal } from "@/components/BiometricsModal";
 import { TiltCard } from "@/components/TiltCard";
 import { SectionErrorBoundary } from "@/components/ErrorBoundary";
+import { BiometricsModal } from "@/components/BiometricsModal";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useState, useMemo } from "react";
@@ -18,8 +18,6 @@ import { WorkoutDay, ProtocolDay, WorkoutLog } from "@/lib/types";
 import { useSettings } from "@/context/SettingsContext";
 import { getUnitLabel } from "@/lib/conversions";
 import { DEMO_USER_ID } from "@/lib/constants";
-import { CheckpointTestAlert } from "@/components/CheckpointTestAlert";
-import { isCheckpointWeek, getCheckpointData } from "@/lib/checkpointTests";
 
 // Dynamic import for AiCoach with loading skeleton
 const AiCoach = dynamic(() => import("@/components/AiCoach"), {
@@ -184,11 +182,29 @@ export default function Home() {
         const weekData = phase.weeks?.[relativeWeekIdx];
 
         if (weekData?.days) {
-          const dynamicProtocol = weekData.days.map((d: WorkoutDay) => ({
-            day: d.day,
-            title: d.title,
-            type: d.segments?.[0]?.type || "Training"
-          }));
+          // Calculate today's index for future detection
+          const localJsDay = new Date().getDay();
+          const localTodayIndex = localJsDay === 0 ? 6 : localJsDay - 1;
+          const actualCurrentWeek = profile.current_week || 1;
+
+          const dynamicProtocol = weekData.days.map((d: WorkoutDay, i: number) => {
+            let isFuture = false;
+            // logic: If viewing a FUTURE week, all days are future.
+            // If viewing CURRENT week, only days after today are future.
+            // If viewing PAST week, no days are "future" (locked).
+            if (viewedWeek > actualCurrentWeek) {
+              isFuture = true;
+            } else if (viewedWeek === actualCurrentWeek) {
+              isFuture = i > localTodayIndex;
+            }
+
+            return {
+              day: d.day,
+              title: d.title,
+              type: d.segments?.[0]?.type || "Training",
+              isFuture: isFuture
+            };
+          });
           setProtocol(dynamicProtocol);
         }
       }
@@ -220,7 +236,7 @@ export default function Home() {
   };
 
   // Calculate real stats
-  const { streak, totalVolume, totalCompletion } = useMemo(() => {
+  const { streak, totalVolume } = useMemo(() => {
     const vol = allLogs.reduce((acc, log) => {
       const pd = log.performance_data || {};
       if (pd.sets && Array.isArray(pd.sets)) {

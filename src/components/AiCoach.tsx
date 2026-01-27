@@ -49,9 +49,13 @@ export default function AiCoach() {
 
     const isLoading = status === 'streaming' || status === 'submitted';
 
-    // Auto-scroll to bottom when new messages arrive
+    // Auto-scroll to bottom only when new messages arrive (not on initial load if empty)
+    const prevMessagesLength = useRef(0);
     useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        if (messages.length > prevMessagesLength.current) {
+            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+        prevMessagesLength.current = messages.length;
     }, [messages]);
 
     // Fetch user's AI profile settings
@@ -155,11 +159,10 @@ export default function AiCoach() {
 
                 {displayableMessages.map((m) => (
                     <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-[90%] rounded-[24px] px-6 py-4 text-sm leading-relaxed whitespace-pre-wrap ${
-                            m.role === 'user'
+                        <div className={`max-w-[90%] rounded-[24px] px-6 py-4 text-sm leading-relaxed whitespace-pre-wrap ${m.role === 'user'
                                 ? 'bg-foreground text-background rounded-br-none shadow-xl'
                                 : 'bg-muted text-foreground rounded-bl-none border border-border shadow-lg shadow-black/5'
-                        }`}>
+                            }`}>
                             {getMessageContent(m)}
                         </div>
                     </div>
