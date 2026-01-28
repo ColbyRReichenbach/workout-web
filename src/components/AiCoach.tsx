@@ -105,6 +105,14 @@ export default function AiCoach() {
 
     // Extract displayable content from message
     const getMessageContent = (message: UIMessage): string => {
+        // Log message for debugging
+        console.log(`[AiCoach] Processing message ${message.id}:`, {
+            role: message.role,
+            contentLength: message.content?.length,
+            partsCount: message.parts?.length,
+            toolInvocations: (message as any).toolInvocations?.length
+        });
+
         // 1. Check for legacy/standard content property first
         if (message.content) return message.content;
 
@@ -124,11 +132,15 @@ export default function AiCoach() {
         return '';
     };
 
-    // Filter out messages that genuinely have no content (e.g., hidden tool-call messages)
+    // Filter out messages that genuinely have no content
     const displayableMessages = messages.filter(m => {
+        if (m.role === 'user') return true;
         const content = getMessageContent(m);
-        // Special case: ignore messages that only contain tool calls if they are not the latest Assistant message
-        if (!content && m.role === 'assistant') return false;
+        // Only hide Assistant messages that are COMPLETELY empty and have tool calls
+        if (m.role === 'assistant' && !content) {
+            const tools = (m as any).toolInvocations;
+            if (tools && tools.length > 0) return false;
+        }
         return content.length > 0;
     });
 

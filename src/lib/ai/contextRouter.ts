@@ -195,7 +195,7 @@ ${truncateToTokenLimit(fullPhaseContent, TOKEN_BUDGETS.INJURY)}
 
         case 'LOGISTICS':
             // MOST OPTIMIZED: Just today's routine
-            const dailyRoutine = extractSection(fullPhaseContent, `#### ${today}`);
+            const dailyRoutine = extractSection(fullPhaseContent, today);
 
             if (dailyRoutine) {
                 const exerciseList = extractExerciseList(dailyRoutine);
