@@ -254,11 +254,11 @@ export async function POST(req: Request) {
         `;
 
         // 7. STREAM AI RESPONSE
-        console.log('[API/Chat] Starting streamText with model gpt-4o');
+        console.log('[API/Chat] Starting streamText with model gpt-4o-mini');
 
         try {
             const result = streamText({
-                model: openai('gpt-4o'),
+                model: openai('gpt-4o-mini'),
                 system: systemPrompt,
                 messages: sanitizedMessages,
                 tools: {
