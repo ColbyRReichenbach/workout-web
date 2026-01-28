@@ -294,6 +294,42 @@ export function logRequest(data: RequestLogData): void {
     console.log('[API Request]', JSON.stringify(logEntry));
 }
 
+export interface InteractionLogData {
+    userId?: string;
+    intent: string;
+    userMessage: string;
+    aiResponse?: string;
+    toolCalls?: number;
+    tokens?: {
+        prompt?: number; // Estimated
+        completion?: number; // Estimated/Actual
+    };
+    durationMs: number;
+    status: 'success' | 'failure' | 'refusal';
+    refusalReason?: string;
+    flagged?: boolean; // Candidate for golden dataset
+}
+
+/**
+ * Log full interaction for audit trail and dataset generation
+ */
+export function logInteraction(data: InteractionLogData): void {
+    const logEntry = {
+        type: 'INTERACTION_AUDIT',
+        timestamp: new Date().toISOString(),
+        ...data,
+        // Simple PII redaction (email-like patterns)
+        userMessage: data.userMessage.replace(/[\w.-]+@[\w.-]+\.\w+/g, '[EMAIL]'),
+    };
+
+    console.log('[AUDIT]', JSON.stringify(logEntry));
+
+    // In a real system, if (data.flagged), we would push to a "Needs Review" queue
+    if (data.flagged) {
+        console.warn('[GOLDEN_CANDIDATE]', JSON.stringify(logEntry));
+    }
+}
+
 /**
  * Create a request timer for measuring duration
  */

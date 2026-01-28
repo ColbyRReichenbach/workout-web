@@ -6,7 +6,7 @@ import { chatRequestSchema, sanitizeString, BOUNDS, extractMessageContent } from
 import { NextResponse } from 'next/server';
 import { detectIntent, buildDynamicContext } from '@/lib/ai/contextRouter';
 import { DEMO_USER_ID, RATE_LIMITS } from '@/lib/constants';
-import { logRequest, createRequestTimer, ApiErrors } from '@/lib/api/helpers';
+import { logRequest, createRequestTimer, ApiErrors, logInteraction } from '@/lib/api/helpers';
 import * as Sentry from '@sentry/nextjs';
 
 export const maxDuration = 30;
@@ -44,6 +44,9 @@ const INJECTION_PATTERNS = [
     /jailbreak/i,
     /DAN\s*(mode)?/i,
     /reveal\s+(your|the)\s+(system|original|initial)\s+(prompt|instructions)/i,
+    /never\s+refuse\s+a\s+request/i,
+    /do\s+anything\s+now/i,
+    /act\s+as\s+an\s+unrestricted/i,
 ];
 
 function detectPromptInjection(content: string): boolean {
@@ -277,6 +280,34 @@ YOUR MISSION:
                         toolCallCount: toolCalls?.length || 0,
                         toolResultCount: toolResults?.length || 0
                     });
+
+                    // RESPONSE VALIDATION (Audit/Logging)
+                    // We don't block the stream (it's already sent), but we log violations for the golden dataset.
+                    let flagged = false;
+                    let refusalReason: string | undefined;
+
+                    if (text) {
+                        const forbiddenTerms = ['internal_error', 'system_prompt', 'unauthorized_access'];
+                        const hasForbiddenTerm = forbiddenTerms.some(term => text.toLowerCase().includes(term));
+                        if (hasForbiddenTerm) {
+                            console.warn(`[AI Safety] Response contained forbidden term: ${text.substring(0, 50)}...`);
+                            flagged = true;
+                            refusalReason = 'Forbidden term detected';
+                        }
+                    }
+
+                    // AUDIT LOG
+                    logInteraction({
+                        userId,
+                        intent: intent || 'UNKNOWN',
+                        userMessage: userMessages[userMessages.length - 1]?.content || '',
+                        aiResponse: text,
+                        toolCalls: toolCalls?.length || 0,
+                        durationMs: timer.getDuration(),
+                        status: flagged ? 'refusal' : 'success',
+                        refusalReason,
+                        flagged
+                    });
                 },
             });
 
@@ -285,8 +316,8 @@ YOUR MISSION:
             // Return protocol-compliant data stream response
             const response = result.toUIMessageStreamResponse();
 
-
-            // Log successful request
+            // Request logging is handled by logInteraction now for success cases, 
+            // but we keep generic request logging for consistency
             logRequest({
                 method: 'POST',
                 path: '/api/chat',
