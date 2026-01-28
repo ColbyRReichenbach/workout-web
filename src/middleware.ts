@@ -41,6 +41,33 @@ export async function middleware(request: NextRequest) {
     // check for guest mode cookie
     const isGuest = request.cookies.get('guest-mode')?.value === 'true'
 
+    // CSP and SECURITY HEADERS
+    const nonce = crypto.randomUUID()
+    const cspHeader = `
+        default-src 'self';
+        script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https: http: 'unsafe-inline' ${process.env.NODE_ENV === 'development' ? "'unsafe-eval'" : ''};
+        style-src 'self' 'unsafe-inline';
+        img-src 'self' data: blob: https:;
+        font-src 'self' data:;
+        object-src 'none';
+        base-uri 'self';
+        form-action 'self';
+        frame-ancestors 'none';
+        connect-src 'self' https://api.openai.com https://*.supabase.co https://*.sentry.io wss://*.supabase.co https://vercel.live;
+    `.replace(/\s{2,}/g, ' ').trim()
+
+    const requestHeaders = new Headers(request.headers)
+    requestHeaders.set('x-nonce', nonce)
+    requestHeaders.set('Content-Security-Policy', cspHeader)
+
+    response = NextResponse.next({
+        request: {
+            headers: requestHeaders,
+        },
+    })
+
+    response.headers.set('Content-Security-Policy', cspHeader)
+
     // PROTECTED ROUTES
     // Dashboard at / and other protected pages require authentication OR guest mode
     if (!user && !isGuest &&

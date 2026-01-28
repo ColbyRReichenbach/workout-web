@@ -16,6 +16,7 @@ export const maxDuration = 30;
 // ============================================
 
 import { checkRateLimit } from '@/lib/redis';
+import { getClientIp } from '@/lib/ip';
 
 // Use centralized rate limit configuration
 const RATE_LIMIT = RATE_LIMITS.CHAT;
@@ -100,7 +101,9 @@ export async function POST(req: Request) {
         }
 
         // 2. RATE LIMITING - Protect against abuse
-        const rateLimit = await checkRateLimitWrapper(userId);
+        // Use user ID if authenticated, otherwise use trusted IP for guests
+        const identifier = user ? user.id : await getClientIp();
+        const rateLimit = await checkRateLimitWrapper(identifier);
         if (!rateLimit.allowed) {
             return NextResponse.json(
                 {

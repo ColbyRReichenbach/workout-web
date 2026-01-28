@@ -37,6 +37,9 @@ function cleanupLocalRateLimit() {
  * Check Rate Limit for a given identifier
  * Uses Upstash Redis in production, falls back to in-memory map if not configured.
  * 
+ * IMPORTANT: Ensure the identifier is trusted. If using IP addresses, use the 
+ * getClientIp utility from @/lib/ip to avoid spoofing.
+ * 
  * @param identifier Unique identifier for the user or IP
  * @param config Rate limit configuration (requests per window)
  * @param prefix Redis key prefix for this limiter

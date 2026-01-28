@@ -26,12 +26,41 @@ const NanoParticles = ({ intensity: targetIntensity, heartDuration }: { intensit
     const lastBeatTime = useRef<number>(0);
     const secondBeatFired = useRef<boolean>(false);
     const smoothIntensity = useRef(0);
+    const [reducedMotion, setReducedMotion] = useState(false);
+    const [isVisible, setIsVisible] = useState(true);
+
+    useEffect(() => {
+        // Detect reduced motion preference
+        const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+        setReducedMotion(mediaQuery.matches);
+
+        const handleMotionChange = (e: MediaQueryListEvent) => setReducedMotion(e.matches);
+        mediaQuery.addEventListener('change', handleMotionChange);
+
+        // Detect tab visibility
+        const handleVisibilityChange = () => {
+            setIsVisible(document.visibilityState === 'visible');
+        };
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            mediaQuery.removeEventListener('change', handleMotionChange);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, []);
 
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
+
+        // Skip animation entirely if tab is hidden or reduced motion is preferred
+        if (!isVisible || reducedMotion) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            particles.current = [];
+            return;
+        }
 
         const dpr = window.devicePixelRatio || 1;
         const handleResize = () => {
@@ -139,7 +168,9 @@ const NanoParticles = ({ intensity: targetIntensity, heartDuration }: { intensit
             window.removeEventListener('resize', handleResize);
             cancelAnimationFrame(requestRef.current);
         };
-    }, [targetIntensity, heartDuration]);
+    }, [targetIntensity, heartDuration, isVisible, reducedMotion]);
+
+    if (reducedMotion) return null;
 
     return (
         <canvas
@@ -220,6 +251,19 @@ export default function LoginPage() {
           animation-iteration-count: infinite;
           transition: animation-duration 0.8s ease-in-out;
         }
+
+        @media (prefers-reduced-motion: reduce) {
+          .animate-heart-beat {
+            animation: none;
+            transition: none;
+          }
+          .slide-in {
+            animation: none !important;
+            transform: none !important;
+            opacity: 1 !important;
+          }
+        }
+
         .glass {
           background: rgba(255, 255, 255, 0.4);
           backdrop-filter: blur(16px);
