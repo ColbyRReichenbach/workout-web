@@ -140,7 +140,7 @@ export async function POST(req: Request) {
             );
         }
 
-        const { messages } = validation.data;
+        const { messages, userDay } = validation.data;
 
         // 4. SANITIZE INPUT - Prevent XSS and clean content
         // Handle both legacy content format and AI SDK v6 parts format
@@ -187,7 +187,7 @@ export async function POST(req: Request) {
         const intent = detectIntent(lastUserMessage);
         console.log(`[API/Chat] Intent Detected: ${intent}`);
 
-        const { systemPromptAdditions } = await buildDynamicContext(intent, currentPhase, currentWeek);
+        const { systemPromptAdditions } = await buildDynamicContext(intent, currentPhase, currentWeek, userDay);
         // Note: phases are already used in buildDynamicContext, but we keep them for prompt footer
 
         // --- SAFETY PROTOCOLS ---
@@ -261,6 +261,7 @@ export async function POST(req: Request) {
                 model: openai('gpt-4o-mini'),
                 system: systemPrompt,
                 messages: sanitizedMessages,
+                maxSteps: 5,
                 tools: {
                     getRecentLogs,
                     getBiometrics
@@ -276,10 +277,11 @@ export async function POST(req: Request) {
                 },
             });
 
-            console.log('[API/Chat] streamText created. Converting to text stream response...');
+            console.log('[API/Chat] streamText created. Converting to data stream response...');
 
-            // Return streaming response
-            const response = result.toTextStreamResponse();
+            // Return protocol-compliant data stream response
+            const response = result.toUIMessageStreamResponse();
+
 
             // Log successful request
             logRequest({
@@ -299,7 +301,10 @@ export async function POST(req: Request) {
         }
 
     } catch (error) {
-        console.error('[AI Chat Error]', error);
+        console.error('[AI Chat Error] Detailed:', error);
+        if (error instanceof Error) {
+            console.error('[AI Chat Error] Stack:', error.stack);
+        }
         Sentry.captureException(error);
 
         // Log failed request

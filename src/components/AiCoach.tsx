@@ -35,6 +35,9 @@ export default function AiCoach() {
         error: chatError,
     } = useChat({
         transport,
+        body: {
+            userDay: new Date().toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase()
+        },
         onError: (err: Error) => {
             console.error('[AiCoach] Error:', err);
             setLocalError(err.message || 'An error occurred. Please try again.');
@@ -102,7 +105,18 @@ export default function AiCoach() {
 
     // Extract displayable content from message
     const getMessageContent = (message: UIMessage): string => {
-        // Check parts array for text content
+        // Log message for debugging
+        console.log(`[AiCoach] Processing message ${message.id}:`, {
+            role: message.role,
+            contentLength: message.content?.length,
+            partsCount: message.parts?.length,
+            toolInvocations: (message as any).toolInvocations?.length
+        });
+
+        // 1. Check for legacy/standard content property first
+        if (message.content) return message.content;
+
+        // 2. Check parts array for text content (SDK v6+)
         if (message.parts && Array.isArray(message.parts)) {
             const textParts = message.parts
                 .filter((part): part is TextPart =>
@@ -118,9 +132,15 @@ export default function AiCoach() {
         return '';
     };
 
-    // Filter out empty messages
+    // Filter out messages that genuinely have no content
     const displayableMessages = messages.filter(m => {
+        if (m.role === 'user') return true;
         const content = getMessageContent(m);
+        // Only hide Assistant messages that are COMPLETELY empty and have tool calls
+        if (m.role === 'assistant' && !content) {
+            const tools = (m as any).toolInvocations;
+            if (tools && tools.length > 0) return false;
+        }
         return content.length > 0;
     });
 
@@ -160,8 +180,8 @@ export default function AiCoach() {
                 {displayableMessages.map((m) => (
                     <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                         <div className={`max-w-[90%] rounded-[24px] px-6 py-4 text-sm leading-relaxed whitespace-pre-wrap ${m.role === 'user'
-                                ? 'bg-foreground text-background rounded-br-none shadow-xl'
-                                : 'bg-muted text-foreground rounded-bl-none border border-border shadow-lg shadow-black/5'
+                            ? 'bg-foreground text-background rounded-br-none shadow-xl'
+                            : 'bg-muted text-foreground rounded-bl-none border border-border shadow-lg shadow-black/5'
                             }`}>
                             {getMessageContent(m)}
                         </div>
