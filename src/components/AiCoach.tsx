@@ -28,6 +28,8 @@ export default function AiCoach() {
         api: '/api/chat',
     }), []);
 
+    const [activeTag, setActiveTag] = useState<string | null>(null);
+
     const {
         messages,
         sendMessage,
@@ -36,7 +38,8 @@ export default function AiCoach() {
     } = useChat({
         transport,
         body: {
-            userDay: new Date().toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase()
+            userDay: new Date().toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase(),
+            intentTag: activeTag
         },
         onError: (err: Error) => {
             console.error('[AiCoach] Error:', err);
@@ -45,6 +48,8 @@ export default function AiCoach() {
         onFinish: ({ message }) => {
             console.log('[AiCoach] Message finished:', message.id);
             setLocalError(null);
+            // Reset tag after use
+            setActiveTag(null);
         },
     });
 
@@ -85,15 +90,23 @@ export default function AiCoach() {
     }, []);
 
     // Handle form submission
-    const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
-        if (!inputValue.trim() || isLoading) return;
+    const onSubmit = async (e?: React.FormEvent<HTMLFormElement>, text?: string, tag?: string) => {
+        if (e) e.preventDefault();
 
-        console.log('[AiCoach] Submitting message:', inputValue.substring(0, 50));
+        const messageText = text || inputValue;
+        if (!messageText.trim() || isLoading) return;
+
+        console.log('[AiCoach] Submitting message:', messageText.substring(0, 50));
         setLocalError(null);
 
-        const messageText = inputValue;
-        setInputValue('');
+        if (!text) setInputValue('');
+
+        // If tag is provided, set it before sending. 
+        // Note: With sendMessage, we might need a small delay or use a ref if state doesn't update fast enough,
+        // but let's try setting it and calling sendMessage.
+        if (tag) {
+            setActiveTag(tag);
+        }
 
         try {
             await sendMessage({ text: messageText });
@@ -143,6 +156,61 @@ export default function AiCoach() {
         }
         return content.length > 0;
     });
+
+    const lastAssistantMessage = [...displayableMessages].reverse().find(m => m.role === 'assistant');
+
+    /**
+     * Action Chips Component
+     */
+    const ActionChips = () => {
+        const suggestions = useMemo(() => {
+            if (!lastAssistantMessage) {
+                return [
+                    { label: "What's my workout today?", tag: "logistics" },
+                    { label: "How is my progress?", tag: "progress" }
+                ];
+            }
+
+            const content = getMessageContent(lastAssistantMessage).toLowerCase();
+
+            if (content.includes('injury') || content.includes('pain') || content.includes('hurt') || content.includes('regression')) {
+                return [
+                    { label: "Give me a regression", tag: "injury" },
+                    { label: "Why this substitution?", tag: "injury" },
+                    { label: "Show rest day tips", tag: "injury" }
+                ];
+            }
+
+            if (content.includes('workout') || content.includes('routine') || content.includes('exercise')) {
+                return [
+                    { label: "Give me a substitution", tag: "logistics" },
+                    { label: "Why this weight?", tag: "progress" },
+                    { label: "Log this session", tag: "logistics" }
+                ];
+            }
+
+            return [
+                { label: "Explain more", tag: "general" },
+                { label: "What's tomorrow?", tag: "logistics" }
+            ];
+        }, [lastAssistantMessage]);
+
+        if (isLoading) return null;
+
+        return (
+            <div className="flex flex-wrap gap-2 mb-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
+                {suggestions.map((s, i) => (
+                    <button
+                        key={i}
+                        onClick={() => onSubmit(undefined, s.label, s.tag)}
+                        className="px-4 py-2 rounded-full bg-muted border border-border text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:bg-foreground hover:text-background hover:border-foreground transition-all shadow-sm"
+                    >
+                        {s.label}
+                    </button>
+                ))}
+            </div>
+        );
+    };
 
     return (
         <div className="flex flex-col h-full p-4">
@@ -210,8 +278,11 @@ export default function AiCoach() {
                 <div ref={messagesEndRef} />
             </div>
 
+            {/* Action Chips */}
+            <ActionChips />
+
             {/* Input Form */}
-            <form onSubmit={onSubmit} className="relative mt-auto">
+            <form onSubmit={(e) => onSubmit(e)} className="relative mt-auto">
                 <input
                     value={inputValue}
                     onChange={(e) => setInputValue(e.target.value)}
