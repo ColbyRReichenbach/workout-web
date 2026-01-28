@@ -372,6 +372,7 @@ export const chatMessageSchema = z.object({
 
 export const chatRequestSchema = z.object({
     messages: z.array(chatMessageSchema).min(1).max(50),
+    userDay: z.string().optional(), // Optional localized day (e.g., 'TUESDAY')
 })
 
 /**

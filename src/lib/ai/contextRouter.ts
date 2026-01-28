@@ -61,12 +61,16 @@ export function detectIntent(message: string): IntentType {
 }
 
 /**
- * Extracts a specific section from the Master Plan Markdown
+ * Extracts a specific section from the Master Plan Markdown.
+ * Improved to handle both #### DAY and * **DAY** formats.
  */
 function extractSection(markdown: string, sectionHeader: string): string {
-    const regex = new RegExp(`(${sectionHeader}[\\s\\S]*?)(?=(#{1,4}\\s|\\Z))`, 'i');
+    // Escape special characters for regex but allow for flexibility in prefixing
+    const escapedHeader = sectionHeader.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // Match #### HEADER or * **HEADER** or ### HEADER
+    const regex = new RegExp(`(?:#{1,4}|\\*\\s\\*\\*)\\s*${escapedHeader}[\\s\\S]*?(?=(?:#{1,4}\\s|\\*\\s\\*\\*|\\Z))`, 'i');
     const match = markdown.match(regex);
-    return match ? match[1].trim() : '';
+    return match ? match[0].trim() : '';
 }
 
 /**
@@ -118,7 +122,8 @@ function createPhaseSummary(phaseContent: string): string {
 export async function buildDynamicContext(
     intent: IntentType,
     currentPhase: number,
-    currentWeek: number
+    currentWeek: number,
+    providedUserDay?: string
 ): Promise<ContextPayload> {
 
     const planPath = path.join(process.cwd(), 'docs', 'routine_master_plan.md');
@@ -135,14 +140,27 @@ export async function buildDynamicContext(
         };
     }
 
-    // Get Current Day
-    const today = new Date().toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase();
+    // Get Current Day (Prefer provided specialized day from client)
+    const today = (providedUserDay || new Date().toLocaleDateString('en-US', { weekday: 'long' })).toUpperCase();
 
     let specificContext = '';
     let tools: string[] = [];
 
+    // Phase extraction logic
+    let targetPhase = currentPhase;
+    let actualWeek = currentWeek;
+
+    // Phase 5 Special Logic: Re-entry to Phase 1 for non-testing weeks
+    if (currentPhase === 5) {
+        const TESTING_WEEKS = [37, 44, 51];
+        if (!TESTING_WEEKS.includes(currentWeek)) {
+            targetPhase = 1;
+            console.log(`[ContextRouter] Phase 5 Re-entry detected for week ${currentWeek}. Redirecting to Phase 1 context.`);
+        }
+    }
+
     // Phase content extraction
-    const phaseRegex = new RegExp(`(## PHASE ${currentPhase}[\\s\\S]*?)(?=## PHASE \\d|$)`, 'i');
+    const phaseRegex = new RegExp(`(## PHASE ${targetPhase}[\\s\\S]*?)(?=## PHASE \\d|$)`, 'i');
     const phaseMatch = masterPlan.match(phaseRegex);
     const fullPhaseContent = phaseMatch ? phaseMatch[1] : '';
 

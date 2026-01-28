@@ -35,6 +35,9 @@ export default function AiCoach() {
         error: chatError,
     } = useChat({
         transport,
+        body: {
+            userDay: new Date().toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase()
+        },
         onError: (err: Error) => {
             console.error('[AiCoach] Error:', err);
             setLocalError(err.message || 'An error occurred. Please try again.');
@@ -160,8 +163,8 @@ export default function AiCoach() {
                 {displayableMessages.map((m) => (
                     <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                         <div className={`max-w-[90%] rounded-[24px] px-6 py-4 text-sm leading-relaxed whitespace-pre-wrap ${m.role === 'user'
-                                ? 'bg-foreground text-background rounded-br-none shadow-xl'
-                                : 'bg-muted text-foreground rounded-bl-none border border-border shadow-lg shadow-black/5'
+                            ? 'bg-foreground text-background rounded-br-none shadow-xl'
+                            : 'bg-muted text-foreground rounded-bl-none border border-border shadow-lg shadow-black/5'
                             }`}>
                             {getMessageContent(m)}
                         </div>
