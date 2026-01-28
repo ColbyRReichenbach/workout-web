@@ -23,13 +23,18 @@ export default function AiCoach() {
     const [inputValue, setInputValue] = useState('');
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
+    // Create transport once
+    const transport = useMemo(() => new DefaultChatTransport({
+        api: '/api/chat',
+    }), []);
+
     const {
         messages,
-        append,
+        sendMessage,
         status,
         error: chatError,
     } = useChat({
-        api: '/api/chat',
+        transport,
         body: {
             userDay: new Date().toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase()
         },
@@ -37,8 +42,8 @@ export default function AiCoach() {
             console.error('[AiCoach] Error:', err);
             setLocalError(err.message || 'An error occurred. Please try again.');
         },
-        onFinish: (message) => {
-            console.log('[AiCoach] Message completed:', message.id);
+        onFinish: ({ message }) => {
+            console.log('[AiCoach] Message finished:', message.id);
             setLocalError(null);
         },
     });
@@ -91,7 +96,7 @@ export default function AiCoach() {
         setInputValue('');
 
         try {
-            await append({ role: 'user', content: messageText });
+            await sendMessage({ text: messageText });
         } catch (err) {
             console.error('[AiCoach] Send failed:', err);
             setLocalError('Failed to send message. Please try again.');
@@ -100,15 +105,28 @@ export default function AiCoach() {
 
     // Extract displayable content from message
     const getMessageContent = (message: UIMessage): string => {
-        // 1. Check for standard content property
+        // Log message for debugging
+        console.log(`[AiCoach] Processing message ${message.id}:`, {
+            role: message.role,
+            contentLength: message.content?.length,
+            partsCount: message.parts?.length,
+            toolInvocations: (message as any).toolInvocations?.length
+        });
+
+        // 1. Check for legacy/standard content property first
         if (message.content) return message.content;
 
         // 2. Check parts array for text content (SDK v6+)
         if (message.parts && Array.isArray(message.parts)) {
-            return message.parts
-                .filter((part): part is TextPart => part.type === 'text')
-                .map(part => part.text)
-                .join('\n');
+            const textParts = message.parts
+                .filter((part): part is TextPart =>
+                    part.type === 'text' && typeof (part as TextPart).text === 'string'
+                )
+                .map(part => part.text);
+
+            if (textParts.length > 0) {
+                return textParts.join('\n');
+            }
         }
 
         return '';
@@ -118,11 +136,12 @@ export default function AiCoach() {
     const displayableMessages = messages.filter(m => {
         if (m.role === 'user') return true;
         const content = getMessageContent(m);
-        // Only hide Assistant messages that are COMPLETELY empty AND have tool calls
+        // Only hide Assistant messages that are COMPLETELY empty and have tool calls
         if (m.role === 'assistant' && !content) {
-            if ((m as any).toolInvocations?.length > 0) return false;
+            const tools = (m as any).toolInvocations;
+            if (tools && tools.length > 0) return false;
         }
-        return true; // Show everything else to avoid missing partial streams
+        return content.length > 0;
     });
 
     return (

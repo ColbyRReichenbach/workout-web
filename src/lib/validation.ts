@@ -344,20 +344,41 @@ const textPartSchema = z.object({
 
 const filePartSchema = z.object({
     type: z.literal('file'),
-    url: z.string().optional(),
+    data: z.string().optional(),
     mimeType: z.string().optional(),
-    name: z.string().optional(),
+})
+
+const reasoningPartSchema = z.object({
+    type: z.literal('reasoning'),
+    reasoning: z.string(),
+})
+
+const toolCallPartSchema = z.object({
+    type: z.literal('tool-call'),
+    toolCallId: z.string(),
+    toolName: z.string(),
+    args: z.any(),
+})
+
+const toolResultPartSchema = z.object({
+    type: z.literal('tool-result'),
+    toolCallId: z.string(),
+    toolName: z.string(),
+    result: z.any(),
 })
 
 const messagePartSchema = z.discriminatedUnion('type', [
     textPartSchema,
     filePartSchema,
+    reasoningPartSchema,
+    toolCallPartSchema,
+    toolResultPartSchema,
 ])
 
 // Support both legacy content string and new parts array format
 export const chatMessageSchema = z.object({
     id: z.string().optional(),
-    role: z.enum(['user', 'assistant', 'system']),
+    role: z.enum(['user', 'assistant', 'system', 'tool']),
     // Legacy format: content as string
     content: z
         .string()
@@ -378,14 +399,18 @@ export const chatRequestSchema = z.object({
 /**
  * Extract text content from a message (handles both legacy and v6 formats)
  */
-export function extractMessageContent(message: { content?: string; parts?: Array<{ type: string; text?: string }> }): string {
+export function extractMessageContent(message: { content?: string; parts?: Array<{ type: string; text?: string; reasoning?: string }> }): string {
     if (message.content) {
         return message.content;
     }
     if (message.parts) {
         return message.parts
-            .filter((p): p is { type: 'text'; text: string } => p.type === 'text' && typeof p.text === 'string')
-            .map(p => p.text)
+            .map(p => {
+                if (p.type === 'text' && typeof p.text === 'string') return p.text;
+                if (p.type === 'reasoning' && typeof p.reasoning === 'string') return p.reasoning;
+                return '';
+            })
+            .filter(Boolean)
             .join('\n');
     }
     return '';

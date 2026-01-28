@@ -62,12 +62,13 @@ export function detectIntent(message: string): IntentType {
 
 /**
  * Extracts a specific section from the Master Plan Markdown.
- * Improved to handle both #### DAY and * **DAY** formats with strict line boundaries.
+ * Improved to handle both #### DAY and * **DAY** formats.
  */
 function extractSection(markdown: string, sectionHeader: string): string {
+    // Escape special characters for regex but allow for flexibility in prefixing
     const escapedHeader = sectionHeader.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    // Look for Header at start of line, containing escapedHeader, until next header at start of line
-    const regex = new RegExp(`(?:^|\n)(?:#{1,4}|\\*\\*|\\*\\s\\*\\*)\\s*${escapedHeader}[\\s\\S]*?(?=\n(?:#|\\*\\s\\*\\*)|$)`, 'i');
+    // Match #### HEADER or * **HEADER** or ### HEADER
+    const regex = new RegExp(`(?:#{1,4}|\\*\\s\\*\\*)\\s*${escapedHeader}[\\s\\S]*?(?=(?:#{1,4}\\s|\\*\\s\\*\\*|\\Z))`, 'i');
     const match = markdown.match(regex);
     return match ? match[0].trim() : '';
 }

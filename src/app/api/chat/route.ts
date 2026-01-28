@@ -277,10 +277,11 @@ export async function POST(req: Request) {
                 },
             });
 
-            console.log('[API/Chat] streamText created. Converting to text stream response...');
+            console.log('[API/Chat] streamText created. Converting to data stream response...');
 
-            // Return streaming response
-            const response = result.toTextStreamResponse();
+            // Return protocol-compliant data stream response
+            const response = result.toUIMessageStreamResponse();
+
 
             // Log successful request
             logRequest({
@@ -300,7 +301,10 @@ export async function POST(req: Request) {
         }
 
     } catch (error) {
-        console.error('[AI Chat Error]', error);
+        console.error('[AI Chat Error] Detailed:', error);
+        if (error instanceof Error) {
+            console.error('[AI Chat Error] Stack:', error.stack);
+        }
         Sentry.captureException(error);
 
         // Log failed request
