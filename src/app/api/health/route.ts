@@ -10,8 +10,21 @@ import { APP_CONFIG } from '@/lib/constants';
  *
  * GET /api/health
  */
-export async function GET() {
+export async function GET(request: Request) {
     const startTime = Date.now();
+    const headers = request.headers;
+    const authHeader = headers.get('x-health-secret');
+    const expectedSecret = process.env.HEALTH_CHECK_SECRET;
+
+    // Default to minimal response for unauthenticated requests
+    const isAuthorized = expectedSecret && authHeader === expectedSecret;
+
+    if (!isAuthorized) {
+        return NextResponse.json(
+            { status: 'ok' },
+            { status: 200 }
+        );
+    }
 
     const healthStatus = {
         status: 'healthy' as 'healthy' | 'degraded' | 'unhealthy',

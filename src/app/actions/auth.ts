@@ -12,19 +12,10 @@ import * as Sentry from '@sentry/nextjs'
 // ============================================
 
 import { checkRateLimit } from '@/lib/redis';
+import { getClientIp } from '@/lib/ip';
 
 async function checkAuthRateLimit(identifier: string): Promise<{ allowed: boolean; remaining: number }> {
     return checkRateLimit(identifier, RATE_LIMITS.AUTH, "@upstash/ratelimit/auth");
-}
-
-/**
- * Get client IP for rate limiting
- */
-async function getClientIp(): Promise<string> {
-    const headersList = await headers();
-    return headersList.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-        headersList.get('x-real-ip') ||
-        'unknown';
 }
 
 // ============================================
