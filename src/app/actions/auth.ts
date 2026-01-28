@@ -4,67 +4,17 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import { GUEST_MODE_COOKIE, RATE_LIMITS, COMMON_PASSWORDS } from '@/lib/constants'
-import { Ratelimit } from '@upstash/ratelimit'
-import { Redis } from '@upstash/redis'
 import { headers } from 'next/headers'
+import * as Sentry from '@sentry/nextjs'
 
 // ============================================
 // RATE LIMITING
 // ============================================
 
-// Initialize Redis and Ratelimit for auth endpoints
-const redis = (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN)
-    ? new Redis({
-        url: process.env.UPSTASH_REDIS_REST_URL,
-        token: process.env.UPSTASH_REDIS_REST_TOKEN,
-    })
-    : null;
-
-const authRateLimiter = redis
-    ? new Ratelimit({
-        redis: redis,
-        limiter: Ratelimit.slidingWindow(RATE_LIMITS.AUTH.requests, RATE_LIMITS.AUTH.window),
-        analytics: true,
-        prefix: "@upstash/ratelimit/auth",
-    })
-    : null;
-
-// In-memory fallback for development
-const localRateLimitMap = new Map<string, { count: number; resetTime: number }>();
+import { checkRateLimit } from '@/lib/redis';
 
 async function checkAuthRateLimit(identifier: string): Promise<{ allowed: boolean; remaining: number }> {
-    // Production: Use Upstash Redis
-    if (authRateLimiter) {
-        try {
-            const { success, remaining } = await authRateLimiter.limit(identifier);
-            return { allowed: success, remaining };
-        } catch (error) {
-            console.error('[Auth RateLimit] Upstash error, falling back to local', error);
-        }
-    }
-
-    // Dev/Fallback: Use in-memory
-    const now = Date.now();
-    const record = localRateLimitMap.get(identifier);
-
-    // Cleanup old entries
-    if (localRateLimitMap.size > 1000) {
-        for (const [key, value] of localRateLimitMap.entries()) {
-            if (now > value.resetTime) localRateLimitMap.delete(key);
-        }
-    }
-
-    if (!record || now > record.resetTime) {
-        localRateLimitMap.set(identifier, { count: 1, resetTime: now + RATE_LIMITS.AUTH.windowMs });
-        return { allowed: true, remaining: RATE_LIMITS.AUTH.requests - 1 };
-    }
-
-    if (record.count >= RATE_LIMITS.AUTH.requests) {
-        return { allowed: false, remaining: 0 };
-    }
-
-    record.count++;
-    return { allowed: true, remaining: RATE_LIMITS.AUTH.requests - record.count };
+    return checkRateLimit(identifier, RATE_LIMITS.AUTH, "@upstash/ratelimit/auth");
 }
 
 /**
@@ -171,6 +121,7 @@ export async function loginWithOAuth(provider: 'google' | 'apple') {
 
     if (error) {
         console.error(error)
+        Sentry.captureException(error)
         return { error: error.message }
     }
 
@@ -282,6 +233,7 @@ export async function resetPassword(email: string): Promise<{ error?: string; su
     if (error) {
         // Don't reveal if email exists for security
         console.error('[Auth] Password reset error:', error.message);
+        Sentry.captureException(error);
     }
 
     // Always return success to prevent email enumeration

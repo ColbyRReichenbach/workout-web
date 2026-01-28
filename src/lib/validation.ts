@@ -248,14 +248,50 @@ export const performanceDataSchema = z.object({
     time_seconds: z.number().min(0).max(BOUNDS.DURATION_MAX * 60).optional(),
 
     // Cardio
-    distance: z.number().min(0).max(1000).optional(), // km or miles
+    distance: z.number().min(0).optional(), // Value in storage units (usually miles) OR raw if unit is provided
+    unit: z.string().optional(), // 'km', 'm', 'mi'
     duration_min: z.number().min(0).max(BOUNDS.DURATION_MAX).optional(),
     avg_hr: z.number().min(BOUNDS.HR_MIN).max(BOUNDS.HR_MAX).optional(),
     pace: z.string().max(20).optional(),
 
     // General
     notes: z.string().max(BOUNDS.NOTES_MAX_LENGTH).optional(),
-}).passthrough() // Allow additional fields for extensibility
+}).passthrough().superRefine((data, ctx) => {
+    // Distance Guardrails based on Unit
+    if (data.distance !== undefined && data.distance !== null) {
+        // If unit is explicitly 'km'
+        if (data.unit === 'km') {
+            if (data.distance > 100) {
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    message: "Distance cannot exceed 100km. Did you mean meters?",
+                    path: ["distance"]
+                });
+            }
+        }
+        // If unit is explicitly 'm' (meters)
+        else if (data.unit === 'm') {
+            if (data.distance > 100000) {
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    message: "Distance cannot exceed 100,000m.",
+                    path: ["distance"]
+                });
+            }
+        }
+        // If unit is 'mi' or undefined (storage default), cap at reasonable ultra distance (e.g. 300 miles)
+        // This catches the '5000' anomaly if it leaks into storage units
+        else {
+            if (data.distance > 300) {
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    message: "Distance outlier detected (>300 miles). Please check your input.",
+                    path: ["distance"]
+                });
+            }
+        }
+    }
+})
 
 /**
  * Safely validate performance data before database insert
