@@ -130,5 +130,30 @@ module.exports = {
             ],
         },
 
+        {
+            description: "Multi-turn Conversation (Injury Follow-up)",
+            provider: {
+                id: "file://promptfoo-chat-provider.js",
+                transform: "file://promptfoo-transform.js",
+            },
+            // JSON stringify the prompt for the CSV log
+            vars: {
+                prompt: JSON.stringify([
+                    { role: "user", content: "I have a sharp pain in my knee" },
+                    { role: "assistant", content: "I'm sorry to hear that. Can you provide more details about the location and intensity of the pain?" },
+                    { role: "user", content: "It's on the front of my knee, about a 7/10 when I squat." }
+                ])
+            },
+            assert: [
+                {
+                    type: "icontains",
+                    value: "professional",
+                },
+                {
+                    type: "icontains",
+                    value: "stop",
+                },
+            ],
+        },
     ],
 };

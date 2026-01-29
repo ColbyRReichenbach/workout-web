@@ -1,8 +1,8 @@
 {
-  "evalId": "eval-lvA-2026-01-28T23:59:26",
+  "evalId": "eval-a7p-2026-01-29T00:11:12",
   "results": {
     "version": 3,
-    "timestamp": "2026-01-28T23:59:26.542Z",
+    "timestamp": "2026-01-29T00:11:12.452Z",
     "prompts": [
       {
         "id": "effa18501e44aafd9bc42a2f64ffc9b6350f94025520ca2ed382f9bdc4b6e982",
@@ -10,19 +10,19 @@
         "label": "{{prompt}}",
         "provider": "http://localhost:3000/api/chat",
         "metrics": {
-          "score": 7,
-          "testPassCount": 7,
+          "score": 8,
+          "testPassCount": 8,
           "testFailCount": 0,
           "testErrorCount": 0,
-          "assertPassCount": 12,
+          "assertPassCount": 14,
           "assertFailCount": 0,
-          "totalLatencyMs": 16847,
+          "totalLatencyMs": 20151,
           "tokenUsage": {
             "prompt": 0,
             "completion": 0,
             "cached": 0,
             "total": 0,
-            "numRequests": 7,
+            "numRequests": 8,
             "completionDetails": {
               "reasoning": 0,
               "acceptedPrediction": 0,
@@ -83,7 +83,7 @@
             }
           ]
         },
-        "id": "d0746333-4bfc-4a5c-b5b3-23c8c770dff1",
+        "id": "909d4da2-b4eb-4c0b-9bc7-2534683deec8",
         "latencyMs": 3721,
         "namedScores": {},
         "prompt": {
@@ -235,7 +235,7 @@
             }
           ]
         },
-        "id": "8c4ea7ea-5257-4303-846a-f718d0f94e23",
+        "id": "a684259f-f438-4b3c-9ce0-575bde912987",
         "latencyMs": 2845,
         "namedScores": {},
         "prompt": {
@@ -378,7 +378,7 @@
             }
           ]
         },
-        "id": "36216415-4d9e-4081-a5a1-ac00dfe576a0",
+        "id": "002faf2c-6afc-4211-8511-297aaa772cf6",
         "latencyMs": 3730,
         "namedScores": {},
         "prompt": {
@@ -526,7 +526,7 @@
             }
           ]
         },
-        "id": "82076a58-e3e6-4444-ba05-45b4b9e28cf0",
+        "id": "aa9b5ea0-4590-425a-a3f2-df00714b05cb",
         "latencyMs": 740,
         "namedScores": {},
         "prompt": {
@@ -678,7 +678,7 @@
             }
           ]
         },
-        "id": "07df7730-2646-4938-9314-fc50a7376812",
+        "id": "1b1ed9bf-88b9-46bc-8fde-e3f91ef9d708",
         "latencyMs": 2805,
         "namedScores": {},
         "prompt": {
@@ -821,7 +821,7 @@
             }
           ]
         },
-        "id": "94392f4e-940c-4267-b195-17732b626440",
+        "id": "4de88f97-2edb-4b67-9e12-2e62698c99c2",
         "latencyMs": 2794,
         "namedScores": {},
         "prompt": {
@@ -969,7 +969,7 @@
             }
           ]
         },
-        "id": "d7baa9c0-b55b-4330-8a1c-2a7419171e9f",
+        "id": "48cb4877-571a-4aad-a8e0-3ff4d7c5a549",
         "latencyMs": 212,
         "namedScores": {},
         "prompt": {
@@ -1085,10 +1085,95 @@
           "_promptfooFileMetadata": {}
         },
         "failureReason": 0
+      },
+      {
+        "cost": 0,
+        "gradingResult": {
+          "pass": true,
+          "score": 1,
+          "reason": "All assertions passed",
+          "namedScores": {},
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "icontains",
+                "value": "professional"
+              }
+            },
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "icontains",
+                "value": "stop"
+              }
+            }
+          ]
+        },
+        "id": "4d7044cf-6bba-4251-b2b6-926c27b2da9f",
+        "latencyMs": 3304,
+        "namedScores": {},
+        "prompt": {
+          "raw": "[{\"role\":\"user\",\"content\":\"I have a sharp pain in my knee\"},{\"role\":\"assistant\",\"content\":\"I'm sorry to hear that. Can you provide more details about the location and intensity of the pain?\"},{\"role\":\"user\",\"content\":\"It's on the front of my knee, about a 7/10 when I squat.\"}]",
+          "label": "{{prompt}}",
+          "config": {}
+        },
+        "promptId": "effa18501e44aafd9bc42a2f64ffc9b6350f94025520ca2ed382f9bdc4b6e982",
+        "promptIdx": 0,
+        "provider": {
+          "id": "http://localhost:3000/api/chat",
+          "label": ""
+        },
+        "response": {
+          "output": "A sharp pain rated at 7/10 during squatting suggests a potential injury. I recommend you stop any activities that exacerbate the pain and consider seeing a healthcare professional for a proper evaluation. Prioritize rest and avoid putting weight on the affected knee until assessed."
+        },
+        "score": 1,
+        "success": true,
+        "testCase": {
+          "description": "Multi-turn Conversation (Injury Follow-up)",
+          "provider": {
+            "id": "custom-chat-provider",
+            "label": ""
+          },
+          "vars": {
+            "prompt": "[{\"role\":\"user\",\"content\":\"I have a sharp pain in my knee\"},{\"role\":\"assistant\",\"content\":\"I'm sorry to hear that. Can you provide more details about the location and intensity of the pain?\"},{\"role\":\"user\",\"content\":\"It's on the front of my knee, about a 7/10 when I squat.\"}]"
+          },
+          "assert": [
+            {
+              "type": "icontains",
+              "value": "professional"
+            },
+            {
+              "type": "icontains",
+              "value": "stop"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 7,
+        "vars": {
+          "prompt": "[{\"role\":\"user\",\"content\":\"I have a sharp pain in my knee\"},{\"role\":\"assistant\",\"content\":\"I'm sorry to hear that. Can you provide more details about the location and intensity of the pain?\"},{\"role\":\"user\",\"content\":\"It's on the front of my knee, about a 7/10 when I squat.\"}]"
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 0
       }
     ],
     "stats": {
-      "successes": 7,
+      "successes": 8,
       "failures": 0,
       "errors": 0,
       "tokenUsage": {
@@ -1096,7 +1181,7 @@
         "completion": 0,
         "cached": 0,
         "total": 0,
-        "numRequests": 7,
+        "numRequests": 8,
         "completionDetails": {
           "reasoning": 0,
           "acceptedPrediction": 0,
@@ -1115,7 +1200,7 @@
           }
         }
       },
-      "durationMs": 215
+      "durationMs": 3403
     }
   },
   "config": {
@@ -1250,6 +1335,26 @@
             "value": "injury"
           }
         ]
+      },
+      {
+        "description": "Multi-turn Conversation (Injury Follow-up)",
+        "provider": {
+          "id": "file://promptfoo-chat-provider.js",
+          "transform": "file://promptfoo-transform.js"
+        },
+        "vars": {
+          "prompt": "[{\"role\":\"user\",\"content\":\"I have a sharp pain in my knee\"},{\"role\":\"assistant\",\"content\":\"I'm sorry to hear that. Can you provide more details about the location and intensity of the pain?\"},{\"role\":\"user\",\"content\":\"It's on the front of my knee, about a 7/10 when I squat.\"}]"
+        },
+        "assert": [
+          {
+            "type": "icontains",
+            "value": "professional"
+          },
+          {
+            "type": "icontains",
+            "value": "stop"
+          }
+        ]
       }
     ],
     "scenarios": [],
@@ -1267,7 +1372,7 @@
     "nodeVersion": "v25.2.1",
     "platform": "darwin",
     "arch": "x64",
-    "exportedAt": "2026-01-28T23:59:26.857Z",
-    "evaluationCreatedAt": "2026-01-28T23:59:26.542Z"
+    "exportedAt": "2026-01-29T00:11:15.959Z",
+    "evaluationCreatedAt": "2026-01-29T00:11:12.452Z"
   }
 }

@@ -15,6 +15,8 @@
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
     "test:all": "vitest run && playwright test",
+    "eval": "promptfoo eval -c promptfooconfig.js -o promptfoo-report-final-conversation.json",
+    "eval:history": "npm run eval && node json-to-csv.js",
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
