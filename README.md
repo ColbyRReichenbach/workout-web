@@ -105,4 +105,4 @@ npx promptfoo eval
 Production deployment is optimized for Vercel. Ensure all environment variables are correctly mapped in the Vercel Dashboard before deployment.
 
 ## License
-Distributed under the MIT License.
+Proprietary. All rights reserved. See [LICENSE](file:///Users/colbyreichenbach/Desktop/workout-web-2/LICENSE) for details.
