@@ -299,7 +299,7 @@ BEHAVIOR: Acknowledge effort. Use "We" statements. Push for consistency.
                 messages: sanitizedMessages as any,
                 maxSteps: 5,
                 tools: enabledTools,
-                onFinish: ({ text, toolCalls, toolResults, finishReason }) => {
+                onFinish: ({ text, toolCalls, toolResults, finishReason }: any) => {
                     console.log('[API/Chat] Stream finished:', {
                         finishReason,
                         hasText: !!text,
@@ -336,7 +336,7 @@ BEHAVIOR: Acknowledge effort. Use "We" statements. Push for consistency.
                         flagged
                     });
                 },
-            });
+            } as any);
 
             console.log('[API/Chat] streamText created. Converting to data stream response...');
 

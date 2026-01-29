@@ -45,13 +45,13 @@ export default function AiCoach() {
             console.error('[AiCoach] Error:', err);
             setLocalError(err.message || 'An error occurred. Please try again.');
         },
-        onFinish: ({ message }) => {
+        onFinish: ({ message }: { message: any }) => {
             console.log('[AiCoach] Message finished:', message.id);
             setLocalError(null);
             // Reset tag after use
             setActiveTag(null);
         },
-    });
+    } as any);
 
     const [profile, setProfile] = useState<AIProfile | null>(null);
 
@@ -118,24 +118,27 @@ export default function AiCoach() {
 
     // Extract displayable content from message
     const getMessageContent = (message: UIMessage): string => {
+        // Cast to any to bypass strict type checking for legacy/flexible fields
+        const m = message as any;
+
         // Log message for debugging
-        console.log(`[AiCoach] Processing message ${message.id}:`, {
-            role: message.role,
-            contentLength: message.content?.length,
-            partsCount: message.parts?.length,
-            toolInvocations: (message as any).toolInvocations?.length
+        console.log(`[AiCoach] Processing message ${m.id}:`, {
+            role: m.role,
+            contentLength: m.content?.length,
+            partsCount: m.parts?.length,
+            toolInvocations: m.toolInvocations?.length
         });
 
         // 1. Check for legacy/standard content property first
-        if (message.content) return message.content;
+        if (m.content) return m.content;
 
         // 2. Check parts array for text content (SDK v6+)
-        if (message.parts && Array.isArray(message.parts)) {
-            const textParts = message.parts
-                .filter((part): part is TextPart =>
-                    part.type === 'text' && typeof (part as TextPart).text === 'string'
+        if (m.parts && Array.isArray(m.parts)) {
+            const textParts = m.parts
+                .filter((part: any) =>
+                    part.type === 'text' && typeof part.text === 'string'
                 )
-                .map(part => part.text);
+                .map((part: any) => part.text);
 
             if (textParts.length > 0) {
                 return textParts.join('\n');
@@ -298,6 +301,9 @@ export default function AiCoach() {
                     <Send size={18} />
                 </button>
             </form>
+            <p className="text-[10px] text-muted-foreground/60 text-center mt-4 px-4 leading-tight">
+                Coach AI answers are AI Generated using user context. AI can get things wrong, always make sure to double check answers. For any medical advice please consult your primary care physician.
+            </p>
         </div>
     );
 }
