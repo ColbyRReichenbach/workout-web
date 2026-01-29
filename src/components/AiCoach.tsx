@@ -2,10 +2,11 @@
 
 import { useChat, type UIMessage } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
-import { Send, Bot, HeartPulse, AlertCircle } from 'lucide-react';
+import { Send, Bot, HeartPulse, AlertCircle, Flag } from 'lucide-react';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { DEMO_USER_ID } from '@/lib/constants';
+import ReportModal from './ReportModal';
 
 interface AIProfile {
     ai_name: string | null;
@@ -21,12 +22,15 @@ interface TextPart {
 export default function AiCoach() {
     const [localError, setLocalError] = useState<string | null>(null);
     const [inputValue, setInputValue] = useState('');
+    const [isReportOpen, setIsReportOpen] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     // Create transport once
     const transport = useMemo(() => new DefaultChatTransport({
         api: '/api/chat',
     }), []);
+
+    const [activeTag, setActiveTag] = useState<string | null>(null);
 
     const {
         messages,
@@ -36,17 +40,20 @@ export default function AiCoach() {
     } = useChat({
         transport,
         body: {
-            userDay: new Date().toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase()
+            userDay: new Date().toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase(),
+            intentTag: activeTag
         },
         onError: (err: Error) => {
             console.error('[AiCoach] Error:', err);
             setLocalError(err.message || 'An error occurred. Please try again.');
         },
-        onFinish: ({ message }) => {
+        onFinish: ({ message }: { message: any }) => {
             console.log('[AiCoach] Message finished:', message.id);
             setLocalError(null);
+            // Reset tag after use
+            setActiveTag(null);
         },
-    });
+    } as any);
 
     const [profile, setProfile] = useState<AIProfile | null>(null);
 
@@ -85,15 +92,23 @@ export default function AiCoach() {
     }, []);
 
     // Handle form submission
-    const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
-        if (!inputValue.trim() || isLoading) return;
+    const onSubmit = async (e?: React.FormEvent<HTMLFormElement>, text?: string, tag?: string) => {
+        if (e) e.preventDefault();
 
-        console.log('[AiCoach] Submitting message:', inputValue.substring(0, 50));
+        const messageText = text || inputValue;
+        if (!messageText.trim() || isLoading) return;
+
+        console.log('[AiCoach] Submitting message:', messageText.substring(0, 50));
         setLocalError(null);
 
-        const messageText = inputValue;
-        setInputValue('');
+        if (!text) setInputValue('');
+
+        // If tag is provided, set it before sending. 
+        // Note: With sendMessage, we might need a small delay or use a ref if state doesn't update fast enough,
+        // but let's try setting it and calling sendMessage.
+        if (tag) {
+            setActiveTag(tag);
+        }
 
         try {
             await sendMessage({ text: messageText });
@@ -105,24 +120,27 @@ export default function AiCoach() {
 
     // Extract displayable content from message
     const getMessageContent = (message: UIMessage): string => {
+        // Cast to any to bypass strict type checking for legacy/flexible fields
+        const m = message as any;
+
         // Log message for debugging
-        console.log(`[AiCoach] Processing message ${message.id}:`, {
-            role: message.role,
-            contentLength: message.content?.length,
-            partsCount: message.parts?.length,
-            toolInvocations: (message as any).toolInvocations?.length
+        console.log(`[AiCoach] Processing message ${m.id}:`, {
+            role: m.role,
+            contentLength: m.content?.length,
+            partsCount: m.parts?.length,
+            toolInvocations: m.toolInvocations?.length
         });
 
         // 1. Check for legacy/standard content property first
-        if (message.content) return message.content;
+        if (m.content) return m.content;
 
         // 2. Check parts array for text content (SDK v6+)
-        if (message.parts && Array.isArray(message.parts)) {
-            const textParts = message.parts
-                .filter((part): part is TextPart =>
-                    part.type === 'text' && typeof (part as TextPart).text === 'string'
+        if (m.parts && Array.isArray(m.parts)) {
+            const textParts = m.parts
+                .filter((part: any) =>
+                    part.type === 'text' && typeof part.text === 'string'
                 )
-                .map(part => part.text);
+                .map((part: any) => part.text);
 
             if (textParts.length > 0) {
                 return textParts.join('\n');
@@ -144,21 +162,92 @@ export default function AiCoach() {
         return content.length > 0;
     });
 
+    const lastAssistantMessage = [...displayableMessages].reverse().find(m => m.role === 'assistant');
+
+    /**
+     * Action Chips Component
+     */
+    const ActionChips = () => {
+        const suggestions = useMemo(() => {
+            if (!lastAssistantMessage) {
+                return [
+                    { label: "What's my workout today?", tag: "logistics" },
+                    { label: "How is my progress?", tag: "progress" }
+                ];
+            }
+
+            const content = getMessageContent(lastAssistantMessage).toLowerCase();
+
+            if (content.includes('injury') || content.includes('pain') || content.includes('hurt') || content.includes('regression')) {
+                return [
+                    { label: "Give me a regression", tag: "injury" },
+                    { label: "Why this substitution?", tag: "injury" },
+                    { label: "Show rest day tips", tag: "injury" }
+                ];
+            }
+
+            if (content.includes('workout') || content.includes('routine') || content.includes('exercise')) {
+                return [
+                    { label: "Give me a substitution", tag: "logistics" },
+                    { label: "Why this weight?", tag: "progress" },
+                    { label: "Log this session", tag: "logistics" }
+                ];
+            }
+
+            return [
+                { label: "Explain more", tag: "general" },
+                { label: "What's tomorrow?", tag: "logistics" }
+            ];
+        }, [lastAssistantMessage]);
+
+        if (isLoading) return null;
+
+        return (
+            <div className="flex flex-wrap gap-2 mb-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
+                {suggestions.map((s, i) => (
+                    <button
+                        key={i}
+                        onClick={() => onSubmit(undefined, s.label, s.tag)}
+                        className="px-4 py-2 rounded-full bg-muted border border-border text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:bg-foreground hover:text-background hover:border-foreground transition-all shadow-sm"
+                    >
+                        {s.label}
+                    </button>
+                ))}
+            </div>
+        );
+    };
+
     return (
-        <div className="flex flex-col h-full p-4">
+        <div className="flex flex-col h-full p-4 relative">
+            <ReportModal
+                isOpen={isReportOpen}
+                onClose={() => setIsReportOpen(false)}
+                messages={messages}
+            />
+
             {/* Header / Teaser */}
-            <div className="flex items-center gap-4 mb-8">
-                <div className="h-12 w-12 rounded-2xl bg-primary flex items-center justify-center shadow-2xl shadow-primary/20 transition-transform duration-200 hover:scale-105">
-                    <HeartPulse size={24} className="text-primary-foreground" />
+            <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-4">
+                    <div className="h-12 w-12 rounded-2xl bg-primary flex items-center justify-center shadow-2xl shadow-primary/20 transition-transform duration-200 hover:scale-105">
+                        <HeartPulse size={24} className="text-primary-foreground" />
+                    </div>
+                    <div>
+                        <h3 className="text-xl font-serif text-foreground italic">
+                            {profile?.ai_name || "ECHO-P1"}
+                        </h3>
+                        <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">
+                            {profile?.ai_personality ? `${profile.ai_personality} Intelligence` : "Protocol Intelligence"}
+                        </p>
+                    </div>
                 </div>
-                <div>
-                    <h3 className="text-xl font-serif text-foreground italic">
-                        {profile?.ai_name || "ECHO-P1"}
-                    </h3>
-                    <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">
-                        {profile?.ai_personality ? `${profile.ai_personality} Intelligence` : "Protocol Intelligence"}
-                    </p>
-                </div>
+
+                <button
+                    onClick={() => setIsReportOpen(true)}
+                    className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition-all"
+                    title="Report an issue"
+                >
+                    <Flag size={18} />
+                </button>
             </div>
 
             {/* Chat Area */}
@@ -210,8 +299,11 @@ export default function AiCoach() {
                 <div ref={messagesEndRef} />
             </div>
 
+            {/* Action Chips */}
+            <ActionChips />
+
             {/* Input Form */}
-            <form onSubmit={onSubmit} className="relative mt-auto">
+            <form onSubmit={(e) => onSubmit(e)} className="relative mt-auto">
                 <input
                     value={inputValue}
                     onChange={(e) => setInputValue(e.target.value)}
@@ -227,6 +319,9 @@ export default function AiCoach() {
                     <Send size={18} />
                 </button>
             </form>
+            <p className="text-[10px] text-muted-foreground/60 text-center mt-4 px-4 leading-tight">
+                Coach AI answers are AI Generated using user context. AI can get things wrong, always make sure to double check answers. For any medical advice please consult your primary care physician.
+            </p>
         </div>
     );
 }

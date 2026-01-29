@@ -15,6 +15,8 @@
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
     "test:all": "vitest run && playwright test",
+    "eval": "promptfoo eval -c eval/promptfooconfig.js -o promptfoo-report-final-conversation.json",
+    "eval:history": "npm run eval && node eval/json-to-csv.js",
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
@@ -57,6 +59,7 @@
     "happy-dom": "^20.3.1",
     "jsdom": "^27.4.0",
     "msw": "^2.12.7",
+    "promptfoo": "^0.120.18",
     "tailwindcss": "^4",
     "tw-animate-css": "^1.4.0",
     "typescript": "^5",

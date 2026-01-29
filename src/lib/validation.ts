@@ -384,16 +384,22 @@ export const chatMessageSchema = z.object({
         .string()
         .max(BOUNDS.MESSAGE_MAX_LENGTH, `Message cannot exceed ${BOUNDS.MESSAGE_MAX_LENGTH} characters`)
         .optional(),
-    // AI SDK v6 format: parts array
-    parts: z.array(messagePartSchema).optional(),
-}).refine(
-    (msg) => msg.content || (msg.parts && msg.parts.length > 0),
-    { message: 'Message must have either content or parts' }
+    // AI SDK v6 format: parts array - allowing any structure to support all part types (tool-call, image, etc.)
+    parts: z.array(z.any()).optional(),
+    // Support tool invocations and results
+    toolInvocations: z.array(z.any()).optional(),
+    toolCallId: z.string().optional(),
+    toolName: z.string().optional(),
+    result: z.any().optional(),
+}).passthrough().refine(
+    (msg) => msg.content || (msg.parts && msg.parts.length > 0) || (msg.toolInvocations && msg.toolInvocations.length > 0) || msg.role === 'tool' || msg.result !== undefined,
+    { message: 'Message must have content, parts, or tool data' }
 )
 
 export const chatRequestSchema = z.object({
     messages: z.array(chatMessageSchema).min(1).max(50),
     userDay: z.string().optional(), // Optional localized day (e.g., 'TUESDAY')
+    intentTag: z.string().nullable().optional(), // Force specific intent
 })
 
 /**

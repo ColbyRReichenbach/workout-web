@@ -7,8 +7,12 @@ import {
     logTokenUsage,
 } from './tokenUtils';
 
-// Types
 export type IntentType = 'INJURY' | 'PROGRESS' | 'LOGISTICS' | 'GENERAL';
+
+export interface Message {
+    role: 'user' | 'assistant' | 'system' | 'tool';
+    content: string;
+}
 
 export interface ContextPayload {
     intent: IntentType;
@@ -22,7 +26,7 @@ const KEYWORDS = {
     INJURY: [
         'hurt', 'pain', 'ache', 'injury', 'sore', 'swollen', 'tweak', 'snap', 'popped',
         'dizzy', 'faint', 'sick', 'ill', 'fever', 'click', 'pinch', 'sub', 'substitute',
-        'alternative', 'can i do', 'instead of'
+        'alternative', 'can i do', 'instead of', 'regression'
     ],
     PROGRESS: [
         'progress', 'trend', 'history', 'log', 'record', 'stats', 'data', 'biometric',
@@ -32,18 +36,21 @@ const KEYWORDS = {
     LOGISTICS: [
         'today', 'tomorrow', 'schedule', 'plan', 'routine', 'what do i do', 'warmup',
         'workout', 'superset', 'reps', 'sets', 'rest'
+    ],
+    CONTINUATION: [
+        'more', 'next', 'why', 'else', 'option', 'alternative', 'another', 'explain',
+        'tell me', 'how come', 'what about', 'regression'
     ]
 };
 
 /**
- * Detects the user's intent based on the latest message content.
- * Uses a heuristic keyword scoring system.
+ * Heuristic keyword scoring for a single message.
  */
-export function detectIntent(message: string): IntentType {
-    const content = message.toLowerCase();
+function calculateIntent(content: string): IntentType {
+    const text = content.toLowerCase();
 
     // 1. Safety/Injury checks (Highest Priority)
-    if (KEYWORDS.INJURY.some(k => content.includes(k))) {
+    if (KEYWORDS.INJURY.some(k => text.includes(k))) {
         return 'INJURY';
     }
 
@@ -51,13 +58,46 @@ export function detectIntent(message: string): IntentType {
     let progressScore = 0;
     let logisticsScore = 0;
 
-    KEYWORDS.PROGRESS.forEach(k => { if (content.includes(k)) progressScore++; });
-    KEYWORDS.LOGISTICS.forEach(k => { if (content.includes(k)) logisticsScore++; });
+    KEYWORDS.PROGRESS.forEach(k => { if (text.includes(k)) progressScore++; });
+    KEYWORDS.LOGISTICS.forEach(k => { if (text.includes(k)) logisticsScore++; });
 
     if (progressScore > 0 && progressScore >= logisticsScore) return 'PROGRESS';
     if (logisticsScore > 0 && logisticsScore > progressScore) return 'LOGISTICS';
 
     return 'GENERAL';
+}
+
+/**
+ * Detects the user's intent based on the conversational history.
+ * Handles "Conversational Continuations" by carrying over previous intent.
+ */
+export function detectIntent(messages: Message[]): IntentType {
+    if (!messages || messages.length === 0) return 'GENERAL';
+
+    const userMessages = messages.filter(m => m.role === 'user');
+    if (userMessages.length === 0) return 'GENERAL';
+
+    const lastUserMessage = userMessages[userMessages.length - 1].content;
+    const currentIntent = calculateIntent(lastUserMessage);
+
+    // If current intent is GENERAL, check if it's a follow-up to a previous specific intent
+    if (currentIntent === 'GENERAL') {
+        const text = lastUserMessage.toLowerCase();
+        const isFollowUp = KEYWORDS.CONTINUATION.some(k => text.includes(k)) || text.length < 20;
+
+        if (isFollowUp && userMessages.length > 1) {
+            // Traverse backwards through user messages to find the last specific intent
+            for (let i = userMessages.length - 2; i >= 0; i--) {
+                const prevIntent = calculateIntent(userMessages[i].content);
+                if (prevIntent !== 'GENERAL') {
+                    console.log(`[ContextRouter] Carry-over intent detected: ${prevIntent} (from follow-up: "${text}")`);
+                    return prevIntent;
+                }
+            }
+        }
+    }
+
+    return currentIntent;
 }
 
 /**
@@ -117,12 +157,12 @@ function createPhaseSummary(phaseContent: string): string {
 
 /**
  * Builds the dynamic context based on Intent and User State
- * Now with token limiting and optimization
  */
 export async function buildDynamicContext(
     intent: IntentType,
     currentPhase: number,
     currentWeek: number,
+    messages: Message[],
     providedUserDay?: string
 ): Promise<ContextPayload> {
 
@@ -140,16 +180,11 @@ export async function buildDynamicContext(
         };
     }
 
-    // Get Current Day (Prefer provided specialized day from client)
+    // Get Current Day
     const today = (providedUserDay || new Date().toLocaleDateString('en-US', { weekday: 'long' })).toUpperCase();
-
-    let specificContext = '';
-    let tools: string[] = [];
 
     // Phase extraction logic
     let targetPhase = currentPhase;
-    let actualWeek = currentWeek;
-
     // Phase 5 Special Logic: Re-entry to Phase 1 for non-testing weeks
     if (currentPhase === 5) {
         const TESTING_WEEKS = [37, 44, 51];
@@ -163,6 +198,32 @@ export async function buildDynamicContext(
     const phaseRegex = new RegExp(`(## PHASE ${targetPhase}[\\s\\S]*?)(?=## PHASE \\d|$)`, 'i');
     const phaseMatch = masterPlan.match(phaseRegex);
     const fullPhaseContent = phaseMatch ? phaseMatch[1] : '';
+
+    // EXTRACT CORE ROUTINE (PERMANENT KNOWLEDGE)
+    const dailyRoutineRaw = extractSection(fullPhaseContent, today);
+    const coreRoutineSnippet = dailyRoutineRaw
+        ? `### CORE ROUTINE - ${today} (Week ${currentWeek}, Phase ${currentPhase})\n${truncateToTokenLimit(extractExerciseList(dailyRoutineRaw), 500)}`
+        : `### STATUS - ${today} (Week ${currentWeek}, Phase ${currentPhase})\nRest or recovery focused day.`;
+
+    // EXTRACT RECENTLY DISCUSSED EXERCISES
+    const lastAssistantMessages = messages
+        .filter(m => m.role === 'assistant')
+        .slice(-2)
+        .map(m => m.content)
+        .join('\n');
+
+    // Simple heuristic to extract exercise-like lines from recent history
+    const recentExercises = lastAssistantMessages.split('\n')
+        .filter(line => line.trim().startsWith('-') || line.trim().match(/^\d+\./))
+        .slice(-5)
+        .join('\n');
+
+    const contextBuffer = recentExercises
+        ? `\n### RECENTLY DISCUSSED EXERCISES\n${recentExercises}\n`
+        : '';
+
+    let specificContext = '';
+    let tools: string[] = [];
 
     // Token budget per intent type (tokens)
     const TOKEN_BUDGETS = {
@@ -262,7 +323,12 @@ INSTRUCTION:
     }
 
     // Build final context
-    const systemPromptAdditions = specificContext.trim();
+    const systemPromptAdditions = `
+${coreRoutineSnippet}
+${contextBuffer}
+
+${specificContext}
+`.trim();
 
     // Log token usage
     const tokenEstimate = estimateTokens(systemPromptAdditions);

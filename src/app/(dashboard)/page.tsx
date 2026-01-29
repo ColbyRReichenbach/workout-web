@@ -9,6 +9,7 @@ import {
 import { DayCard, DayDetailModal } from "@/components/WeeklySchedule";
 import { TiltCard } from "@/components/TiltCard";
 import { SectionErrorBoundary } from "@/components/ErrorBoundary";
+import { ChatErrorBoundary } from "@/components/ChatErrorBoundary";
 import { BiometricsModal } from "@/components/BiometricsModal";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -451,9 +452,9 @@ export default function Home() {
 
           <div className="glass-card border border-white/40 rounded-[48px] p-2 h-[600px] shadow-2xl relative overflow-hidden group">
             <div className="absolute inset-0 bg-gradient-to-b from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
-            <SectionErrorBoundary name="AI Coach">
+            <ChatErrorBoundary>
               <AiCoach />
-            </SectionErrorBoundary>
+            </ChatErrorBoundary>
           </div>
         </div>
       </div>
