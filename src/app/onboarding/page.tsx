@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Ruler, Weight, Activity, ChevronRight, User, Globe, Bot, Dumbbell, Sparkles, CheckCircle2, Timer, Zap, ArrowRight } from "lucide-react";
+import { Ruler, Weight, Activity, ChevronRight, User, Globe, Bot, Dumbbell, Sparkles, CheckCircle2, Timer, Zap, ArrowRight, Scan, Heart, BatteryCharging } from "lucide-react";
+import { FloatingInput } from "@/components/FloatingInput";
 import { updateOnboardingData } from "@/app/actions/user";
 import { logout } from "@/app/actions/auth";
 import { useRouter } from "next/navigation";
@@ -135,12 +136,17 @@ export default function OnboardingPage() {
     };
 
     return (
-        <div className="min-h-screen bg-[#F5F5F4] flex flex-col items-center justify-center p-6 text-stone-900 font-sans relative overflow-hidden">
+        <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-foreground font-sans relative overflow-hidden">
 
-            {/* Background Atmosphere */}
-            <div className="absolute inset-0 pointer-events-none">
-                <div className="absolute top-1/4 -left-20 w-[600px] h-[600px] bg-rose-500/5 blur-[128px] rounded-full" />
-                <div className="absolute bottom-1/4 -right-20 w-[600px] h-[600px] bg-rose-500/5 blur-[128px] rounded-full" />
+            {/* Background Atmosphere - Matched to Dashboard */}
+            <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-[2px] bg-primary/40 shadow-[0_0_24px_rgba(239,68,68,0.8)] scan-line" />
+                <div className="absolute inset-0 bg-carbon-fibre" />
+                <div className="absolute inset-0 bg-primary/5 animate-biometric-flicker" />
+
+                {/* Original Ambient Orbs - Retained but softened */}
+                <div className="absolute top-1/4 -left-20 w-[600px] h-[600px] bg-primary/10 blur-[128px] rounded-full" />
+                <div className="absolute bottom-1/4 -right-20 w-[600px] h-[600px] bg-primary/10 blur-[128px] rounded-full" />
             </div>
 
             <form
@@ -168,61 +174,67 @@ export default function OnboardingPage() {
                         <motion.div key="step1" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -30 }} className="space-y-10">
                             <div className="text-center space-y-6">
                                 <div className="relative mx-auto w-20 h-20">
-                                    <User size={32} className="text-stone-900 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
-                                    <div className="absolute inset-0 bg-rose-500/20 blur-2xl rounded-full animate-pulse" />
+                                    <User size={32} className="text-foreground absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+                                    <div className="absolute inset-0 bg-primary/20 blur-2xl rounded-full animate-pulse" />
                                 </div>
-                                <h1 className="text-5xl font-serif text-stone-900 tracking-tight">Identity.</h1>
+                                <h1 className="text-5xl font-serif text-foreground tracking-tight">Identity.</h1>
                             </div>
-                            <input
-                                type="text"
-                                placeholder="Enter your name"
+                            <FloatingInput
+                                label="Your Name"
                                 value={formState.full_name}
                                 onChange={(e) => updateField('full_name', e.target.value)}
-                                className="w-full bg-transparent text-3xl font-serif text-stone-900 text-center outline-none placeholder:text-stone-200"
-                                autoFocus
                                 onKeyDown={(e) => e.key === 'Enter' && formState.full_name && setStep(2)}
                             />
-                            <button type="button" onClick={() => setStep(2)} className="w-full bg-stone-900 text-white h-16 rounded-2xl font-bold">Next</button>
+
+                            <motion.div
+                                className="absolute top-0 right-0 p-4 opacity-50"
+                                animate={{ opacity: [0.3, 0.6, 0.3] }}
+                                transition={{ duration: 2, repeat: Infinity }}
+                            >
+                                <Scan size={140} className="text-rose-200" strokeWidth={0.5} />
+                            </motion.div>
+
+                            <button type="button" onClick={() => setStep(2)} className="w-full bg-primary text-primary-foreground h-16 rounded-2xl font-bold mt-10 shadow-xl shadow-primary/20 btn-pro">Next Step</button>
                         </motion.div>
                     )}
 
                     {step === 2 && (
                         <motion.div key="step2" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -30 }} className="space-y-10">
-                            <h2 className="text-4xl font-serif text-center text-stone-900 italic">Measurement Protocol</h2>
+                            <h2 className="text-4xl font-serif text-center text-foreground italic">Measurement Protocol</h2>
                             <div className="grid grid-cols-2 gap-4">
                                 {(['imperial', 'metric'] as const).map((mode) => (
-                                    <button key={mode} type="button" onClick={() => setUnits(mode)} className={`p-10 rounded-3xl border ${units === mode ? "bg-white border-rose-500/30" : "bg-transparent border-transparent"}`}>
+                                    <button key={mode} type="button" onClick={() => setUnits(mode)} className={`p-10 rounded-3xl border flex items-center justify-center transition-all ${units === mode ? "bg-card border-primary/30 text-primary" : "bg-transparent border-transparent text-muted-foreground hover:bg-card/50"}`}>
                                         <span className="text-xl font-serif capitalize">{mode}</span>
                                     </button>
                                 ))}
                             </div>
-                            <button type="button" onClick={() => setStep(3)} className="w-full bg-stone-900 text-white h-16 rounded-2xl font-bold">Next</button>
+                            <button type="button" onClick={() => setStep(3)} className="w-full bg-primary text-primary-foreground h-16 rounded-2xl font-bold btn-pro">Next</button>
                         </motion.div>
                     )}
 
                     {step === 3 && (
                         <motion.div key="step3" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -30 }} className="space-y-10">
-                            <h2 className="text-4xl font-serif text-center text-stone-900 italic">Physical Baseline</h2>
+                            <h2 className="text-4xl font-serif text-center text-foreground italic">Physical Baseline</h2>
                             <div className="space-y-6">
-                                <div className="bg-white p-6 rounded-3xl flex items-center justify-between">
-                                    <label className="text-xs font-bold text-stone-400 uppercase tracking-widest">Height</label>
+                                <div className="glass-card p-6 rounded-3xl flex items-center justify-between">
+                                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Height</label>
                                     {units === 'imperial' ? (
                                         <div className="flex gap-2">
-                                            <input type="number" placeholder="6" value={formState.height_ft} onChange={e => updateField('height_ft', e.target.value)} className="w-12 text-2xl font-serif text-right outline-none" />
-                                            <span className="text-stone-300 text-2xl font-serif">'</span>
-                                            <input type="number" placeholder="2" value={formState.height_in} onChange={e => updateField('height_in', e.target.value)} className="w-12 text-2xl font-serif text-right outline-none" />
-                                            <span className="text-stone-300 text-2xl font-serif">"</span>
+                                            <input type="number" placeholder="6" value={formState.height_ft} onChange={e => updateField('height_ft', e.target.value)} className="w-12 text-2xl font-serif text-right outline-none bg-transparent text-foreground placeholder-muted-foreground/30" />
+                                            <span className="text-muted-foreground text-2xl font-serif">'</span>
+                                            <input type="number" placeholder="2" value={formState.height_in} onChange={e => updateField('height_in', e.target.value)} className="w-12 text-2xl font-serif text-right outline-none bg-transparent text-foreground placeholder-muted-foreground/30" />
+                                            <span className="text-muted-foreground text-2xl font-serif">"</span>
                                         </div>
                                     ) : (
-                                        <input type="number" placeholder="185" value={formState.height_cm} onChange={e => updateField('height_cm', e.target.value)} className="w-24 text-2xl font-serif text-right outline-none" />
+                                        <input type="number" placeholder="185" value={formState.height_cm} onChange={e => updateField('height_cm', e.target.value)} className="w-24 text-2xl font-serif text-right outline-none bg-transparent text-foreground placeholder-muted-foreground/30" />
                                     )}
                                 </div>
-                                <div className="bg-white p-6 rounded-3xl flex items-center justify-between">
-                                    <label className="text-xs font-bold text-stone-400 uppercase tracking-widest">Weight</label>
-                                    <input type="number" placeholder={units === 'imperial' ? "195" : "88"} value={formState.weight} onChange={e => updateField('weight', e.target.value)} className="w-24 text-2xl font-serif text-right outline-none" />
+                                <div className="glass-card p-6 rounded-3xl flex items-center justify-between">
+                                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Weight</label>
+                                    <input type="number" placeholder={units === 'imperial' ? "195" : "88"} value={formState.weight} onChange={e => updateField('weight', e.target.value)} className="w-24 text-2xl font-serif text-right outline-none bg-transparent text-foreground placeholder-muted-foreground/30" />
                                 </div>
                             </div>
-                            <button type="button" onClick={() => setStep(4)} className="w-full bg-stone-900 text-white h-16 rounded-2xl font-bold">Next</button>
+                            <button type="button" onClick={() => setStep(4)} className="w-full bg-primary text-primary-foreground h-16 rounded-2xl font-bold btn-pro">Next</button>
                         </motion.div>
                     )}
 
@@ -230,8 +242,8 @@ export default function OnboardingPage() {
                     {step === 4 && subStep === 'SELECTION' && (
                         <motion.div key="step4-select" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -30 }} className="space-y-8">
                             <div className="text-center space-y-2">
-                                <h2 className="text-4xl font-serif text-stone-900 italic">Performance Matrix</h2>
-                                <p className="text-stone-400 text-[10px] uppercase tracking-[0.3em] font-bold">Select the modalities you track</p>
+                                <h2 className="text-4xl font-serif text-foreground italic">Performance Matrix</h2>
+                                <p className="text-muted-foreground text-[10px] uppercase tracking-[0.3em] font-bold">Select the modalities you track</p>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 {[
@@ -244,14 +256,14 @@ export default function OnboardingPage() {
                                         key={cat.id}
                                         type="button"
                                         onClick={() => toggleCategory(cat.id)}
-                                        className={`p-6 rounded-3xl border flex flex-col items-center gap-3 transition-all ${selectedCategories.includes(cat.id) ? "bg-rose-50 border-rose-500/30 text-rose-700" : "bg-white border-transparent text-stone-400 hover:bg-stone-50"}`}
+                                        className={`p-6 rounded-3xl border flex flex-col items-center gap-3 transition-all ${selectedCategories.includes(cat.id) ? "bg-primary/5 border-primary/30 text-primary" : "glass-card border-transparent text-muted-foreground hover:bg-card/80"}`}
                                     >
                                         <cat.icon size={24} />
                                         <span className="text-sm font-bold">{cat.label}</span>
                                     </button>
                                 ))}
                             </div>
-                            <button type="button" onClick={() => setSubStep('INPUT')} className="w-full bg-stone-900 text-white h-16 rounded-2xl font-bold flex items-center justify-center gap-2">
+                            <button type="button" onClick={() => setSubStep('INPUT')} className="w-full bg-primary text-primary-foreground h-16 rounded-2xl font-bold flex items-center justify-center gap-2 btn-pro">
                                 Enter Known Maxes <ChevronRight size={18} />
                             </button>
                         </motion.div>
@@ -260,53 +272,97 @@ export default function OnboardingPage() {
                     {step === 4 && subStep === 'INPUT' && (
                         <motion.div key="step4-input" initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -50 }} className="space-y-8">
                             <div className="text-center">
-                                <h2 className="text-3xl font-serif text-stone-900 italic">Input Data</h2>
-                                <p className="text-stone-400 text-[10px] uppercase tracking-[0.2em] font-bold">Leave blank if unknown</p>
+                                <h2 className="text-3xl font-serif text-foreground italic">Input Data</h2>
+                                <p className="text-muted-foreground text-[10px] uppercase tracking-[0.2em] font-bold">Leave blank if unknown</p>
                             </div>
 
-                            <div className="space-y-6 max-h-[50vh] overflow-y-auto pr-2">
+                            <div className="space-y-6 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
                                 {/* Always show Squat/Bench as anchors */}
-                                <div className="space-y-3">
-                                    <h3 className="text-xs font-bold text-stone-400 uppercase tracking-widest pl-2">Primary Anchors</h3>
-                                    <div className="grid grid-cols-1 gap-3">
-                                        <input type="number" placeholder="Back Squat" value={formState.squat_max} onChange={e => updateField('squat_max', e.target.value)} className="w-full p-4 rounded-2xl bg-white border border-stone-100 text-lg outline-none focus:border-rose-200" />
-                                        <input type="number" placeholder="Bench Press" value={formState.bench_max} onChange={e => updateField('bench_max', e.target.value)} className="w-full p-4 rounded-2xl bg-white border border-stone-100 text-lg outline-none focus:border-rose-200" />
+                                <div className="space-y-4">
+                                    <div className="flex items-center gap-2 pl-1 mb-2">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                                        <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Primary Anchors</h3>
+                                        <motion.div
+                                            animate={{ rotate: [-10, 10, -10] }}
+                                            transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                                            className="ml-auto opacity-20"
+                                        >
+                                            <Weight size={24} className="text-foreground" />
+                                        </motion.div>
+                                    </div>
+                                    <div className="grid grid-cols-1 gap-4">
+                                        <FloatingInput label="Back Squat" type="number" value={formState.squat_max} onChange={e => updateField('squat_max', e.target.value)} />
+                                        <FloatingInput label="Bench Press" type="number" value={formState.bench_max} onChange={e => updateField('bench_max', e.target.value)} />
                                     </div>
                                 </div>
 
-                                {selectedCategories.includes('strength') && (
-                                    <div className="space-y-3">
-                                        <h3 className="text-xs font-bold text-stone-400 uppercase tracking-widest pl-2">Secondary Strength</h3>
-                                        <input type="number" placeholder="Deadlift" value={formState.deadlift_max} onChange={e => updateField('deadlift_max', e.target.value)} className="w-full p-4 rounded-2xl bg-white border border-stone-100 text-lg outline-none" />
-                                        <input type="number" placeholder="Overhead Press" value={formState.ohp_max} onChange={e => updateField('ohp_max', e.target.value)} className="w-full p-4 rounded-2xl bg-white border border-stone-100 text-lg outline-none" />
-                                    </div>
-                                )}
+                                <AnimatePresence>
+                                    {selectedCategories.includes('strength') && (
+                                        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="space-y-4">
+                                            <div className="flex items-center gap-2 pl-1 mb-2">
+                                                <Dumbbell size={14} className="text-muted-foreground" />
+                                                <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Secondary Strength</h3>
+                                            </div>
+                                            <FloatingInput label="Deadlift" type="number" value={formState.deadlift_max} onChange={e => updateField('deadlift_max', e.target.value)} />
+                                            <FloatingInput label="Overhead Press" type="number" value={formState.ohp_max} onChange={e => updateField('ohp_max', e.target.value)} />
+                                        </motion.div>
+                                    )}
 
-                                {selectedCategories.includes('olympic') && (
-                                    <div className="space-y-3">
-                                        <h3 className="text-xs font-bold text-stone-400 uppercase tracking-widest pl-2">Olympic Lifts</h3>
-                                        <input type="number" placeholder="Clean & Jerk" value={formState.clean_jerk_max} onChange={e => updateField('clean_jerk_max', e.target.value)} className="w-full p-4 rounded-2xl bg-white border border-stone-100 text-lg outline-none" />
-                                        <input type="number" placeholder="Snatch" value={formState.snatch_max} onChange={e => updateField('snatch_max', e.target.value)} className="w-full p-4 rounded-2xl bg-white border border-stone-100 text-lg outline-none" />
-                                        <input type="number" placeholder="Front Squat" value={formState.front_squat_max} onChange={e => updateField('front_squat_max', e.target.value)} className="w-full p-4 rounded-2xl bg-white border border-stone-100 text-lg outline-none" />
-                                    </div>
-                                )}
+                                    {selectedCategories.includes('olympic') && (
+                                        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="space-y-4">
+                                            <div className="flex items-center gap-2 pl-1 mb-2">
+                                                <Activity size={14} className="text-muted-foreground" />
+                                                <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Olympic Lifts</h3>
+                                            </div>
+                                            <FloatingInput label="Clean & Jerk" type="number" value={formState.clean_jerk_max} onChange={e => updateField('clean_jerk_max', e.target.value)} />
+                                            <FloatingInput label="Snatch" type="number" value={formState.snatch_max} onChange={e => updateField('snatch_max', e.target.value)} />
+                                            <FloatingInput label="Front Squat" type="number" value={formState.front_squat_max} onChange={e => updateField('front_squat_max', e.target.value)} />
+                                        </motion.div>
+                                    )}
 
-                                {selectedCategories.includes('cardio') && (
-                                    <div className="space-y-3">
-                                        <h3 className="text-xs font-bold text-stone-400 uppercase tracking-widest pl-2">Endurance (mm:ss)</h3>
-                                        <input type="text" placeholder="1 Mile Run (e.g. 6:30)" value={formState.mile_time} onChange={e => updateField('mile_time', e.target.value)} className="w-full p-4 rounded-2xl bg-white border border-stone-100 text-lg outline-none" />
-                                        <input type="text" placeholder="2k Row (e.g. 7:15)" value={formState.row_2k} onChange={e => updateField('row_2k', e.target.value)} className="w-full p-4 rounded-2xl bg-white border border-stone-100 text-lg outline-none" />
-                                    </div>
-                                )}
+                                    {selectedCategories.includes('cardio') && (
+                                        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="space-y-4">
+                                            <div className="flex items-center gap-2 pl-1 mb-2">
+                                                <Heart size={14} className="text-muted-foreground" />
+                                                <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Endurance (mm:ss)</h3>
+                                                <motion.svg viewBox="0 0 50 15" className="w-12 h-4 ml-auto text-primary opacity-50">
+                                                    <motion.path
+                                                        d="M0 7.5 H10 L15 0 L20 15 L25 7.5 H50"
+                                                        fill="none"
+                                                        stroke="currentColor"
+                                                        strokeWidth="2"
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                        initial={{ pathLength: 0, opacity: 0 }}
+                                                        animate={{ pathLength: 1, opacity: 1 }}
+                                                        transition={{ duration: 1.5, repeat: Infinity, repeatDelay: 0.5 }}
+                                                    />
+                                                </motion.svg>
+                                            </div>
+                                            <FloatingInput label="1 Mile Run" type="text" value={formState.mile_time} onChange={e => updateField('mile_time', e.target.value)} />
+                                            <FloatingInput label="2k Row" type="text" value={formState.row_2k} onChange={e => updateField('row_2k', e.target.value)} />
+                                        </motion.div>
+                                    )}
 
-                                {selectedCategories.includes('power') && (
-                                    <div className="space-y-3">
-                                        <h3 className="text-xs font-bold text-stone-400 uppercase tracking-widest pl-2">Power Output</h3>
-                                        <input type="number" placeholder="Max Watts (Air Bike)" value={formState.bike_max_watts} onChange={e => updateField('bike_max_watts', e.target.value)} className="w-full p-4 rounded-2xl bg-white border border-stone-100 text-lg outline-none" />
-                                    </div>
-                                )}
+                                    {selectedCategories.includes('power') && (
+                                        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="space-y-4">
+                                            <div className="flex items-center gap-2 pl-1 mb-2">
+                                                <BatteryCharging size={14} className="text-muted-foreground" />
+                                                <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Power Output</h3>
+                                                <motion.div
+                                                    animate={{ opacity: [0.3, 1, 0.3], scale: [0.9, 1.1, 0.9] }}
+                                                    transition={{ duration: 2, repeat: Infinity }}
+                                                    className="ml-auto text-yellow-500 opacity-50"
+                                                >
+                                                    <Zap size={18} fill="currentColor" />
+                                                </motion.div>
+                                            </div>
+                                            <FloatingInput label="Max Watts (Air Bike)" type="number" value={formState.bike_max_watts} onChange={e => updateField('bike_max_watts', e.target.value)} />
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
                             </div>
-                            <button type="button" onClick={() => setSubStep('REVEAL')} className="w-full bg-stone-900 text-white h-16 rounded-2xl font-bold flex items-center justify-center gap-2">
+                            <button type="button" onClick={() => setSubStep('REVEAL')} className="w-full bg-primary text-primary-foreground h-16 rounded-2xl font-bold flex items-center justify-center gap-2 btn-pro">
                                 Calibrate Profile <Sparkles size={18} />
                             </button>
                         </motion.div>
@@ -316,20 +372,20 @@ export default function OnboardingPage() {
                     {step === 4 && subStep === 'REVEAL' && (
                         <motion.div key="step4-reveal" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
                             <div className="text-center space-y-2">
-                                <div className="inline-flex items-center gap-2 bg-rose-100 text-rose-600 px-4 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest mb-4">
+                                <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest mb-4">
                                     <Zap size={12} fill="currentColor" /> Pulse Intelligence Active
                                 </div>
-                                <h2 className="text-3xl font-serif text-stone-900 italic">Profile Calibrated</h2>
-                                <p className="text-stone-400 text-sm max-w-sm mx-auto">
+                                <h2 className="text-3xl font-serif text-foreground italic">Profile Calibrated</h2>
+                                <p className="text-muted-foreground text-sm max-w-sm mx-auto">
                                     We've filled in the missing gaps using your anchors.
                                     <br />This ensures your first workout is optimized.
                                 </p>
                             </div>
 
-                            <div className="bg-white rounded-[32px] p-6 shadow-sm border border-stone-100 space-y-4">
-                                <div className="flex justify-between items-center border-b border-stone-100 pb-4">
-                                    <span className="text-xs font-bold text-stone-400 uppercase tracking-widest">Metric</span>
-                                    <span className="text-xs font-bold text-stone-400 uppercase tracking-widest">Value</span>
+                            <div className="glass-card rounded-[32px] p-6 shadow-sm border border-border space-y-4">
+                                <div className="flex justify-between items-center border-b border-white/5 pb-4">
+                                    <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Metric</span>
+                                    <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Value</span>
                                 </div>
                                 {/* Show a few key examples */}
                                 {[
@@ -339,16 +395,16 @@ export default function OnboardingPage() {
                                     { label: 'Bike Watts', val: estimatedProfile?.bike_max_watts, isEst: !formState.bike_max_watts },
                                 ].map(item => (
                                     <div key={item.label} className="flex justify-between items-center">
-                                        <span className="text-stone-600 font-medium">{item.label}</span>
+                                        <span className="text-foreground/80 font-medium">{item.label}</span>
                                         <div className="flex items-center gap-2">
-                                            <span className="font-serif text-xl text-stone-900">{item.val || '-'}</span>
-                                            {item.isEst && <span className="text-[9px] font-bold text-rose-500 bg-rose-50 px-1.5 py-0.5 rounded">EST</span>}
+                                            <span className="font-serif text-xl text-foreground">{item.val || '-'}</span>
+                                            {item.isEst && <span className="text-[9px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded">EST</span>}
                                         </div>
                                     </div>
                                 ))}
                             </div>
 
-                            <button type="button" onClick={() => setStep(5)} className="w-full bg-stone-900 text-white h-16 rounded-2xl font-bold flex items-center justify-center gap-2">
+                            <button type="button" onClick={() => setStep(5)} className="w-full bg-primary text-primary-foreground h-16 rounded-2xl font-bold flex items-center justify-center gap-2 btn-pro">
                                 Finalize Setup <ArrowRight size={18} />
                             </button>
                         </motion.div>
@@ -359,20 +415,20 @@ export default function OnboardingPage() {
                     {step === 5 && (
                         <motion.div key="step5" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
                             <div className="text-center">
-                                <h2 className="text-4xl font-serif text-stone-900 italic">Pulse Agent</h2>
-                                <p className="text-stone-400 text-[10px] uppercase tracking-[0.3em] font-bold">Your digital coach</p>
+                                <h2 className="text-4xl font-serif text-foreground italic">Pulse Agent</h2>
+                                <p className="text-muted-foreground text-[10px] uppercase tracking-[0.3em] font-bold">Your digital coach</p>
                             </div>
                             <div className="space-y-4">
-                                <input type="text" placeholder="Agent Name (e.g. ECHO)" value={formState.ai_name} onChange={e => updateField('ai_name', e.target.value)} className="w-full p-6 text-center text-3xl font-serif bg-white rounded-[32px] outline-none" />
+                                <input type="text" placeholder="Agent Name (e.g. ECHO)" value={formState.ai_name} onChange={e => updateField('ai_name', e.target.value)} className="w-full p-6 text-center text-3xl font-serif glass-card rounded-[32px] outline-none text-foreground placeholder-muted-foreground/30" />
                                 <div className="grid grid-cols-2 gap-3">
                                     {['Stoic', 'Motivational', 'Clinical', 'Direct'].map(p => (
-                                        <button key={p} type="button" onClick={() => updateField('ai_personality', p)} className={`p-4 rounded-xl border text-sm font-bold uppercase tracking-widest ${formState.ai_personality === p ? "bg-rose-600 text-white border-rose-600" : "bg-white text-stone-400"}`}>
+                                        <button key={p} type="button" onClick={() => updateField('ai_personality', p)} className={`p-4 rounded-xl border text-sm font-bold uppercase tracking-widest ${formState.ai_personality === p ? "bg-primary text-primary-foreground border-primary" : "glass-card text-muted-foreground hover:bg-card/80 border-transparent"}`}>
                                             {p}
                                         </button>
                                     ))}
                                 </div>
                             </div>
-                            <button type="submit" className="w-full bg-rose-600 text-white h-20 rounded-[32px] font-bold text-lg shadow-xl shadow-rose-600/20">
+                            <button type="submit" className="w-full bg-primary text-primary-foreground h-20 rounded-[32px] font-bold text-lg shadow-xl shadow-primary/20 btn-pro">
                                 Initialize System
                             </button>
                         </motion.div>

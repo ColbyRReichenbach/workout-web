@@ -81,8 +81,12 @@ export async function middleware(request: NextRequest) {
     }
 
     // LOGIN / ONBOARDING PAGE
-    // If user is already logged in OR is guest, redirect to home/dashboard
-    if ((user || isGuest) && (request.nextUrl.pathname.startsWith('/login') || request.nextUrl.pathname.startsWith('/onboarding'))) {
+    // If user is already logged in, redirect to home
+    // If guest, allow /onboarding but redirect from /login
+    if (user && (request.nextUrl.pathname.startsWith('/login') || request.nextUrl.pathname.startsWith('/onboarding'))) {
+        return NextResponse.redirect(new URL('/', request.url))
+    }
+    if (isGuest && request.nextUrl.pathname.startsWith('/login')) {
         return NextResponse.redirect(new URL('/', request.url))
     }
 
