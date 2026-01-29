@@ -254,5 +254,13 @@ local.properties
 
 
 # ============================================================================
+# 🤖 AI & EVALUATION (Local Data)
+# ============================================================================
+promptfoo-report.json
+promptfoo-report-final-conversation.json
+eval-history/
+# Removed root IMPLEMENTATION_PLAN.md (moved to docs/)
+
+# ============================================================================
 # END OF GITIGNORE
 # ============================================================================
