@@ -280,10 +280,35 @@ export interface RequestLogData {
     error?: string;
 }
 
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+const SHOULD_LOG_REQUESTS =
+    !IS_PRODUCTION || process.env.REQUEST_LOGGING_ENABLED === 'true';
+const SHOULD_LOG_INTERACTIONS =
+    !IS_PRODUCTION || process.env.AUDIT_LOGGING_ENABLED === 'true';
+const MAX_LOGGED_TEXT_LENGTH = 500;
+
+function truncateLogText(text: string): string {
+    if (text.length <= MAX_LOGGED_TEXT_LENGTH) {
+        return text;
+    }
+    return `${text.slice(0, MAX_LOGGED_TEXT_LENGTH)}…[truncated]`;
+}
+
+function sanitizeLogText(text: string): string {
+    const redacted = text
+        .replace(/[\w.-]+@[\w.-]+\.\w+/g, '[EMAIL]')
+        .replace(/\+?\d[\d\s().-]{7,}\d/g, '[PHONE]');
+    return truncateLogText(redacted);
+}
+
 /**
  * Log API request with structured format
  */
 export function logRequest(data: RequestLogData): void {
+    if (!SHOULD_LOG_REQUESTS) {
+        return;
+    }
+
     const logEntry = {
         timestamp: new Date().toISOString(),
         ...data,
@@ -314,12 +339,17 @@ export interface InteractionLogData {
  * Log full interaction for audit trail and dataset generation
  */
 export function logInteraction(data: InteractionLogData): void {
+    if (!SHOULD_LOG_INTERACTIONS) {
+        return;
+    }
+
     const logEntry = {
         type: 'INTERACTION_AUDIT',
         timestamp: new Date().toISOString(),
         ...data,
         // Simple PII redaction (email-like patterns)
-        userMessage: data.userMessage.replace(/[\w.-]+@[\w.-]+\.\w+/g, '[EMAIL]'),
+        userMessage: sanitizeLogText(data.userMessage),
+        aiResponse: data.aiResponse ? sanitizeLogText(data.aiResponse) : undefined,
     };
 
     console.log('[AUDIT]', JSON.stringify(logEntry));
