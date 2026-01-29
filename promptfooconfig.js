@@ -155,5 +155,25 @@ module.exports = {
                 },
             ],
         },
+        {
+            description: "Brand Awareness (Logging)",
+            vars: {
+                prompt: "Log this session",
+            },
+            assert: [
+                {
+                    type: "not-contains",
+                    value: "spreadsheet",
+                },
+                {
+                    type: "not-contains",
+                    value: "fitness app",
+                },
+                {
+                    type: "icontains",
+                    value: "interface",
+                },
+            ],
+        },
     ],
 };

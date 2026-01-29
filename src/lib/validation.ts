@@ -384,8 +384,8 @@ export const chatMessageSchema = z.object({
         .string()
         .max(BOUNDS.MESSAGE_MAX_LENGTH, `Message cannot exceed ${BOUNDS.MESSAGE_MAX_LENGTH} characters`)
         .optional(),
-    // AI SDK v6 format: parts array
-    parts: z.array(messagePartSchema).optional(),
+    // AI SDK v6 format: parts array - allowing any structure to support all part types (tool-call, image, etc.)
+    parts: z.array(z.any()).optional(),
     // Support tool invocations and results
     toolInvocations: z.array(z.any()).optional(),
     toolCallId: z.string().optional(),

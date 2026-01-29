@@ -2,10 +2,11 @@
 
 import { useChat, type UIMessage } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
-import { Send, Bot, HeartPulse, AlertCircle } from 'lucide-react';
+import { Send, Bot, HeartPulse, AlertCircle, Flag } from 'lucide-react';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { DEMO_USER_ID } from '@/lib/constants';
+import ReportModal from './ReportModal';
 
 interface AIProfile {
     ai_name: string | null;
@@ -21,6 +22,7 @@ interface TextPart {
 export default function AiCoach() {
     const [localError, setLocalError] = useState<string | null>(null);
     const [inputValue, setInputValue] = useState('');
+    const [isReportOpen, setIsReportOpen] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     // Create transport once
@@ -216,20 +218,36 @@ export default function AiCoach() {
     };
 
     return (
-        <div className="flex flex-col h-full p-4">
+        <div className="flex flex-col h-full p-4 relative">
+            <ReportModal
+                isOpen={isReportOpen}
+                onClose={() => setIsReportOpen(false)}
+                messages={messages}
+            />
+
             {/* Header / Teaser */}
-            <div className="flex items-center gap-4 mb-8">
-                <div className="h-12 w-12 rounded-2xl bg-primary flex items-center justify-center shadow-2xl shadow-primary/20 transition-transform duration-200 hover:scale-105">
-                    <HeartPulse size={24} className="text-primary-foreground" />
+            <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-4">
+                    <div className="h-12 w-12 rounded-2xl bg-primary flex items-center justify-center shadow-2xl shadow-primary/20 transition-transform duration-200 hover:scale-105">
+                        <HeartPulse size={24} className="text-primary-foreground" />
+                    </div>
+                    <div>
+                        <h3 className="text-xl font-serif text-foreground italic">
+                            {profile?.ai_name || "ECHO-P1"}
+                        </h3>
+                        <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">
+                            {profile?.ai_personality ? `${profile.ai_personality} Intelligence` : "Protocol Intelligence"}
+                        </p>
+                    </div>
                 </div>
-                <div>
-                    <h3 className="text-xl font-serif text-foreground italic">
-                        {profile?.ai_name || "ECHO-P1"}
-                    </h3>
-                    <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">
-                        {profile?.ai_personality ? `${profile.ai_personality} Intelligence` : "Protocol Intelligence"}
-                    </p>
-                </div>
+
+                <button
+                    onClick={() => setIsReportOpen(true)}
+                    className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition-all"
+                    title="Report an issue"
+                >
+                    <Flag size={18} />
+                </button>
             </div>
 
             {/* Chat Area */}
