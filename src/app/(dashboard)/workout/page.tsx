@@ -179,10 +179,18 @@ export default function WorkoutPage() {
     };
 
     const calcWeight = (segmentName: string, percent: number) => {
-        if (!profile) return 0;
-        const targetLbs = calculateWorkingSet(segmentName, percent, profile);
-        if (units === 'metric') return Math.round((targetLbs * 0.453592) / 2.5) * 2.5;
-        return Math.round(targetLbs / 5) * 5;
+        if (!profile) return { weight: 0, isEstimate: false, needsCalibration: true };
+        const result = calculateWorkingSet(segmentName, percent, profile);
+
+        // Normalize for units
+        let displayWeight = result.weight;
+        if (units === 'metric') {
+            displayWeight = Math.round((result.weight * 0.453592) / 2.5) * 2.5;
+        } else {
+            displayWeight = Math.round(result.weight / 5) * 5;
+        }
+
+        return { ...result, weight: displayWeight };
     };
 
     const estimate1RM = (weight: number, reps: number) => Math.round(weight / (1.0278 - (0.0278 * reps)));
@@ -327,6 +335,14 @@ export default function WorkoutPage() {
         setLoggedSegments(prev => { const updated = new Set([...prev]); updated.delete(idx); return updated; });
     };
 
+    const workoutStatus = segments.reduce((acc, s) => {
+        if (!s.target?.percent_1rm) return acc;
+        const res = calcWeight(s.name, s.target.percent_1rm);
+        if (res.needsCalibration) acc.needsCalibration = true;
+        if (res.isEstimate) acc.hasEstimates = true;
+        return acc;
+    }, { needsCalibration: false, hasEstimates: false });
+
     if (loading) return <div className="flex h-[60vh] items-center justify-center text-muted-foreground font-serif animate-pulse text-xl">Preparing Pulse Environment...</div>;
 
     return (
@@ -334,6 +350,31 @@ export default function WorkoutPage() {
             <PostFlightModal isOpen={showPostFlight} onClose={() => setShowPostFlight(false)} onFinish={handleFinishWorkout} />
             <PrCelebration show={prCelebration.show} value={prCelebration.value} unit={prCelebration.unit} onComplete={() => setPrCelebration({ ...prCelebration, show: false })} />
             <motion.div variants={container} initial="hidden" animate="show" className="space-y-12">
+                {workoutStatus.needsCalibration && (
+                    <div className="bg-amber-500/10 border border-amber-500/20 rounded-[32px] p-8 flex items-center justify-between gap-6">
+                        <div className="flex items-center gap-6">
+                            <div className="w-12 h-12 rounded-2xl bg-amber-500/20 flex items-center justify-center text-amber-600">
+                                <Activity size={24} />
+                            </div>
+                            <div>
+                                <h3 className="font-serif text-xl text-amber-900 italic">Uncalibrated Sequence</h3>
+                                <p className="text-amber-700/70 text-sm">This workout contains loads based on missing PRs. Some targets will be defaulted until you calibrate.</p>
+                            </div>
+                        </div>
+                        <a href="/profile" className="px-6 py-3 bg-amber-600 text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-amber-700 transition-colors shrink-0">Calibrate Now</a>
+                    </div>
+                )}
+                {!workoutStatus.needsCalibration && workoutStatus.hasEstimates && (
+                    <div className="bg-primary/5 border border-primary/10 rounded-[32px] p-8 flex items-center gap-6">
+                        <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
+                            <Zap size={24} />
+                        </div>
+                        <div>
+                            <h3 className="font-serif text-xl text-foreground italic">Intelligent Calibration Active</h3>
+                            <p className="text-muted-foreground text-sm">We&apos;ve estimated your secondary loads based on your primary Bench and Squat PRs. Update your profile for absolute precision.</p>
+                        </div>
+                    </div>
+                )}
                 <header className="space-y-4">
                     <div className="flex items-center gap-2 text-primary"><HeartPulse size={16} className="animate-pulse" /><span className="text-[10px] font-bold uppercase tracking-[0.4em] opacity-60">Live Pulse Session</span></div>
                     <h1 className="font-serif text-6xl md:text-8xl text-foreground leading-[0.85] tracking-tight">{todaysWorkout?.title}</h1>
@@ -360,12 +401,32 @@ export default function WorkoutPage() {
                                                     <span className="font-serif text-3xl italic tracking-tight">{segment.target.sets} <span className="text-muted-foreground font-sans text-sm not-italic uppercase tracking-widest font-bold mx-1">sets of</span> {segment.target.reps}</span>
                                                 </div>
                                             )}
-                                            {segment.target?.percent_1rm && (
-                                                <div className="flex items-center gap-4">
-                                                    <div className="w-12 h-12 rounded-xl bg-primary/5 border border-primary/10 flex items-center justify-center text-primary"><Zap size={20} /></div>
-                                                    <span className="text-muted-foreground text-xl font-light">Load: <span className="font-serif text-3xl text-foreground italic tracking-tight">{calcWeight(segment.name, segment.target.percent_1rm)}{getUnitLabel(units, 'weight')}</span><span className="text-[10px] font-bold uppercase tracking-[0.3em] text-primary/40 ml-4">@{segment.target.percent_1rm * 100}%</span></span>
-                                                </div>
-                                            )}
+                                            {segment.target?.percent_1rm && (() => {
+                                                const { weight, isEstimate, needsCalibration, source } = calcWeight(segment.name, segment.target.percent_1rm);
+                                                return (
+                                                    <div className="flex items-center gap-4">
+                                                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center border ${needsCalibration ? 'bg-amber-500/10 border-amber-500/20 text-amber-500' : 'bg-primary/5 border-primary/10 text-primary'}`}>
+                                                            <Zap size={20} />
+                                                        </div>
+                                                        <div className="flex flex-col">
+                                                            <span className={`text-xl font-light ${needsCalibration ? 'text-amber-600/60' : 'text-muted-foreground'}`}>
+                                                                Load: <span className={`font-serif text-3xl italic tracking-tight ${needsCalibration ? 'text-amber-600' : 'text-foreground'}`}>
+                                                                    {needsCalibration ? "Calibration Required" : `${weight}${getUnitLabel(units, 'weight')}`}
+                                                                </span>
+                                                                {!needsCalibration && isEstimate && (
+                                                                    <span className="text-[10px] font-bold uppercase tracking-widest text-primary/40 ml-3 bg-primary/5 px-2 py-0.5 rounded-full">Estimated</span>
+                                                                )}
+                                                            </span>
+                                                            {!needsCalibration && isEstimate && source && (
+                                                                <span className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-widest mt-1">{source}</span>
+                                                            )}
+                                                            {needsCalibration && (
+                                                                <a href="/profile" className="text-[10px] font-bold text-amber-600 uppercase tracking-widest hover:underline mt-1">Configure Personal Records</a>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })()}
                                         </div>
                                     </div>
                                     <div className="w-full md:w-auto flex items-center justify-end">
@@ -377,7 +438,7 @@ export default function WorkoutPage() {
                                         ) : (
                                             <>
                                                 {segment.tracking_mode === 'CHECKBOX' && <button onClick={() => logSegment(segment, idx, { completed: true })} className="h-24 w-24 rounded-xl bg-primary/5 border border-primary/10 flex items-center justify-center hover:bg-primary hover:text-white transition-all"><CheckCircle size={36} /></button>}
-                                                {segment.tracking_mode === 'STRENGTH_SETS' && <LogStrengthSets segment={segment} idx={idx} onLog={logSegment} calculatedWeight={segment.target?.percent_1rm ? calcWeight(segment.name, segment.target.percent_1rm) : undefined} />}
+                                                {segment.tracking_mode === 'STRENGTH_SETS' && <LogStrengthSets segment={segment} idx={idx} onLog={logSegment} calculatedWeight={segment.target?.percent_1rm ? calcWeight(segment.name, segment.target.percent_1rm).weight : undefined} />}
                                                 {segment.tracking_mode === 'METCON' && <LogMetcon segment={segment} idx={idx} onLog={logSegment} />}
                                                 {segment.tracking_mode === 'CARDIO_BASIC' && <LogCardioBasic segment={segment} idx={idx} onLog={logSegment} />}
                                             </>
