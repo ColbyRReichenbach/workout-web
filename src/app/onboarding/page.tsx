@@ -11,6 +11,7 @@ import { createClient } from "@/utils/supabase/client";
 import { GUEST_MODE_COOKIE } from "@/lib/constants";
 import { estimateMissingMaxes } from "@/lib/calculations/percentages";
 import { UserProfile } from "@/lib/types";
+import { NanoParticles } from "@/components/NanoParticles";
 
 /**
  * Parse a specific cookie value from document.cookie string
@@ -51,7 +52,9 @@ export default function OnboardingPage() {
     const [selectedCategories, setSelectedCategories] = useState<string[]>(['strength']);
     const [isBlackingOut, setIsBlackingOut] = useState(false);
     const [isPulsing, setIsPulsing] = useState(false);
-    const [vibrate, setVibrate] = useState(false);
+    const [readyToPulse, setReadyToPulse] = useState(false);
+    const [isRedirecting, setIsRedirecting] = useState(false);
+    const [pulseSpeed, setPulseSpeed] = useState(1.4);
 
     // Estimates for the Reveal step
     const [estimatedProfile, setEstimatedProfile] = useState<UserProfile | null>(null);
@@ -164,29 +167,41 @@ export default function OnboardingPage() {
         e.preventDefault();
         if (step !== 5) return;
 
-        // Stage 1: Vibration (tactile feedback)
-        setVibrate(true);
-        await new Promise(resolve => setTimeout(resolve, 1200));
+        // Stage 0: Pre-warm
+        router.prefetch('/');
 
-        // Stage 2: Deep Blackout
+        // Stage 1: Transition to light background
         setIsBlackingOut(true);
         await new Promise(resolve => setTimeout(resolve, 800));
 
-        // Stage 3: The Pulse (Cinematic Reset)
+        // Stage 2: Data Sync + Heart Start (Slow)
         setIsPulsing(true);
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        setPulseSpeed(1.4);
 
-        if (isGuest) { router.push('/'); return; }
+        if (!isGuest) {
+            const formData = new FormData();
+            Object.entries(formState).forEach(([key, val]) => {
+                if (key === 'mile_time') formData.append('mile_time_sec', parseTime(val).toString());
+                else if (key === 'row_2k') formData.append('row_2k_sec', parseTime(val).toString());
+                else formData.append(key, val);
+            });
+            formData.append('units', units);
+            await updateOnboardingData(formData);
+        }
 
-        const formData = new FormData();
-        Object.entries(formState).forEach(([key, val]) => {
-            if (key === 'mile_time') formData.append('mile_time_sec', parseTime(val).toString());
-            else if (key === 'row_2k') formData.append('row_2k_sec', parseTime(val).toString());
-            else formData.append(key, val);
-        });
-        formData.append('units', units);
+        // Stage 3: Speed Up Pulse (Anticipation)
+        setPulseSpeed(0.8);
+        await new Promise(resolve => setTimeout(resolve, 1200));
 
-        await updateOnboardingData(formData);
+        setPulseSpeed(0.4);
+        await new Promise(resolve => setTimeout(resolve, 800));
+
+        // Stage 4: THE FINAL PULSE + REDIRECT
+        setReadyToPulse(true);
+        setTimeout(() => {
+            setIsRedirecting(true);
+            setTimeout(() => router.push('/'), 400);
+        }, 600);
     };
 
     const springTransition = { type: "spring", damping: 25, mass: 0.5, stiffness: 120 } as const;
@@ -229,10 +244,15 @@ export default function OnboardingPage() {
                 .btn-primary:hover::after {
                     left: 120%;
                 }
-                @keyframes heartbeat {
-                    0% { transform: scale(1); opacity: 0.8; }
-                    15% { transform: scale(3.5); opacity: 0; }
-                    100% { transform: scale(3.5); opacity: 0; }
+                @keyframes heartbeat-pulse {
+                    0% { transform: scale(1); filter: drop-shadow(0 0 20px rgba(239,68,68,0.2)); }
+                    15% { transform: scale(1.15); filter: drop-shadow(0 0 40px rgba(239,68,68,0.4)); }
+                    30% { transform: scale(1); }
+                    45% { transform: scale(1.2); filter: drop-shadow(0 0 50px rgba(239,68,68,0.5)); }
+                    70% { transform: scale(1); }
+                }
+                .animate-heartbeat-pulse {
+                    animation: heartbeat-pulse var(--pulse-speed, 1.4s) ease-in-out infinite;
                 }
                 @keyframes vibrate {
                     0% { transform: translate(0,0) rotate(0); }
@@ -245,8 +265,8 @@ export default function OnboardingPage() {
                     70% { transform: translate(-1px, -1px) rotate(0.5deg); }
                     100% { transform: translate(0,0) rotate(0); }
                 }
-                .animate-heartbeat {
-                    animation: heartbeat 2s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+                .animate-heartbeat-once {
+                    animation: heartbeat-once 2.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
                 }
                 .vibrate {
                     animation: vibrate 0.1s linear infinite;
@@ -272,7 +292,7 @@ export default function OnboardingPage() {
                     borderRadius: "3rem"
                 }}
                 transition={springTransition}
-                className={`glass relative z-20 flex flex-col overflow-hidden ${vibrate ? 'vibrate' : ''}`}
+                className="glass relative z-20 flex flex-col overflow-hidden"
                 style={{ minHeight: "550px" }}
             >
                 <form
@@ -625,18 +645,27 @@ export default function OnboardingPage() {
                 {isBlackingOut && (
                     <motion.div
                         initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
+                        animate={{ opacity: isRedirecting ? 0 : 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 bg-[#09090b] z-[100] flex items-center justify-center pointer-events-none"
+                        transition={{ duration: 0.8, ease: "easeInOut" }}
+                        className="fixed inset-0 bg-[#f5f2ed] z-[100] flex items-center justify-center pointer-events-none"
                     >
                         <AnimatePresence>
                             {isPulsing && (
-                                <div className="relative">
-                                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 rounded-full border-2 border-red-500/50 animate-heartbeat" />
-                                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 rounded-full border-2 border-red-500/30 animate-heartbeat [animation-delay:0.3s]" />
-                                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 rounded-full border-2 border-red-500/10 animate-heartbeat [animation-delay:0.6s]" />
-                                    <div className="w-12 h-12 bg-red-500 rounded-full shadow-[0_0_30px_rgba(239,68,68,0.8)]" />
-                                </div>
+                                <motion.div
+                                    initial={{ opacity: 0, scale: 0.8 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    className="relative flex items-center justify-center"
+                                >
+                                    <div
+                                        className="relative pointer-events-none z-10"
+                                        style={{ '--pulse-speed': `${pulseSpeed}s` } as any}
+                                    >
+                                        <Heart
+                                            className="w-64 h-64 text-[#ef4444] fill-[#ef4444] animate-heartbeat-pulse"
+                                        />
+                                    </div>
+                                </motion.div>
                             )}
                         </AnimatePresence>
                     </motion.div>
