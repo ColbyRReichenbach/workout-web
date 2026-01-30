@@ -60,6 +60,15 @@ export async function updateOnboardingData(formData: FormData) {
             squat_max: squatLbs,
             bench_max: benchLbs,
             deadlift_max: deadliftLbs,
+            // Olympic Lifts
+            front_squat_max: units === 'metric' ? Math.round((parseFloat(formData.get('front_squat_max') as string) || 0) * 2.20462) : (parseFloat(formData.get('front_squat_max') as string) || 0),
+            clean_jerk_max: units === 'metric' ? Math.round((parseFloat(formData.get('clean_jerk_max') as string) || 0) * 2.20462) : (parseFloat(formData.get('clean_jerk_max') as string) || 0),
+            snatch_max: units === 'metric' ? Math.round((parseFloat(formData.get('snatch_max') as string) || 0) * 2.20462) : (parseFloat(formData.get('snatch_max') as string) || 0),
+            ohp_max: units === 'metric' ? Math.round((parseFloat(formData.get('ohp_max') as string) || 0) * 2.20462) : (parseFloat(formData.get('ohp_max') as string) || 0),
+            // Power & Cardio
+            bike_max_watts: parseFloat(formData.get('bike_max_watts') as string) || 0,
+            mile_time_sec: parseFloat(formData.get('mile_time_sec') as string) || 0,
+            row_2k_sec: parseFloat(formData.get('row_2k_sec') as string) || 0,
             ai_name: aiName,
             ai_personality: aiPersonality,
             current_week: 1,

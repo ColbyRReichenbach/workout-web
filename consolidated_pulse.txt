@@ -1,0 +1,1487 @@
+"use client";
+
+import React, { useState } from 'react';
+import { motion } from 'framer-motion';
+import { Mail, Lock, ArrowRight, ChevronLeft, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { loginDemoUser, signInWithEmail, signUpWithEmail, resetPassword } from "@/app/actions/auth";
+
+interface LoginViewProps {
+    onSuccess: () => void;
+    setIntensity: (intensity: number) => void;
+    isTransitioning: boolean;
+}
+
+export const LoginView = ({ onSuccess, setIntensity, isTransitioning }: LoginViewProps) => {
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [isFocused, setIsFocused] = useState(false);
+    const [view, setView] = useState<'initial' | 'login' | 'signup' | 'reset'>('initial');
+    const [loading, setLoading] = useState(false);
+    const [status, setStatus] = useState<{ type: 'error' | 'success', message: string } | null>(null);
+
+    const onEnter = () => setIntensity(isFocused || email.length > 0 ? 2 : 1);
+    const onLeave = () => setIntensity(isFocused || email.length > 0 ? 2 : 0);
+
+    const handleBack = () => {
+        setView('initial');
+        setIsFocused(false);
+        setIntensity(0);
+        setStatus(null);
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setLoading(true);
+        setStatus(null);
+
+        const formData = new FormData();
+        formData.append('email', email);
+        formData.append('password', password);
+
+        let result;
+        if (view === 'login') {
+            result = await signInWithEmail(formData);
+        } else if (view === 'signup') {
+            result = await signUpWithEmail(formData);
+        } else if (view === 'reset') {
+            result = await resetPassword(email);
+        }
+
+        if (result?.error) {
+            setStatus({ type: 'error', message: result.error });
+            setLoading(false);
+        } else if (result?.success || !result?.error) {
+            // result is null on success for some actions
+            onSuccess();
+        }
+    };
+
+    const handleGuestLogin = async () => {
+        setLoading(true);
+        await loginDemoUser();
+        onSuccess();
+    };
+
+    return (
+        <motion.div
+            layoutId="card"
+            className={`glass p-10 rounded-[2.5rem] space-y-8 min-h-[500px] flex flex-col justify-center relative w-full max-w-md ${isTransitioning ? 'pointer-events-none' : ''}`}
+            animate={{
+                scale: isTransitioning ? 0.8 : 1,
+                filter: isTransitioning ? 'blur(10px)' : 'blur(0px)',
+                borderRadius: isTransitioning ? '50%' : '2.5rem',
+                opacity: isTransitioning ? 0 : 1
+            }}
+            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+        >
+            {view !== 'initial' && (
+                <button
+                    onClick={handleBack}
+                    className="absolute top-7 left-8 p-2 text-zinc-400 hover:text-zinc-900 transition-colors z-30"
+                >
+                    <ChevronLeft className="w-6 h-6" />
+                </button>
+            )}
+
+            {view === 'initial' && (
+                <div className="text-center space-y-3 pt-6">
+                    <h1 className="text-5xl font-serif text-zinc-900 tracking-tight leading-tight">
+                        Welcome
+                    </h1>
+                    <p className="text-zinc-500 text-sm font-medium">
+                        Continue your pulse
+                    </p>
+                </div>
+            )}
+
+            <div className="flex-grow flex flex-col justify-center">
+                {status && (
+                    <div className={`mb-6 p-4 rounded-2xl flex items-start gap-3 ${status.type === 'error' ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-green-50 text-green-600 border border-green-100'}`}>
+                        {status.type === 'error' ? <AlertCircle className="w-5 h-5 shrink-0" /> : <CheckCircle2 className="w-5 h-5 shrink-0" />}
+                        <p className="text-xs font-bold leading-relaxed">{status.message}</p>
+                    </div>
+                )}
+
+                {view === 'initial' ? (
+                    <div className="space-y-4">
+                        <button
+                            onClick={() => setView('login')}
+                            onMouseEnter={onEnter}
+                            onMouseLeave={onLeave}
+                            className="w-full bg-zinc-900 text-white font-bold py-4 rounded-2xl hover:bg-zinc-800 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg shadow-zinc-900/10 grid grid-cols-[1fr_auto_1fr] items-center group"
+                        >
+                            <div className="flex justify-start pl-6">
+                                <Mail className="w-5 h-5 text-zinc-400 group-hover:text-white transition-colors" />
+                            </div>
+                            <span className="whitespace-nowrap">Sign in with Email</span>
+                            <div className="flex justify-end pr-6">
+                                <ArrowRight className="w-4 h-4 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
+                            </div>
+                        </button>
+
+                        <div className="relative py-2">
+                            <div className="absolute inset-0 flex items-center">
+                                <div className="w-full border-t border-zinc-200/60"></div>
+                            </div>
+                            <div className="relative flex justify-center text-[10px] uppercase tracking-widest">
+                                <span className="bg-[#f5f2ed]/80 px-4 text-zinc-400 font-bold backdrop-blur-sm rounded-full">Or</span>
+                            </div>
+                        </div>
+
+                        <button
+                            onClick={handleGuestLogin}
+                            onMouseEnter={onEnter}
+                            onMouseLeave={onLeave}
+                            className="w-full bg-white/40 border border-zinc-200 text-zinc-900 py-4 rounded-2xl hover:bg-white/80 hover:scale-[1.02] active:scale-[0.98] transition-all grid grid-cols-[1fr_auto_1fr] items-center group shadow-sm"
+                        >
+                            <div className="w-5 h-5 ml-6" />
+                            <div className="flex flex-col items-center">
+                                <span className="font-bold text-sm">Continue as guest</span>
+                                <span className="text-[10px] text-zinc-400 font-medium uppercase tracking-wider group-hover:text-zinc-500 transition-colors">Mock data for full experience</span>
+                            </div>
+                            <div className="flex justify-end pr-6">
+                                <ArrowRight className="w-4 h-4 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
+                            </div>
+                        </button>
+                    </div>
+                ) : (
+                    <form className="space-y-5" onSubmit={handleSubmit}>
+                        <div className="space-y-2">
+                            <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-[0.2em] ml-1">Email Address</label>
+                            <div className="relative group">
+                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 group-focus-within:text-[#ef4444] transition-colors" />
+                                <input
+                                    type="email"
+                                    value={email}
+                                    required
+                                    onMouseEnter={onEnter}
+                                    onMouseLeave={onLeave}
+                                    onFocus={() => { setIsFocused(true); setIntensity(2); }}
+                                    onBlur={() => { setIsFocused(false); setIntensity(email.length > 0 ? 2 : 0); }}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    className="w-full bg-white/60 border border-zinc-200 text-zinc-900 rounded-2xl py-3.5 pl-11 pr-4 outline-none focus:ring-4 focus:ring-[#ef4444]/5 focus:border-[#ef4444]/40 transition-all placeholder:text-zinc-300"
+                                    placeholder="name@example.com"
+                                />
+                            </div>
+                        </div>
+
+                        {view !== 'reset' && (
+                            <div className="space-y-2">
+                                <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-[0.2em] ml-1">Password</label>
+                                <div className="relative group">
+                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 group-focus-within:text-[#ef4444] transition-colors" />
+                                    <input
+                                        type="password"
+                                        value={password}
+                                        required
+                                        onMouseEnter={onEnter}
+                                        onMouseLeave={onLeave}
+                                        onFocus={() => { setIsFocused(true); setIntensity(2); }}
+                                        onBlur={() => { setIsFocused(false); setIntensity(email.length > 0 ? 2 : 0); }}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        className="w-full bg-white/60 border border-zinc-200 text-zinc-900 rounded-2xl py-3.5 pl-11 pr-4 outline-none focus:ring-4 focus:ring-[#ef4444]/5 focus:border-[#ef4444]/40 transition-all placeholder:text-zinc-300"
+                                        placeholder="••••••••"
+                                    />
+                                </div>
+                            </div>
+                        )}
+
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            onMouseEnter={onEnter}
+                            onMouseLeave={onLeave}
+                            className="w-full bg-zinc-900 text-white font-bold py-4 rounded-2xl hover:bg-zinc-800 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg shadow-zinc-900/10 flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {loading ? "Processing..." : view === 'reset' ? "Send Recovery Link" : "Continue"}
+                            {!loading && <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />}
+                        </button>
+                    </form>
+                )}
+            </div>
+
+            <div className="pt-6 space-y-4">
+                {view === 'login' && (
+                    <div className="text-center">
+                        <button
+                            onClick={() => { setView('reset'); setStatus(null); }}
+                            className="text-xs text-zinc-400 font-bold hover:text-[#ef4444] transition-colors"
+                        >
+                            Forgot your password?
+                        </button>
+                    </div>
+                )}
+
+                {view === 'initial' && (
+                    <p className="text-center text-zinc-500 text-sm">
+                        New here? {' '}
+                        <button
+                            onClick={() => { setView('signup'); setStatus(null); }}
+                            className="text-zinc-900 hover:text-[#ef4444] transition-colors font-bold underline underline-offset-4 decoration-zinc-200"
+                        >
+                            Create your pulse
+                        </button>
+                    </p>
+                )}
+
+                {(view === 'signup' || view === 'reset') && (
+                    <div className="text-center">
+                        <button
+                            onClick={() => { setView('login'); setStatus(null); }}
+                            className="text-zinc-900 hover:text-[#ef4444] transition-colors font-bold underline underline-offset-4 decoration-zinc-200 text-sm"
+                        >
+                            Sign in instead
+                        </button>
+                    </div>
+                )}
+            </div>
+        </motion.div>
+    );
+};
+"use client";
+
+import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Ruler, Weight, Activity, ChevronRight, User, Globe, Bot, Dumbbell, Sparkles, CheckCircle2, Timer, Zap, ArrowRight, Scan, Heart, BatteryCharging, ChevronLeft } from "lucide-react";
+import { FloatingInput } from "@/components/FloatingInput";
+import { updateOnboardingData } from "@/app/actions/user";
+import { logout } from "@/app/actions/auth";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/utils/supabase/client";
+import { GUEST_MODE_COOKIE } from "@/lib/constants";
+import { estimateMissingMaxes } from "@/lib/calculations/percentages";
+import { UserProfile } from "@/lib/types";
+
+function getCookieValue(name: string): string | null {
+    if (typeof document === "undefined") return null;
+    const cookies = document.cookie.split(';');
+    for (const cookie of cookies) {
+        const [cookieName, cookieValue] = cookie.trim().split('=');
+        if (cookieName === name) {
+            return decodeURIComponent(cookieValue);
+        }
+    }
+    return null;
+}
+
+const parseTime = (input: string): number => {
+    if (!input) return 0;
+    if (!input.includes(':')) return parseInt(input) || 0;
+    const [mins, secs] = input.split(':').map(Number);
+    return (mins * 60) + (secs || 0);
+};
+
+const formatTime = (seconds: number): string => {
+    if (!seconds) return "";
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+};
+
+interface OnboardingViewProps {
+    onSuccess: () => void;
+    setIntensity: (intensity: number) => void;
+    isTransitioning: boolean;
+}
+
+export const OnboardingView = ({ onSuccess, setIntensity, isTransitioning }: OnboardingViewProps) => {
+    const [step, setStep] = useState(1);
+    const [subStep, setSubStep] = useState<'SELECTION' | 'INPUT' | 'REVEAL'>('SELECTION');
+    const [isGuest, setIsGuest] = useState(false);
+    const [units, setUnits] = useState<"imperial" | "metric">("imperial");
+    const [selectedCategories, setSelectedCategories] = useState<string[]>(['strength']);
+    const [vibrate, setVibrate] = useState(false);
+    const [estimatedProfile, setEstimatedProfile] = useState<UserProfile | null>(null);
+
+    const router = useRouter();
+
+    const [formState, setFormState] = useState({
+        full_name: "",
+        height_ft: "",
+        height_in: "",
+        height_cm: "",
+        weight: "",
+        squat_max: "",
+        bench_max: "",
+        deadlift_max: "",
+        front_squat_max: "",
+        clean_jerk_max: "",
+        snatch_max: "",
+        ohp_max: "",
+        mile_time: "",
+        row_2k: "",
+        bike_max_watts: "",
+        ai_name: "",
+        ai_personality: "Analytic"
+    });
+
+    const updateField = (field: string, value: string) => {
+        setFormState(prev => ({ ...prev, [field]: value }));
+    };
+
+    const handleBack = () => {
+        if (step === 4) {
+            if (subStep === 'REVEAL') { setSubStep('INPUT'); return; }
+            if (subStep === 'INPUT') { setSubStep('SELECTION'); return; }
+        }
+        if (step > 1) {
+            setStep(prev => {
+                const newStep = prev - 1;
+                if (newStep === 4) setSubStep('REVEAL');
+                else setSubStep('SELECTION');
+                return newStep;
+            });
+        }
+    };
+
+    useEffect(() => {
+        const checkGuestMode = async () => {
+            const supabase = createClient();
+            const { data: { user } } = await supabase.auth.getUser();
+            const guestCookie = getCookieValue(GUEST_MODE_COOKIE.name);
+            const isGuestMode = !user || guestCookie === GUEST_MODE_COOKIE.value;
+
+            setIsGuest(isGuestMode);
+
+            if (isGuestMode) {
+                setUnits("imperial");
+                setFormState(prev => ({
+                    ...prev,
+                    full_name: "Colby Reichenbach",
+                    height_ft: "6", height_in: "2",
+                    weight: "195",
+                    squat_max: "345", bench_max: "245", deadlift_max: "405",
+                    mile_time: "6:30",
+                    ai_name: "ECHO-P1",
+                }));
+            }
+        };
+        checkGuestMode();
+    }, []);
+
+    useEffect(() => {
+        if (subStep === 'REVEAL') {
+            const tempProfile: UserProfile = {
+                id: 'temp',
+                squat_max: parseInt(formState.squat_max) || 0,
+                bench_max: parseInt(formState.bench_max) || 0,
+                deadlift_max: parseInt(formState.deadlift_max) || 0,
+                front_squat_max: parseInt(formState.front_squat_max) || 0,
+                clean_jerk_max: parseInt(formState.clean_jerk_max) || 0,
+                snatch_max: parseInt(formState.snatch_max) || 0,
+                ohp_max: parseInt(formState.ohp_max) || 0,
+                bike_max_watts: parseInt(formState.bike_max_watts) || 0,
+            };
+            const estimates = estimateMissingMaxes(tempProfile);
+            setEstimatedProfile(estimates);
+        }
+    }, [subStep, formState]);
+
+    const toggleCategory = (cat: string) => {
+        setSelectedCategories(prev =>
+            prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat]
+        );
+    };
+
+    const handleFinalize = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (step !== 5) return;
+
+        setVibrate(true);
+        // Intensity spike for the final heartbeat and double-beat sync
+        setIntensity(3);
+
+        // Wait for vibration and tactile feedback
+        await new Promise(resolve => setTimeout(resolve, 1500));
+
+        if (isGuest) { onSuccess(); return; }
+
+        const formData = new FormData();
+        Object.entries(formState).forEach(([key, val]) => {
+            if (key === 'mile_time') formData.append('mile_time_sec', parseTime(val).toString());
+            else if (key === 'row_2k') formData.append('row_2k_sec', parseTime(val).toString());
+            else formData.append(key, val);
+        });
+        formData.append('units', units);
+
+        await updateOnboardingData(formData);
+        onSuccess();
+    };
+
+    const springTransition = { type: "spring", damping: 25, mass: 0.5, stiffness: 120 } as const;
+
+    return (
+        <motion.div
+            layoutId="card"
+            initial={{ scale: 0.8, opacity: 0, borderRadius: '50%' }}
+            animate={{
+                scale: isTransitioning ? 0 : 1,
+                opacity: isTransitioning ? 0 : 1,
+                borderRadius: isTransitioning ? '50%' : '2.5rem',
+                maxWidth: step === 4 && subStep === 'INPUT' ? "640px" : "448px",
+            }}
+            transition={springTransition}
+            className={`glass relative z-20 flex flex-col overflow-hidden w-full ${vibrate ? 'vibrate' : ''}`}
+            style={{ minHeight: "550px" }}
+        >
+            <form onSubmit={handleFinalize} className="flex-grow p-12 flex flex-col justify-center relative">
+                <AnimatePresence>
+                    {step > 1 && (
+                        <motion.button
+                            type="button"
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: -10 }}
+                            onClick={handleBack}
+                            className="absolute top-4 left-12 p-2 rounded-full hover:bg-zinc-100/50 transition-colors text-zinc-400 hover:text-zinc-900 z-50 group flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest"
+                        >
+                            <ChevronLeft size={16} className="group-hover:-translate-x-0.5 transition-transform" />
+                            Back
+                        </motion.button>
+                    )}
+                </AnimatePresence>
+                <AnimatePresence mode="wait">
+                    <motion.div
+                        key={`${step}-${subStep}`}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        transition={springTransition}
+                        className="w-full"
+                    >
+                        {step === 1 && (
+                            <div className="space-y-12">
+                                <div className="text-center space-y-4">
+                                    <div className="relative mx-auto w-20 h-20">
+                                        <User size={36} className="text-red-500 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+                                        <div className="absolute inset-0 bg-red-500/20 blur-2xl rounded-full animate-pulse" />
+                                    </div>
+                                    <h1 className="text-6xl font-serif text-zinc-900 tracking-tight leading-tighter">Identity.</h1>
+                                    <p className="text-[#ef4444] text-[10px] font-bold uppercase tracking-[0.4em]">Biometric Calibration</p>
+                                </div>
+                                <FloatingInput
+                                    label="Full Name"
+                                    value={formState.full_name}
+                                    onChange={(e) => updateField('full_name', e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && formState.full_name && setStep(2)}
+                                />
+                                <motion.button
+                                    type="button"
+                                    onClick={() => setStep(2)}
+                                    whileHover={{ scale: 1.01, y: -2 }}
+                                    whileTap={{ scale: 0.98, y: 0 }}
+                                    transition={springTransition}
+                                    className="w-full btn-primary h-16 mt-10"
+                                >
+                                    Initiate Protocol
+                                </motion.button>
+                            </div>
+                        )}
+
+                        {step === 2 && (
+                            <div className="space-y-12">
+                                <div className="text-center space-y-4">
+                                    <h2 className="text-5xl font-serif text-zinc-900 italic">Unit Context</h2>
+                                    <p className="text-red-500 text-[10px] font-bold uppercase tracking-[0.4em]">Data Standard Selection</p>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    {(['imperial', 'metric'] as const).map((mode) => (
+                                        <motion.button
+                                            key={mode}
+                                            type="button"
+                                            onClick={() => setUnits(mode)}
+                                            whileHover={{ scale: 1.02 }}
+                                            whileTap={{ scale: 0.96 }}
+                                            transition={springTransition}
+                                            className={`p-10 rounded-3xl border transition-colors ${units === mode ? "bg-white border-red-200 shadow-md text-red-500" : "bg-transparent border-transparent text-zinc-400 hover:bg-white/40"}`}
+                                        >
+                                            <span className="text-xl font-serif capitalize">{mode}</span>
+                                        </motion.button>
+                                    ))}
+                                </div>
+                                <motion.button
+                                    type="button"
+                                    onClick={() => setStep(3)}
+                                    whileHover={{ scale: 1.01, y: -2 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    transition={springTransition}
+                                    className="w-full btn-primary h-16"
+                                >
+                                    Confirm Standard
+                                </motion.button>
+                            </div>
+                        )}
+
+                        {step === 3 && (
+                            <div className="space-y-12">
+                                <div className="text-center space-y-4">
+                                    <h2 className="text-5xl font-serif text-zinc-900 italic">Core Vitals</h2>
+                                    <p className="text-red-500 text-[10px] uppercase tracking-[0.4em] font-bold">Physical Baseline</p>
+                                </div>
+                                <div className="space-y-6">
+                                    <div className="bg-white/40 border border-zinc-200 p-8 rounded-3xl flex items-center justify-between group focus-within:border-red-500/30 transition-colors">
+                                        <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest">Height</label>
+                                        {units === 'imperial' ? (
+                                            <div className="flex gap-2">
+                                                <input type="number" placeholder="6" value={formState.height_ft} onChange={e => updateField('height_ft', e.target.value)} className="w-12 text-3xl font-serif text-right outline-none bg-transparent text-zinc-900 placeholder-zinc-300" />
+                                                <span className="text-red-500 text-3xl font-serif">'</span>
+                                                <input type="number" placeholder="2" value={formState.height_in} onChange={e => updateField('height_in', e.target.value)} className="w-12 text-3xl font-serif text-right outline-none bg-transparent text-zinc-900 placeholder-zinc-300" />
+                                                <span className="text-red-500 text-3xl font-serif">"</span>
+                                            </div>
+                                        ) : (
+                                            <input type="number" placeholder="185" value={formState.height_cm} onChange={e => updateField('height_cm', e.target.value)} className="w-24 text-3xl font-serif text-right outline-none bg-transparent text-zinc-900 placeholder-zinc-300" />
+                                        )}
+                                    </div>
+                                    <div className="bg-white/40 border border-zinc-200 p-8 rounded-3xl flex items-center justify-between group focus-within:border-red-500/30 transition-colors">
+                                        <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest">Mass ({units === 'imperial' ? 'lbs' : 'kg'})</label>
+                                        <input type="number" placeholder={units === 'imperial' ? "195" : "88"} value={formState.weight} onChange={e => updateField('weight', e.target.value)} className="w-24 text-3xl font-serif text-right outline-none bg-transparent text-zinc-900 placeholder-zinc-300" />
+                                    </div>
+                                </div>
+                                <motion.button
+                                    type="button"
+                                    onClick={() => setStep(4)}
+                                    whileHover={{ scale: 1.01, y: -2 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    transition={springTransition}
+                                    className="w-full btn-primary h-16"
+                                >
+                                    Sync Physicals
+                                </motion.button>
+                            </div>
+                        )}
+
+                        {step === 4 && subStep === 'SELECTION' && (
+                            <div className="space-y-10">
+                                <div className="text-center space-y-4">
+                                    <h2 className="text-5xl font-serif text-zinc-900 italic">Capacities</h2>
+                                    <p className="text-red-500 text-[10px] uppercase tracking-[0.4em] font-bold">Select Active Modalities</p>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    {[
+                                        { id: 'strength', label: 'Powerlifting', icon: Dumbbell },
+                                        { id: 'olympic', label: 'Olympic', icon: Activity },
+                                        { id: 'cardio', label: 'Endurance', icon: Timer },
+                                        { id: 'power', label: 'Power', icon: Zap },
+                                    ].map(cat => (
+                                        <motion.button
+                                            key={cat.id}
+                                            type="button"
+                                            onClick={() => toggleCategory(cat.id)}
+                                            whileHover={{ scale: 1.03, y: -2 }}
+                                            whileTap={{ scale: 0.95 }}
+                                            transition={springTransition}
+                                            className={`p-8 rounded-[2rem] border flex flex-col items-center gap-4 transition-colors ${selectedCategories.includes(cat.id) ? "bg-[#ef4444] border-[#ef4444] text-white shadow-lg shadow-red-500/20" : "bg-white/40 border-zinc-200 text-zinc-400 hover:bg-white/80 hover:border-red-200 hover:text-red-400"}`}
+                                        >
+                                            <cat.icon size={28} />
+                                            <span className="text-xs font-bold uppercase tracking-widest leading-none">{cat.label}</span>
+                                        </motion.button>
+                                    ))}
+                                </div>
+                                <motion.button
+                                    type="button"
+                                    onClick={() => setSubStep('INPUT')}
+                                    whileHover={{ scale: 1.01, y: -2 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    transition={springTransition}
+                                    className="w-full btn-primary h-16 flex items-center justify-center gap-3"
+                                >
+                                    Enter Data <ArrowRight size={20} />
+                                </motion.button>
+                            </div>
+                        )}
+
+                        {step === 4 && subStep === 'INPUT' && (
+                            <div className="space-y-10">
+                                <div className="text-center space-y-4">
+                                    <h2 className="text-4xl font-serif text-zinc-900 italic">Neural Sync</h2>
+                                    <p className="text-red-500 text-[10px] uppercase tracking-[0.3em] font-bold">Initial Anchor Metrics</p>
+                                </div>
+
+                                <div className="space-y-6 max-h-[40vh] overflow-y-auto pr-2 custom-scrollbar">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <FloatingInput label="Back Squat" type="number" value={formState.squat_max} onChange={e => updateField('squat_max', e.target.value)} />
+                                        <FloatingInput label="Bench Press" type="number" value={formState.bench_max} onChange={e => updateField('bench_max', e.target.value)} />
+                                    </div>
+
+                                    {selectedCategories.includes('strength') && (
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <FloatingInput label="Deadlift" type="number" value={formState.deadlift_max} onChange={e => updateField('deadlift_max', e.target.value)} />
+                                            <FloatingInput label="OHP" type="number" value={formState.ohp_max} onChange={e => updateField('ohp_max', e.target.value)} />
+                                        </div>
+                                    )}
+
+                                    {selectedCategories.includes('olympic') && (
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <FloatingInput label="Clean & Jerk" type="number" value={formState.clean_jerk_max} onChange={e => updateField('clean_jerk_max', e.target.value)} />
+                                            <FloatingInput label="Snatch" type="number" value={formState.snatch_max} onChange={e => updateField('snatch_max', e.target.value)} />
+                                        </div>
+                                    )}
+
+                                    {selectedCategories.includes('cardio') && (
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <FloatingInput label="1 Mile (m:s)" type="text" value={formState.mile_time} onChange={e => updateField('mile_time', e.target.value)} />
+                                            <FloatingInput label="2k Row (m:s)" type="text" value={formState.row_2k} onChange={e => updateField('row_2k', e.target.value)} />
+                                        </div>
+                                    )}
+                                </div>
+                                <motion.button
+                                    type="button"
+                                    onClick={() => setSubStep('REVEAL')}
+                                    whileHover={{ scale: 1.01, y: -2 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    transition={springTransition}
+                                    className="w-full btn-primary h-16 flex items-center justify-center gap-3"
+                                >
+                                    Simulate Potential <Sparkles size={20} />
+                                </motion.button>
+                            </div>
+                        )}
+
+                        {step === 4 && subStep === 'REVEAL' && (
+                            <div className="space-y-10">
+                                <div className="text-center space-y-4">
+                                    <div className="inline-flex items-center gap-2 bg-red-500 text-white px-5 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-lg shadow-red-500/20">
+                                        <Zap size={12} fill="currentColor" /> Neural Mapping Complete
+                                    </div>
+                                    <h2 className="text-4xl font-serif text-zinc-900 italic">Rhythm Synced</h2>
+                                    <p className="text-zinc-500 text-sm max-w-xs mx-auto italic font-serif">
+                                        Secondary performance markers calibrated via anchor interpolation.
+                                    </p>
+                                </div>
+
+                                <div className="relative group/scroll bg-white/40 border border-zinc-200 rounded-[2.5rem] overflow-hidden">
+                                    <div className="p-10 space-y-6 max-h-[320px] overflow-y-auto custom-scrollbar relative pr-6 scroll-smooth">
+                                        {[
+                                            { label: 'Front Squat', val: estimatedProfile?.front_squat_max, isEst: !formState.front_squat_max, unit: 'lbs' },
+                                            { label: 'Deadlift', val: estimatedProfile?.deadlift_max, isEst: !formState.deadlift_max, unit: 'lbs' },
+                                            { label: 'Clean & Jerk', val: estimatedProfile?.clean_jerk_max, isEst: !formState.clean_jerk_max, unit: 'lbs' },
+                                            { label: 'Snatch', val: estimatedProfile?.snatch_max, isEst: !formState.snatch_max, unit: 'lbs' },
+                                            { label: 'OHP', val: estimatedProfile?.ohp_max, isEst: !formState.ohp_max, unit: 'lbs' },
+                                            { label: 'Bike Power', val: estimatedProfile?.bike_max_watts, isEst: !formState.bike_max_watts, unit: 'w' },
+                                            { label: '1 Mile', val: estimatedProfile?.mile_time_sec ? formatTime(estimatedProfile.mile_time_sec) : null, isEst: !formState.mile_time, unit: '' },
+                                            { label: '2k Row', val: estimatedProfile?.row_2k_sec ? formatTime(estimatedProfile.row_2k_sec) : null, isEst: !formState.row_2k, unit: '' },
+                                        ].filter(item => item.val !== null && item.val !== undefined && item.val !== 0).map((item, i) => (
+                                            <motion.div
+                                                key={item.label}
+                                                initial={{ opacity: 0, x: -10 }}
+                                                animate={{ opacity: 1, x: 0 }}
+                                                transition={{ delay: i * 0.05 + 0.2, duration: 0.4, ease: "easeOut" }}
+                                                className="flex justify-between items-center group/item hover:bg-white/20 p-2 -mx-2 rounded-2xl transition-all duration-300"
+                                            >
+                                                <div className="flex flex-col">
+                                                    <span className="text-zinc-500 font-bold text-[10px] uppercase tracking-[0.2em]">{item.label}</span>
+                                                    {item.isEst && <span className="text-[8px] font-bold text-red-500 uppercase tracking-tighter">AI Estimated</span>}
+                                                </div>
+                                                <div className="flex items-center gap-4">
+                                                    <div className="flex flex-col items-end">
+                                                        <span className="font-serif text-3xl text-zinc-900 leading-none">{item.val}</span>
+                                                        <span className="text-[10px] text-zinc-400 font-bold uppercase">{item.unit}</span>
+                                                    </div>
+                                                    {item.isEst && (
+                                                        <div className="w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center text-red-500 group-hover/item:scale-110 group-hover/item:rotate-12 transition-transform duration-500">
+                                                            <Sparkles size={14} />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </motion.div>
+                                        ))}
+                                    </div>
+                                    <div className="absolute top-0 left-0 right-1.5 h-12 bg-gradient-to-b from-[#f5f2ed] via-[#f5f2ed]/50 to-transparent pointer-events-none rounded-t-[2.5rem] opacity-0 group-hover/scroll:opacity-100 transition-opacity duration-500" />
+                                    <div className="absolute bottom-0 left-0 right-1.5 h-12 bg-gradient-to-t from-[#f5f2ed] via-[#f5f2ed]/50 to-transparent pointer-events-none rounded-b-[2.5rem] opacity-100 transition-opacity duration-500" />
+                                </div>
+
+                                <motion.button
+                                    type="button"
+                                    onClick={() => setStep(5)}
+                                    whileHover={{ scale: 1.01, y: -2 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    transition={springTransition}
+                                    className="w-full btn-primary h-16 flex items-center justify-center gap-3"
+                                >
+                                    Agent Handshake <ArrowRight size={20} />
+                                </motion.button>
+                            </div>
+                        )}
+
+                        {step === 5 && (
+                            <div className="space-y-10">
+                                <div className="text-center space-y-4">
+                                    <h2 className="text-5xl font-serif text-zinc-900 italic">Agent Persona</h2>
+                                    <p className="text-red-500 text-[10px] uppercase tracking-[0.4em] font-bold">Neural Interface Configuration</p>
+                                </div>
+                                <div className="space-y-6">
+                                    <div className="relative group">
+                                        <input
+                                            type="text"
+                                            placeholder="SYSTEM CODE"
+                                            value={formState.ai_name}
+                                            onChange={e => updateField('ai_name', e.target.value)}
+                                            className="w-full p-8 text-center text-4xl font-serif bg-white/40 border border-zinc-200 rounded-3xl outline-none text-zinc-900 placeholder-zinc-300 focus:ring-4 focus:ring-red-500/10 focus:border-red-500/20 transition-all uppercase tracking-widest"
+                                        />
+                                        <div className="absolute inset-0 bg-red-500/5 blur-xl rounded-3xl -z-10 opacity-0 group-focus-within:opacity-100 transition-opacity" />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        {['Analytic', 'Coach'].map(p => (
+                                            <motion.button
+                                                key={p}
+                                                type="button"
+                                                onClick={() => updateField('ai_personality', p)}
+                                                whileHover={{ scale: 1.02 }}
+                                                whileTap={{ scale: 0.97 }}
+                                                transition={springTransition}
+                                                className={`p-6 rounded-2xl border text-xs font-bold uppercase tracking-[0.3em] transition-colors ${formState.ai_personality === p ? "bg-red-500 text-white border-red-500 shadow-lg shadow-red-500/20" : "bg-white/40 text-zinc-400 hover:bg-white/80 border-transparent"}`}
+                                            >
+                                                {p}
+                                            </motion.button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <motion.button
+                                    type="submit"
+                                    whileHover={{ scale: 1.01, y: -3 }}
+                                    whileTap={{ scale: 0.97 }}
+                                    transition={springTransition}
+                                    className="w-full btn-primary h-20 text-xl tracking-wide"
+                                >
+                                    INITIALIZE PULSE
+                                </motion.button>
+                            </div>
+                        )}
+                    </motion.div>
+                </AnimatePresence>
+            </form>
+
+            <div className="px-12 py-8 bg-red-500/[0.03] border-t border-red-500/[0.05] flex justify-between items-center shrink-0">
+                <div className="flex gap-2">
+                    {[1, 2, 3, 4, 5].map(s => (
+                        <div key={s} className={`h-1.5 rounded-full transition-all duration-700 ${s === step ? 'w-10 bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]' : s < step ? 'w-3 bg-zinc-900' : 'w-3 bg-zinc-200'}`} />
+                    ))}
+                </div>
+                <div className="flex items-center gap-3">
+                    <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                    <span className="text-[10px] font-bold text-red-500/80 uppercase tracking-[0.3em]">Protocol Phase {step}.0</span>
+                </div>
+            </div>
+        </motion.div>
+    );
+};
+"use client";
+
+import { motion } from "framer-motion";
+import dynamic from "next/dynamic";
+import { Activity, Calendar, Flame, CalendarDays, ArrowRight, Scale } from "lucide-react";
+import { DayCard, DayDetailModal } from "@/components/WeeklySchedule";
+import { TiltCard } from "@/components/TiltCard";
+import { ChatErrorBoundary } from "@/components/ChatErrorBoundary";
+import { BiometricsModal } from "@/components/BiometricsModal";
+import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { useEffect, useState, useMemo } from "react";
+import { createClient } from "@/utils/supabase/client";
+import { WorkoutDay, ProtocolDay, WorkoutLog } from "@/lib/types";
+import { useSettings } from "@/context/SettingsContext";
+import { getUnitLabel } from "@/lib/conversions";
+import { DEMO_USER_ID } from "@/lib/constants";
+
+const AiCoach = dynamic(() => import("@/components/AiCoach"), {
+    ssr: false,
+    loading: () => (
+        <div className="flex flex-col h-full p-4 animate-pulse">
+            <div className="flex items-center gap-4 mb-8">
+                <div className="h-12 w-12 rounded-2xl bg-muted" />
+                <div className="space-y-2">
+                    <div className="h-5 w-24 bg-muted rounded" />
+                    <div className="h-3 w-32 bg-muted rounded" />
+                </div>
+            </div>
+            <div className="flex-1 space-y-4">
+                <div className="h-4 w-3/4 bg-muted rounded" />
+                <div className="h-4 w-1/2 bg-muted rounded" />
+            </div>
+            <div className="h-16 w-full bg-muted rounded-3xl mt-auto" />
+        </div>
+    ),
+});
+
+const weeklyTemplate = [
+    { day: "Monday", title: "Lower Body Heavy", type: "Strength" },
+    { day: "Tuesday", title: "Upper Body Hypertrophy", type: "Hypertrophy" },
+    { day: "Wednesday", title: "Zone 2 Cardio + Core", type: "Cardio" },
+    { day: "Thursday", title: "Active Recovery", type: "Recovery" },
+    { day: "Friday", title: "Full Body Power", type: "Power" },
+    { day: "Saturday", title: "Long Run / Ruck", type: "Endurance" },
+    { day: "Sunday", title: "Total Rest", type: "Rest" },
+];
+
+const getHighestWeek = (logs: WorkoutLog[]) => {
+    if (!logs || logs.length === 0) return 1;
+    return Math.max(...logs.map(l => l.week_number));
+};
+
+export const DashboardView = () => {
+    const router = useRouter();
+    const [currentWeek, setCurrentWeek] = useState(1);
+    const [currentPhase, setCurrentPhase] = useState(1);
+    const [completedDays, setCompletedDays] = useState<Set<string>>(new Set());
+    const [allLogs, setAllLogs] = useState<WorkoutLog[]>([]);
+    const [protocol, setProtocol] = useState<ProtocolDay[]>(weeklyTemplate);
+    const [loading, setLoading] = useState(true);
+    const { units } = useSettings();
+
+    const [selectedDay, setSelectedDay] = useState<ProtocolDay | null>(null);
+    const [modalOpen, setModalOpen] = useState(false);
+    const [biometricsOpen, setBiometricsOpen] = useState(false);
+
+    const searchParams = useSearchParams();
+    const targetWeekParam = searchParams.get('week');
+
+    useEffect(() => {
+        async function fetchData() {
+            const supabase = createClient();
+            const [
+                { data: userResponse },
+                { data: library }
+            ] = await Promise.all([
+                supabase.auth.getUser(),
+                supabase.from('workout_library').select('program_data').single()
+            ]);
+
+            const user = userResponse?.user;
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('current_week, current_phase, height, weight_lbs')
+                .eq('id', user?.id || DEMO_USER_ID)
+                .single();
+
+            let viewedWeek = profile?.current_week || 1;
+            if (targetWeekParam) {
+                const parsed = parseInt(targetWeekParam);
+                if (!isNaN(parsed)) viewedWeek = parsed;
+            }
+
+            const currentUserId = user?.id || DEMO_USER_ID;
+            const { data: logsData } = await supabase
+                .from('logs')
+                .select('*')
+                .eq('user_id', currentUserId);
+
+            const logs = (logsData as WorkoutLog[]) || [];
+
+            setCurrentWeek(viewedWeek);
+            if (library && library.program_data?.phases) {
+                const phases = library.program_data.phases;
+                let phaseIdx = 0;
+                let weekCount = 0;
+                for (let i = 0; i < phases.length; i++) {
+                    const pWeeks = phases[i].weeks?.length || 4;
+                    if (viewedWeek <= weekCount + pWeeks) {
+                        phaseIdx = i;
+                        break;
+                    }
+                    weekCount += pWeeks;
+                }
+                setCurrentPhase(phaseIdx + 1);
+                const phase = phases[phaseIdx] || phases[0];
+                const relativeWeekIdx = (viewedWeek - 1) - weekCount;
+                const weekData = phase.weeks?.[relativeWeekIdx];
+
+                if (weekData?.days) {
+                    const localJsDay = new Date().getDay();
+                    const localTodayIndex = localJsDay === 0 ? 6 : localJsDay - 1;
+                    const actualCurrentWeek = profile?.current_week || 1;
+
+                    const dynamicProtocol = weekData.days.map((d: WorkoutDay, i: number) => {
+                        let isFuture = false;
+                        if (viewedWeek > actualCurrentWeek) {
+                            isFuture = true;
+                        } else if (viewedWeek === actualCurrentWeek) {
+                            isFuture = i > localTodayIndex;
+                        }
+
+                        return {
+                            day: d.day,
+                            title: d.title,
+                            type: d.segments?.[0]?.type || "Training",
+                            isFuture: isFuture
+                        };
+                    });
+                    setProtocol(dynamicProtocol);
+                }
+            }
+
+            const currentWeekLogs = logs.filter(l => l.week_number === viewedWeek);
+            const daysWithLogs = new Set<string>(currentWeekLogs.map((l: WorkoutLog) => l.day_name));
+            setCompletedDays(daysWithLogs);
+            setAllLogs(logs);
+            setLoading(false);
+        }
+        fetchData();
+    }, [targetWeekParam]);
+
+    const jsDay = new Date().getDay();
+    const todayIndex = jsDay === 0 ? 6 : jsDay - 1;
+    const todayName = protocol[todayIndex]?.day || "Monday";
+
+    const handleDayClick = (day: ProtocolDay) => {
+        setSelectedDay(day);
+        setModalOpen(true);
+    };
+
+    const getLogsForDay = (dayName: string) => {
+        return allLogs.filter(l => l.day_name === dayName && l.week_number === currentWeek);
+    };
+
+    const { streak, displayVolume, burn } = useMemo(() => {
+        const vol = allLogs.reduce((acc, log) => {
+            const pd = log.performance_data || {};
+            if (pd.sets && Array.isArray(pd.sets)) {
+                return acc + pd.sets.reduce((sAcc: number, s: { weight?: number; reps?: number }) => sAcc + ((Number(s.weight) || 0) * (Number(s.reps) || 0)), 0);
+            }
+            return acc + ((Number(pd.weight) || 0) * (Number(pd.reps) || 0));
+        }, 0);
+
+        const dayNames = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+        const loggedAbsIndices = new Set(allLogs.map(l => {
+            const dIdx = dayNames.indexOf(l.day_name);
+            return (l.week_number - 1) * 7 + (dIdx === -1 ? 0 : dIdx);
+        }));
+
+        const currentAbsIndex = (currentWeek - 1) * 7 + todayIndex;
+        let currentStreakCount = 0;
+        let anchorIdx = -1;
+
+        if (loggedAbsIndices.has(currentAbsIndex)) anchorIdx = currentAbsIndex;
+        else if (loggedAbsIndices.has(currentAbsIndex - 1)) anchorIdx = currentAbsIndex - 1;
+
+        if (anchorIdx !== -1) {
+            currentStreakCount = 1;
+            let check = anchorIdx - 1;
+            while (check >= 0 && loggedAbsIndices.has(check)) {
+                currentStreakCount++;
+                check--;
+            }
+        }
+
+        const volVal = units === 'metric' ? vol * 0.453592 : vol;
+        const formattedVol = volVal > 1000 ? `${(volVal / 1000).toFixed(1)}k` : Math.round(volVal).toString();
+
+        return {
+            streak: currentStreakCount,
+            displayVolume: formattedVol,
+            burn: vol > 0 ? Math.round(vol * 0.05) : "0"
+        };
+    }, [allLogs, units, currentWeek, todayIndex]);
+
+    if (loading) {
+        return (
+            <div className="flex h-screen items-center justify-center">
+                <div className="text-muted-foreground font-serif animate-pulse text-xl italic text-center">
+                    Synchronizing Pulse Rhythm...<br />
+                    <span className="text-[10px] font-bold uppercase tracking-widest mt-2 block">Accessing encrypted athlete data</span>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+            className="w-full max-w-7xl mx-auto px-6 py-12 space-y-16"
+        >
+            <DayDetailModal
+                isOpen={modalOpen}
+                onClose={() => setModalOpen(false)}
+                day={selectedDay}
+                isDone={selectedDay ? completedDays.has(selectedDay.day) : false}
+                isToday={selectedDay ? selectedDay.day === todayName : false}
+                logs={selectedDay ? getLogsForDay(selectedDay.day) : []}
+                currentWeek={currentWeek}
+            />
+
+            <header className="flex flex-col md:flex-row justify-between items-end gap-10">
+                <div className="space-y-4 max-w-2xl">
+                    <div className="flex items-center gap-2 text-primary">
+                        <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                        <span className="text-[10px] font-bold uppercase tracking-[0.4em] opacity-60">System Active • Week {currentWeek}</span>
+                    </div>
+                    <h1 className="font-serif text-7xl md:text-9xl text-foreground leading-[0.85] tracking-tighter">
+                        Current Rhythm
+                    </h1>
+                    <p className="text-muted-foreground text-xl font-light italic">
+                        You are currently in Phase {currentPhase}, Week {currentWeek}. Your biometric pulse is optimal.
+                    </p>
+                </div>
+
+                <Link
+                    href="/workout"
+                    className="group relative bg-primary text-primary-foreground pl-10 pr-6 py-6 rounded-[32px] font-bold text-lg flex items-center gap-6 transition-all shadow-[0_20px_40px_-10px_rgba(239,68,68,0.3)] hover:shadow-[0_25px_50px_-12px_rgba(239,68,68,0.5)] active:scale-[0.98]"
+                >
+                    Initiate Today&apos;s Pulse
+                    <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center group-hover:bg-white/30 transition-all group-hover:rotate-[-10deg]">
+                        <ArrowRight size={20} />
+                    </div>
+                </Link>
+            </header>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {[
+                    { icon: Calendar, label: "Streak", value: streak, unit: "Days", color: "text-red-500", bg: "bg-red-500/5", glow: "shadow-red-500/10" },
+                    { icon: Activity, label: "Volume", value: displayVolume, unit: getUnitLabel(units, 'weight'), color: "text-orange-500", bg: "bg-orange-500/5", glow: "shadow-orange-500/10" },
+                    { icon: Flame, label: "Burn", value: burn, unit: "kcal", color: "text-amber-500", bg: "bg-amber-500/5", glow: "shadow-amber-500/10" },
+                    { icon: Scale, label: "Vitals", value: "Sync", unit: "Capture", color: "text-primary", bg: "bg-primary/5", glow: "shadow-primary/10", onClick: () => setBiometricsOpen(true) },
+                ].map((m, i) => (
+                    <TiltCard
+                        key={i}
+                        glowColor={m.glow}
+                        onClick={m.onClick}
+                        className="group rounded-[40px] p-8 cursor-pointer overflow-hidden"
+                    >
+                        <div className={`absolute -right-8 -bottom-8 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity duration-200 pointer-events-none ${m.color}`}>
+                            <m.icon size={140} strokeWidth={1} />
+                        </div>
+                        <div className="flex justify-between items-start mb-10 relative z-10">
+                            <div className={`w-14 h-14 rounded-2xl ${m.bg} ${m.color} flex items-center justify-center transition-transform duration-200 group-hover:scale-105 shadow-sm border border-black/[0.02]`}>
+                                <m.icon size={24} />
+                            </div>
+                            <span className="text-[10px] text-muted-foreground uppercase tracking-[0.3em] font-bold opacity-60">{m.label}</span>
+                        </div>
+                        <div className="relative z-10">
+                            <h3 className="text-5xl font-serif text-foreground mb-1">
+                                {m.value} <span className="text-sm text-muted-foreground font-sans uppercase tracking-[0.2em] font-bold ml-1">{m.unit}</span>
+                            </h3>
+                            <div className="w-8 h-[2px] bg-muted group-hover:w-16 group-hover:bg-primary/20 transition-[width,background-color] duration-300 mt-4" />
+                        </div>
+                    </TiltCard>
+                ))}
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+                <div className="lg:col-span-8 space-y-8">
+                    <div className="flex justify-between items-end border-b border-border pb-6">
+                        <div>
+                            <h3 className="font-serif text-4xl text-foreground tracking-tight">Weekly Protocol</h3>
+                            <p className="text-muted-foreground text-sm mt-1">Adaptive training schedule based on biometric data.</p>
+                        </div>
+                        <div className="flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground bg-muted/50 px-4 py-2 rounded-full border border-border">
+                            <CalendarDays size={14} className="text-primary" />
+                            <span>Phase {currentPhase} • Pulse 0{currentWeek}</span>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {protocol.map((day, i) => (
+                            <DayCard
+                                key={day.day}
+                                day={day}
+                                isToday={todayName === day.day}
+                                isDone={completedDays.has(day.day)}
+                                isPast={i < todayIndex && !completedDays.has(day.day)}
+                                phase={currentPhase}
+                                currentWeek={currentWeek}
+                                onClick={() => handleDayClick(day)}
+                            />
+                        ))}
+                    </div>
+                </div>
+
+                <div className="lg:col-span-4 space-y-8">
+                    <div className="border-b border-border pb-6">
+                        <h3 className="font-serif text-4xl text-foreground tracking-tight">Coach AI</h3>
+                        <p className="text-muted-foreground text-sm mt-1">Real-time performance adjustments.</p>
+                    </div>
+                    <div className="glass-card border border-white/40 rounded-[48px] p-2 h-[600px] shadow-2xl relative overflow-hidden group">
+                        <div className="absolute inset-0 bg-gradient-to-b from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+                        <ChatErrorBoundary>
+                            <AiCoach />
+                        </ChatErrorBoundary>
+                    </div>
+                </div>
+            </div>
+            <BiometricsModal isOpen={biometricsOpen} onClose={() => setBiometricsOpen(false)} />
+        </motion.div>
+    );
+};
+"use client";
+
+import React, { useState, useEffect, useRef } from 'react';
+
+interface Particle {
+    x: number;
+    y: number;
+    vx: number;
+    vy: number;
+    life: number;
+    opacity: number;
+    size: number;
+    color: string;
+}
+
+interface PulseParticlesProps {
+    intensity: number;
+    heartDuration: string;
+    triggerBurst?: boolean;
+}
+
+export const PulseParticles = ({ intensity: targetIntensity, heartDuration, triggerBurst }: PulseParticlesProps) => {
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const particles = useRef<Particle[]>([]);
+    const requestRef = useRef<number>(0);
+    const lastBeatTime = useRef<number>(0);
+    const firstBeatFired = useRef<boolean>(false);
+    const secondBeatFired = useRef<boolean>(false);
+    const smoothIntensity = useRef(0);
+    const [reducedMotion, setReducedMotion] = useState(false);
+    const [isVisible, setIsVisible] = useState(true);
+
+    useEffect(() => {
+        const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+        setReducedMotion(mediaQuery.matches);
+        const handleMotionChange = (e: MediaQueryListEvent) => setReducedMotion(e.matches);
+        mediaQuery.addEventListener('change', handleMotionChange);
+
+        const handleVisibilityChange = () => {
+            setIsVisible(document.visibilityState === 'visible');
+        };
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            mediaQuery.removeEventListener('change', handleMotionChange);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, []);
+
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        if (!isVisible || reducedMotion) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            particles.current = [];
+            return;
+        }
+
+        const dpr = window.devicePixelRatio || 1;
+        const handleResize = () => {
+            canvas.width = window.innerWidth * dpr;
+            canvas.height = window.innerHeight * dpr;
+            ctx.scale(dpr, dpr);
+        };
+
+        window.addEventListener('resize', handleResize);
+        handleResize();
+
+        const parseDuration = (dur: string) => {
+            const val = parseFloat(dur);
+            return val * 1000;
+        };
+
+        const createBurstParticles = (count: number, currentInt: number, isHighDensity = false) => {
+            const newParticles: Particle[] = [];
+            for (let i = 0; i < count; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const dist = 30 + Math.random() * (isHighDensity ? 15 : 35);
+                const minSpeed = isHighDensity ? 8.0 : 4.0;
+                const maxSpeed = isHighDensity ? 20.0 : 12.0;
+                const speed = minSpeed + (maxSpeed - minSpeed) * Math.min(currentInt / 2, 1);
+
+                newParticles.push({
+                    x: window.innerWidth / 2 + Math.cos(angle) * dist,
+                    y: window.innerHeight / 2 + Math.sin(angle) * dist,
+                    vx: Math.cos(angle) * speed * (0.7 + Math.random() * 0.6),
+                    vy: Math.sin(angle) * speed * (0.7 + Math.random() * 0.6),
+                    life: 1,
+                    opacity: 0.7 + Math.random() * 0.3,
+                    size: (isHighDensity ? 3.0 : 2.0) + Math.random() * 3.0,
+                    color: Math.random() > 0.4 ? '#ef4444' : '#f87171'
+                });
+            }
+            return newParticles;
+        };
+
+        const animate = (time: number) => {
+            ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+
+            smoothIntensity.current += (targetIntensity - smoothIntensity.current) * 0.08;
+            const cur = smoothIntensity.current;
+
+            const beatInterval = parseDuration(heartDuration);
+            const timeSinceLastBeat = time - lastBeatTime.current;
+
+            // Heartbeat transition bursts at 15% and 45%
+            if (!firstBeatFired.current && timeSinceLastBeat >= beatInterval * 0.15) {
+                firstBeatFired.current = true;
+                const burstCount = Math.floor(25 + cur * 60);
+                particles.current.push(...createBurstParticles(burstCount, cur));
+            }
+            else if (!secondBeatFired.current && timeSinceLastBeat >= beatInterval * 0.45) {
+                secondBeatFired.current = true;
+                const burstCount = Math.floor(18 + cur * 45);
+                particles.current.push(...createBurstParticles(burstCount, cur));
+            }
+
+            if (timeSinceLastBeat >= beatInterval) {
+                lastBeatTime.current = time;
+                firstBeatFired.current = false;
+                secondBeatFired.current = false;
+            }
+
+            const MAX_PARTICLES = 1200;
+            if (particles.current.length > MAX_PARTICLES) {
+                particles.current = particles.current.slice(-MAX_PARTICLES);
+            }
+
+            const lifeDecay = 0.003 + (cur * 0.002);
+
+            for (let i = particles.current.length - 1; i >= 0; i--) {
+                const p = particles.current[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vx *= 0.995;
+                p.vy *= 0.995;
+                p.life -= lifeDecay;
+
+                if (p.life <= 0) {
+                    particles.current.splice(i, 1);
+                    continue;
+                }
+
+                ctx.globalAlpha = p.life * p.opacity;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size * (0.4 + p.life * 0.6), 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            requestRef.current = requestAnimationFrame(animate);
+        };
+
+        requestRef.current = requestAnimationFrame(animate);
+
+        return () => {
+            window.removeEventListener('resize', handleResize);
+            cancelAnimationFrame(requestRef.current);
+        };
+    }, [targetIntensity, heartDuration, isVisible, reducedMotion]);
+
+    // Manual high-density burst for phase transitions
+    useEffect(() => {
+        if (triggerBurst && canvasRef.current) {
+            const ctx = canvasRef.current.getContext('2d');
+            if (ctx) {
+                const createBurstParticles = (count: number, currentInt: number, isHighDensity = true) => {
+                    const newParticles: Particle[] = [];
+                    for (let i = 0; i < count; i++) {
+                        const angle = Math.random() * Math.PI * 2;
+                        const speed = 12.0 + Math.random() * 8.0;
+                        newParticles.push({
+                            x: window.innerWidth / 2,
+                            y: window.innerHeight / 2,
+                            vx: Math.cos(angle) * speed,
+                            vy: Math.sin(angle) * speed,
+                            life: 1.2,
+                            opacity: 1,
+                            size: 4.0 + Math.random() * 4.0,
+                            color: '#ef4444'
+                        });
+                    }
+                    return newParticles;
+                };
+                particles.current.push(...createBurstParticles(100, smoothIntensity.current));
+            }
+        }
+    }, [triggerBurst]);
+
+    if (reducedMotion) return null;
+
+    return (
+        <canvas
+            ref={canvasRef}
+            className="fixed inset-0 pointer-events-none z-10 w-full h-full"
+            style={{ opacity: 0.9 }}
+        />
+    );
+};
+"use client";
+
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Heart } from 'lucide-react';
+import { PulseParticles } from '@/components/Pulse/PulseParticles';
+import { LoginView } from './LoginView';
+import { OnboardingView } from './OnboardingView';
+import { DashboardView } from './DashboardView';
+
+type ViewState = 'LOGIN' | 'ONBOARDING' | 'DASHBOARD';
+
+const transition = { duration: 0.8, ease: [0.16, 1, 0.3, 1] };
+
+export default function PulsePage() {
+    const [view, setView] = useState<ViewState>('LOGIN');
+    const [intensity, setIntensity] = useState(0);
+    const [isTransitioning, setIsTransitioning] = useState(false);
+    const [triggerBurst, setTriggerBurst] = useState(false);
+    const [showPortal, setShowPortal] = useState(false);
+
+    // Dynamic heart rhythm
+    // Phase 1 transition: duration 0.6s
+    // Phase 2 transition: double-beat sync
+    const getHeartDuration = () => {
+        if (showPortal) return '0.4s';
+        if (isTransitioning) return '0.6s';
+        if (intensity === 3) return '0.5s'; // Finalizing onboarding
+        if (intensity === 2) return '0.7s'; // Active interaction
+        if (intensity === 1) return '1.8s'; // Hover
+        return '4s'; // Idle
+    };
+
+    const heartDuration = getHeartDuration();
+
+    const handleLoginSuccess = async () => {
+        setIsTransitioning(true);
+        setTriggerBurst(true);
+        setTimeout(() => setTriggerBurst(false), 100);
+
+        // Wait for the card morph animation
+        await new Promise(resolve => setTimeout(resolve, 800));
+        setView('ONBOARDING');
+        setIsTransitioning(false);
+        setIntensity(0);
+    };
+
+    const handleOnboardingSuccess = async () => {
+        setIsTransitioning(true);
+        // Stage 1: Reveal Pulse - Heart grows to portal
+        setShowPortal(true);
+
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        setView('DASHBOARD');
+
+        // Final fade out of portal
+        await new Promise(resolve => setTimeout(resolve, 500));
+        setShowPortal(false);
+        setIsTransitioning(false);
+    };
+
+    return (
+        <div className="relative min-h-screen w-full bg-[#f5f2ed] flex items-center justify-center overflow-hidden font-sans selection:bg-red-100">
+            <style>{`
+                @keyframes heartBeat {
+                    0% { transform: scale(1); }
+                    15% { transform: scale(1.1); }
+                    30% { transform: scale(1); }
+                    45% { transform: scale(1.15); }
+                    70% { transform: scale(1); }
+                }
+                .animate-heart-beat {
+                    animation-name: heartBeat;
+                    animation-duration: ${heartDuration};
+                    animation-timing-function: ease-in-out;
+                    animation-iteration-count: infinite;
+                    transition: animation-duration 0.5s ease-in-out;
+                }
+
+                .glass {
+                    background: rgba(255, 255, 255, 0.4);
+                    backdrop-filter: blur(16px);
+                    border: 1px solid rgba(0, 0, 0, 0.05);
+                    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.03);
+                }
+
+                .vibrate {
+                    animation: vibrate 0.1s linear infinite;
+                }
+
+                @keyframes vibrate {
+                    0% { transform: translate(0,0) rotate(0); }
+                    10% { transform: translate(-1px,-1px) rotate(-0.5deg); }
+                    20% { transform: translate(1px, 0) rotate(0.5deg); }
+                    30% { transform: translate(-1px, 1px) rotate(0); }
+                    40% { transform: translate(1px, -1px) rotate(0.5deg); }
+                    50% { transform: translate(-1px, 0) rotate(-0.5deg); }
+                    60% { transform: translate(1px, 1px) rotate(0); }
+                    70% { transform: translate(-1px, -1px) rotate(0.5deg); }
+                    100% { transform: translate(0,0) rotate(0); }
+                }
+
+                .btn-primary {
+                    background: #ef4444;
+                    color: white;
+                    font-weight: 700;
+                    border-radius: 1.5rem;
+                    box-shadow: 0 10px 20px -5px rgba(239, 68, 68, 0.3);
+                    position: relative;
+                    overflow: hidden;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    transition: all 0.3s ease;
+                }
+            `}</style>
+
+            {/* Background Atmosphere */}
+            <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+                <div className="absolute top-[-5%] left-[-5%] w-[50%] h-[50%] bg-red-100/30 blur-[120px] rounded-full" />
+                <div className="absolute bottom-[-5%] right-[-5%] w-[50%] h-[50%] bg-[#ef4444]/5 blur-[120px] rounded-full" />
+            </div>
+
+            <PulseParticles
+                intensity={intensity}
+                heartDuration={heartDuration}
+                triggerBurst={triggerBurst}
+            />
+
+            {/* Global Heart Anchor */}
+            <div className="fixed inset-0 flex items-center justify-center pointer-events-none z-50">
+                <motion.div
+                    layoutId="heart"
+                    className="relative"
+                    animate={{
+                        scale: showPortal ? 30 : 1,
+                        opacity: showPortal && view === 'DASHBOARD' ? 0 : 1,
+                    }}
+                    transition={{
+                        duration: showPortal ? 1.5 : 0.8,
+                        ease: [0.16, 1, 0.3, 1]
+                    }}
+                >
+                    <div className={`absolute inset-0 bg-[#ef4444]/10 blur-[100px] rounded-full animate-heart-beat transition-opacity duration-1000 ${intensity > 0 ? 'opacity-100' : 'opacity-20'}`} />
+                    <Heart
+                        className={`w-64 h-64 text-[#ef4444] fill-[#ef4444] animate-heart-beat relative z-20 drop-shadow-[0_0_20px_rgba(239,68,68,0.15)] ${showPortal ? 'blur-none' : ''}`}
+                    />
+                </motion.div>
+            </div>
+
+            {/* View Management */}
+            <div className="relative z-20 w-full flex items-center justify-center min-h-screen pt-20">
+                <AnimatePresence mode="wait">
+                    {view === 'LOGIN' && (
+                        <div key="login" className="w-full flex justify-center px-6">
+                            <LoginView
+                                onSuccess={handleLoginSuccess}
+                                setIntensity={setIntensity}
+                                isTransitioning={isTransitioning}
+                            />
+                        </div>
+                    )}
+                    {view === 'ONBOARDING' && (
+                        <div key="onboarding" className="w-full flex justify-center px-6">
+                            <OnboardingView
+                                onSuccess={handleOnboardingSuccess}
+                                setIntensity={setIntensity}
+                                isTransitioning={isTransitioning}
+                            />
+                        </div>
+                    )}
+                    {view === 'DASHBOARD' && (
+                        <div key="dashboard" className="w-full">
+                            <DashboardView />
+                        </div>
+                    )}
+                </AnimatePresence>
+            </div>
+        </div>
+    );
+}

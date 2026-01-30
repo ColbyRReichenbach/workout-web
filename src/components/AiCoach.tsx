@@ -4,6 +4,7 @@ import { useChat, type UIMessage } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import { Send, Bot, HeartPulse, AlertCircle, Flag } from 'lucide-react';
 import { useState, useEffect, useRef, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { createClient } from '@/utils/supabase/client';
 import { DEMO_USER_ID } from '@/lib/constants';
 import ReportModal from './ReportModal';
@@ -180,38 +181,40 @@ export default function AiCoach() {
 
             if (content.includes('injury') || content.includes('pain') || content.includes('hurt') || content.includes('regression')) {
                 return [
-                    { label: "Give me a regression", tag: "injury" },
-                    { label: "Why this substitution?", tag: "injury" },
-                    { label: "Show rest day tips", tag: "injury" }
+                    { label: "Regression", tag: "injury" },
+                    { label: "Substitution", tag: "injury" },
+                    { label: "Rest Tips", tag: "injury" }
                 ];
             }
 
             if (content.includes('workout') || content.includes('routine') || content.includes('exercise')) {
                 return [
-                    { label: "Give me a substitution", tag: "logistics" },
-                    { label: "Why this weight?", tag: "progress" },
-                    { label: "Log this session", tag: "logistics" }
+                    { label: "Substitution", tag: "logistics" },
+                    { label: "Target Weight", tag: "progress" },
+                    { label: "Log Session", tag: "logistics" }
                 ];
             }
 
             return [
                 { label: "Explain more", tag: "general" },
-                { label: "What's tomorrow?", tag: "logistics" }
+                { label: "Tomorrow's Plan", tag: "logistics" }
             ];
         }, [lastAssistantMessage]);
 
-        if (isLoading) return null;
+        if (isLoading && displayableMessages.length > 0) return null;
 
         return (
-            <div className="flex flex-wrap gap-2 mb-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
+            <div className="flex flex-wrap gap-1.5 mb-3 px-1">
                 {suggestions.map((s, i) => (
-                    <button
+                    <motion.button
                         key={i}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
                         onClick={() => onSubmit(undefined, s.label, s.tag)}
-                        className="px-4 py-2 rounded-full bg-muted border border-border text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:bg-foreground hover:text-background hover:border-foreground transition-all shadow-sm"
+                        className="px-3 py-1.5 rounded-full bg-muted/50 border border-border/50 text-[9px] font-bold uppercase tracking-widest text-muted-foreground hover:bg-primary/10 hover:text-primary hover:border-primary/20 transition-all shadow-sm"
                     >
                         {s.label}
-                    </button>
+                    </motion.button>
                 ))}
             </div>
         );
@@ -226,64 +229,79 @@ export default function AiCoach() {
             />
 
             {/* Header / Teaser */}
-            <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center justify-between mb-8 px-2">
                 <div className="flex items-center gap-4">
-                    <div className="h-12 w-12 rounded-2xl bg-primary flex items-center justify-center shadow-2xl shadow-primary/20 transition-transform duration-200 hover:scale-105">
-                        <HeartPulse size={24} className="text-primary-foreground" />
+                    <div className="h-12 w-12 rounded-2xl bg-primary flex items-center justify-center shadow-xl shadow-primary/20 transition-all duration-300 hover:scale-105 hover:shadow-primary/30">
+                        <Bot size={24} className="text-primary-foreground" />
                     </div>
                     <div>
-                        <h3 className="text-xl font-serif text-foreground italic">
+                        <h3 className="text-xl font-serif text-foreground font-medium tracking-tight">
                             {profile?.ai_name || "ECHO-P1"}
                         </h3>
-                        <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">
-                            {profile?.ai_personality ? `${profile.ai_personality} Intelligence` : "Protocol Intelligence"}
+                        <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-[0.2em]">
+                            {profile?.ai_personality ? `${profile.ai_personality}` : "Protocol Analyst"}
                         </p>
                     </div>
                 </div>
 
                 <button
                     onClick={() => setIsReportOpen(true)}
-                    className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition-all"
+                    className="p-2.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition-all duration-200"
                     title="Report an issue"
                 >
-                    <Flag size={18} />
+                    <Flag size={16} />
                 </button>
             </div>
 
             {/* Chat Area */}
-            <div className="flex-1 rounded-[32px] overflow-y-auto flex flex-col gap-6 mb-6 scrollbar-hide px-2">
-                {displayableMessages.length === 0 && !isLoading && (
-                    <div className="flex flex-col items-center justify-center my-auto px-6 text-center space-y-4">
-                        <Bot size={40} className="text-muted-foreground/50" />
-                        <p className="text-muted-foreground text-sm font-light italic leading-relaxed">
-                            &quot;Protocol analysis standby. Ready to optimize your trajectory.&quot;
-                        </p>
-                        <div className="text-[10px] text-muted-foreground/50 space-y-1">
-                            <p>Try asking:</p>
-                            <p className="italic">&quot;What&apos;s my workout today?&quot;</p>
-                            <p className="italic">&quot;How did I perform this week?&quot;</p>
-                        </div>
-                    </div>
-                )}
+            <div className="flex-1 rounded-[32px] overflow-y-auto flex flex-col gap-5 mb-6 scrollbar-hide px-2">
+                <AnimatePresence mode="popLayout">
+                    {displayableMessages.length === 0 && !isLoading && (
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.98 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.98 }}
+                            className="flex-1 flex flex-col items-center justify-center px-6 text-center"
+                        >
+                            <p className="text-muted-foreground text-sm font-light italic leading-relaxed max-w-[200px] mb-8">
+                                &quot;Protocol analysis standby. Ready to optimize your trajectory.&quot;
+                            </p>
+                            <div className="w-full">
+                                <p className="text-[9px] text-muted-foreground font-bold uppercase tracking-widest mb-4 opacity-50">Try Asking</p>
+                                <ActionChips />
+                            </div>
+                        </motion.div>
+                    )}
 
-                {displayableMessages.map((m) => (
-                    <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-[90%] rounded-[24px] px-6 py-4 text-sm leading-relaxed whitespace-pre-wrap ${m.role === 'user'
-                            ? 'bg-foreground text-background rounded-br-none shadow-xl'
-                            : 'bg-muted text-foreground rounded-bl-none border border-border shadow-lg shadow-black/5'
-                            }`}>
-                            {getMessageContent(m)}
-                        </div>
-                    </div>
-                ))}
+                    {displayableMessages.map((m) => (
+                        <motion.div
+                            key={m.id}
+                            initial={{ opacity: 0, y: 10, scale: 0.98 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                            className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                        >
+                            <div className={`max-w-[95%] rounded-[24px] px-5 py-3.5 text-sm leading-relaxed whitespace-pre-wrap shadow-sm ${m.role === 'user'
+                                ? 'bg-foreground text-background rounded-br-none'
+                                : 'bg-muted/30 text-foreground rounded-bl-none border border-border/50 backdrop-blur-sm'
+                                }`}>
+                                {getMessageContent(m)}
+                            </div>
+                        </motion.div>
+                    ))}
 
-                {isLoading && (
-                    <div className="flex justify-start">
-                        <div className="bg-muted text-muted-foreground rounded-full px-6 py-2 text-[10px] uppercase font-bold tracking-widest animate-pulse border border-border">
-                            Analyzing...
-                        </div>
-                    </div>
-                )}
+                    {isLoading && (
+                        <motion.div
+                            initial={{ opacity: 0, y: 5 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="flex justify-start"
+                        >
+                            <div className="bg-muted/50 text-muted-foreground rounded-full px-5 py-2 text-[9px] uppercase font-bold tracking-[0.2em] animate-pulse border border-border/50">
+                                Analyzing
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
 
                 {/* Error Display */}
                 {(localError || chatError) && (
@@ -299,8 +317,7 @@ export default function AiCoach() {
                 <div ref={messagesEndRef} />
             </div>
 
-            {/* Action Chips */}
-            <ActionChips />
+
 
             {/* Input Form */}
             <form onSubmit={(e) => onSubmit(e)} className="relative mt-auto">
@@ -308,19 +325,19 @@ export default function AiCoach() {
                     value={inputValue}
                     onChange={(e) => setInputValue(e.target.value)}
                     placeholder="Inquire about performance..."
-                    className="w-full bg-muted border border-border rounded-[24px] py-6 pl-6 pr-16 text-sm italic font-serif focus:outline-none focus:bg-card focus:ring-4 focus:ring-primary/5 transition-all text-foreground placeholder:text-muted-foreground shadow-inner"
+                    className="w-full bg-muted/50 border border-border/50 rounded-[24px] py-5 pl-5 pr-14 text-sm italic font-serif focus:outline-none focus:bg-card focus:ring-4 focus:ring-primary/5 transition-all text-foreground placeholder:text-muted-foreground shadow-sm"
                     disabled={isLoading}
                 />
                 <button
                     type="submit"
                     disabled={isLoading || !inputValue.trim()}
-                    className="absolute right-2 top-2 bottom-2 w-12 bg-primary rounded-[18px] flex items-center justify-center text-primary-foreground hover:bg-foreground hover:text-background disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-xl shadow-primary/20"
+                    className="absolute right-2 top-2 bottom-2 w-11 bg-primary rounded-[18px] flex items-center justify-center text-primary-foreground hover:bg-foreground hover:text-background disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-lg shadow-primary/20"
                 >
-                    <Send size={18} />
+                    <Send size={16} />
                 </button>
             </form>
-            <p className="text-[10px] text-muted-foreground/60 text-center mt-4 px-4 leading-tight">
-                Coach AI answers are AI Generated using user context. AI can get things wrong, always make sure to double check answers. For any medical advice please consult your primary care physician.
+            <p className="text-[9px] text-muted-foreground/70 text-center mt-3 px-6 leading-relaxed max-w-[280px] mx-auto uppercase tracking-tighter">
+                {profile?.ai_name || "ECHO-P1"} responses are AI generated. AI can get things wrong, always confirm with other sources. Consult with a professional for medical or physiological concerns.
             </p>
         </div>
     );
