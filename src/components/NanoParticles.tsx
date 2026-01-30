@@ -88,8 +88,8 @@ export const NanoParticles = ({
                 const angle = Math.random() * Math.PI * 2;
                 // Start around the heart's inner core (behind its surface)
                 const dist = oneShot ? (30 + Math.random() * 40) : (40 + Math.random() * 40);
-                const minSpeed = oneShot ? 10.0 : 4.0;
-                const maxSpeed = oneShot ? 55.0 : 12.0;
+                const minSpeed = oneShot ? 10.0 : 3.0;
+                const maxSpeed = oneShot ? 55.0 : 10.0;
                 const speed = minSpeed + (maxSpeed - minSpeed) * Math.min(currentInt / 2, 1);
 
                 newParticles.push({
@@ -128,16 +128,16 @@ export const NanoParticles = ({
                 if (timeSinceLastBeat >= beatInterval) {
                     lastBeatTime.current = time;
                     secondBeatFired.current = false;
-                    const burstCount = Math.floor(25 + cur * 60);
+                    const burstCount = Math.floor(20 + cur * 45);
                     particles.current.push(...createBurstParticles(burstCount, cur));
                 } else if (!secondBeatFired.current && timeSinceLastBeat >= beatInterval * 0.30) {
                     secondBeatFired.current = true;
-                    const burstCount = Math.floor(18 + cur * 45);
+                    const burstCount = Math.floor(12 + cur * 30);
                     particles.current.push(...createBurstParticles(burstCount, cur));
                 }
             }
 
-            const MAX_PARTICLES = 3000;
+            const MAX_PARTICLES = 2000;
             if (particles.current.length > MAX_PARTICLES) {
                 particles.current = particles.current.slice(-MAX_PARTICLES);
             }
