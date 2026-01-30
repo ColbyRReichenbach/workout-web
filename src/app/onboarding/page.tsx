@@ -633,10 +633,7 @@ export default function OnboardingPage() {
                             <div key={s} className={`h-1.5 rounded-full transition-all duration-700 ${s === step ? 'w-10 bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]' : s < step ? 'w-3 bg-zinc-900' : 'w-3 bg-zinc-200'}`} />
                         ))}
                     </div>
-                    <div className="flex items-center gap-3">
-                        <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                        <span className="text-[10px] font-bold text-red-500/80 uppercase tracking-[0.3em]">Protocol Phase {step}.0</span>
-                    </div>
+
                 </div>
             </motion.div>
 

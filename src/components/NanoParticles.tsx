@@ -143,7 +143,7 @@ export const NanoParticles = ({
             }
 
             // High momentum physics for one-shot
-            const friction = oneShot ? 0.99 : 0.995;
+            const friction = 0.995;
             const lifeDecay = oneShot ? 0.003 : (0.003 + (cur * 0.002));
 
             for (let i = particles.current.length - 1; i >= 0; i--) {
