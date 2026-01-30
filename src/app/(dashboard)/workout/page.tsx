@@ -350,7 +350,7 @@ export default function WorkoutPage() {
             <PostFlightModal isOpen={showPostFlight} onClose={() => setShowPostFlight(false)} onFinish={handleFinishWorkout} />
             <PrCelebration show={prCelebration.show} value={prCelebration.value} unit={prCelebration.unit} onComplete={() => setPrCelebration({ ...prCelebration, show: false })} />
             <motion.div variants={container} initial="hidden" animate="show" className="space-y-12">
-                {workoutStatus.needsCalibration && (
+                {workoutStatus.needsCalibration && profile?.id !== DEMO_USER_ID && (
                     <div className="bg-amber-500/10 border border-amber-500/20 rounded-[32px] p-8 flex items-center justify-between gap-6">
                         <div className="flex items-center gap-6">
                             <div className="w-12 h-12 rounded-2xl bg-amber-500/20 flex items-center justify-center text-amber-600">
@@ -364,7 +364,7 @@ export default function WorkoutPage() {
                         <a href="/profile" className="px-6 py-3 bg-amber-600 text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-amber-700 transition-colors shrink-0">Calibrate Now</a>
                     </div>
                 )}
-                {!workoutStatus.needsCalibration && workoutStatus.hasEstimates && (
+                {!workoutStatus.needsCalibration && workoutStatus.hasEstimates && profile?.id !== DEMO_USER_ID && (
                     <div className="bg-primary/5 border border-primary/10 rounded-[32px] p-8 flex items-center gap-6">
                         <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
                             <Zap size={24} />

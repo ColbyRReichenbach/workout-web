@@ -79,14 +79,47 @@ export function calculateWorkingSet(
 }
 
 /**
+ * Synthetic Baseline for uncalibrated users.
+ * Provides a safe "Level 0" starting point for prescriptions.
+ */
+const BASELINE = {
+    bench_max: 95,
+    squat_max: 135,
+    deadlift_max: 185,
+    ohp_max: 65,
+    front_squat_max: 115,
+    clean_jerk_max: 115,
+    snatch_max: 95,
+    mile_time_sec: 540, // 9:00
+    row_2k_sec: 540,    // 9:00
+    bike_max_watts: 200
+};
+
+/**
  * Estimate missing maxes from known maxes using scientific correlations.
  * Uses Bench Press as the anchor for upper body and Squat for lower body.
+ * If no data is present, uses a synthetic baseline.
  * 
  * @param profile - User profile (may have partial maxes)
  * @returns Profile with estimated maxes filled in
  */
 export function estimateMissingMaxes(profile: UserProfile): UserProfile {
     const estimated = { ...profile };
+
+    // --- 0. Baseline Fallback ---
+    // If both anchors are missing, use baseline to ensure we can prescribe something
+    if (!estimated.squat_max && !estimated.bench_max) {
+        estimated.bench_max = estimated.bench_max || BASELINE.bench_max;
+        estimated.squat_max = estimated.squat_max || BASELINE.squat_max;
+        estimated.deadlift_max = estimated.deadlift_max || BASELINE.deadlift_max;
+        estimated.ohp_max = estimated.ohp_max || BASELINE.ohp_max;
+        estimated.front_squat_max = estimated.front_squat_max || BASELINE.front_squat_max;
+        estimated.clean_jerk_max = estimated.clean_jerk_max || BASELINE.clean_jerk_max;
+        estimated.snatch_max = estimated.snatch_max || BASELINE.snatch_max;
+        estimated.mile_time_sec = estimated.mile_time_sec || BASELINE.mile_time_sec;
+        estimated.row_2k_sec = estimated.row_2k_sec || BASELINE.row_2k_sec;
+        estimated.bike_max_watts = estimated.bike_max_watts || BASELINE.bike_max_watts;
+    }
 
     // --- 1. Secondary Anchor Estimation (Cross-Chain) ---
     // If we have one but not the other, estimate the missing anchor first.
@@ -128,8 +161,14 @@ export function estimateMissingMaxes(profile: UserProfile): UserProfile {
         estimated.bike_max_watts = Math.round(estimated.squat_max * 3.0);
     }
 
-    // Running (placeholder for future expansion, currently uses Daniels VDOT logic in paceZones.ts)
-    // But we can fill in basic sec benchmarks here if needed.
+    // Cardio Estimates (Very rough benchmarks based on general fitness)
+    if (!estimated.mile_time_sec) {
+        // If they have a bench of 225+, assume a decent baseline
+        estimated.mile_time_sec = 480; // 8:00
+    }
+    if (!estimated.row_2k_sec) {
+        estimated.row_2k_sec = 480; // 8:00
+    }
 
     return estimated;
 }

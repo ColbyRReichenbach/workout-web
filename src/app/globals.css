@@ -30,7 +30,7 @@
 :root {
   --radius: 1.5rem;
   /* Softening the light mode background to a more 'Gallery' feel */
-  --background: #fbfbfd;
+  --background: #f5f2ed;
   --card: rgba(255, 255, 255, 0.65);
 
   --foreground: #1c1917;
@@ -103,9 +103,10 @@
     }
   }
 
-  /* Custom Scrollbar */
+  /* Custom Scrollbar - Global & Utility */
   ::-webkit-scrollbar {
     width: 6px;
+    height: 6px;
   }
 
   ::-webkit-scrollbar-track {
@@ -114,12 +115,31 @@
 
   ::-webkit-scrollbar-thumb {
     background: var(--muted-foreground);
-    border-radius: 10px;
-    opacity: 0.5;
+    border-radius: 20px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+    opacity: 0.4;
+    transition: background 0.3s ease;
   }
 
   ::-webkit-scrollbar-thumb:hover {
     background: var(--foreground);
+    background-clip: content-box;
+  }
+
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: var(--muted-foreground) transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 5px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background-color: var(--muted-foreground);
+    border: 1px solid transparent;
+    background-clip: content-box;
   }
 
   /* Apple-Pro Design System */
@@ -242,7 +262,20 @@
   }
 }
 
+/* Global Input Cleanup - Remove 'Clickers' */
 @layer base {
+
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+
   * {
     border-color: var(--border);
   }
