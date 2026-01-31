@@ -18,6 +18,8 @@
     "test:all": "vitest run && playwright test",
     "eval": "promptfoo eval -c eval/promptfooconfig.js -o promptfoo-report-final-conversation.json",
     "eval:history": "npm run eval && node eval/json-to-csv.js",
+    "test:ai": "npx tsx src/scripts/set-demo-privacy.ts Analysis && promptfoo eval -c eval/promptfooconfig.js -o promptfoo-report-enabled.json --no-cache",
+    "test:ai:privacy": "npx tsx src/scripts/set-demo-privacy.ts Private && promptfoo eval -c eval/promptfooconfig.privacy.js -o promptfoo-report-privacy.json --no-cache && npx tsx src/scripts/set-demo-privacy.ts Analysis",
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
@@ -55,6 +57,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^5.1.2",
+    "dotenv": "^17.2.3",
     "eslint": "^9",
     "eslint-config-next": "16.1.3",
     "happy-dom": "^20.3.1",
@@ -62,6 +65,7 @@
     "msw": "^2.12.7",
     "promptfoo": "^0.120.18",
     "tailwindcss": "^4",
+    "tsx": "^4.21.0",
     "tw-animate-css": "^1.4.0",
     "typescript": "^5",
     "vitest": "^4.0.17"

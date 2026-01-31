@@ -2,8 +2,8 @@
 
 import { useChat, type UIMessage } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
-import { Send, Bot, HeartPulse, AlertCircle, Flag } from 'lucide-react';
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { Send, Bot, HeartPulse, AlertCircle, Flag, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { createClient } from '@/utils/supabase/client';
 import { DEMO_USER_ID } from '@/lib/constants';
@@ -24,6 +24,8 @@ export default function AiCoach() {
     const [localError, setLocalError] = useState<string | null>(null);
     const [inputValue, setInputValue] = useState('');
     const [isReportOpen, setIsReportOpen] = useState(false);
+    const [feedbackGiven, setFeedbackGiven] = useState<Record<string, 'positive' | 'negative' | null>>({});
+    const [messageStartTimes, setMessageStartTimes] = useState<Record<string, number>>({});
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     // Create transport once
@@ -50,6 +52,17 @@ export default function AiCoach() {
         },
         onFinish: ({ message }: { message: any }) => {
             console.log('[AiCoach] Message finished:', message.id);
+
+            // Transfer pending start time to this message ID for latency tracking
+            setMessageStartTimes(prev => {
+                const startTime = prev['_pending'];
+                if (startTime) {
+                    const { _pending, ...rest } = prev;
+                    return { ...rest, [message.id]: startTime };
+                }
+                return prev;
+            });
+
             setLocalError(null);
             // Reset tag after use
             setActiveTag(null);
@@ -112,12 +125,53 @@ export default function AiCoach() {
         }
 
         try {
+            // Track start time for latency calculation
+            const startTime = Date.now();
             await sendMessage({ text: messageText });
+            // Store start time keyed by next message (will be set in onFinish)
+            setMessageStartTimes(prev => ({ ...prev, _pending: startTime }));
         } catch (err) {
             console.error('[AiCoach] Send failed:', err);
             setLocalError('Failed to send message. Please try again.');
         }
     };
+
+    // Submit feedback for a message
+    const submitFeedback = useCallback(async (
+        messageId: string,
+        rating: 'positive' | 'negative',
+        userMessage?: string,
+        aiResponse?: string,
+        rawMessage?: any
+    ) => {
+        // Mark as given immediately for UI
+        setFeedbackGiven(prev => ({ ...prev, [messageId]: rating }));
+
+        try {
+            // Extract intent and tools from message if provided
+            const toolsUsed = rawMessage?.toolInvocations?.map((ti: any) => ti.toolName) || [];
+
+            const response = await fetch('/api/ai/feedback', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    messageId,
+                    rating,
+                    userMessage: userMessage?.substring(0, 500),
+                    aiResponse: aiResponse?.substring(0, 1000),
+                    latencyMs: messageStartTimes[messageId] ? Date.now() - messageStartTimes[messageId] : null,
+                    toolsUsed,
+                    // Note: intent could be passed here if we had it in the message object
+                })
+            });
+
+            if (!response.ok) {
+                console.error('[AiCoach] Feedback submission failed');
+            }
+        } catch (err) {
+            console.error('[AiCoach] Feedback error:', err);
+        }
+    }, []);
 
     // Extract displayable content from message
     const getMessageContent = (message: UIMessage): string => {
@@ -273,22 +327,59 @@ export default function AiCoach() {
                         </motion.div>
                     )}
 
-                    {displayableMessages.map((m) => (
-                        <motion.div
-                            key={m.id}
-                            initial={{ opacity: 0, y: 10, scale: 0.98 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                            className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                        >
-                            <div className={`max-w-[95%] rounded-[24px] px-5 py-3.5 text-sm leading-relaxed whitespace-pre-wrap shadow-sm ${m.role === 'user'
-                                ? 'bg-foreground text-background rounded-br-none'
-                                : 'bg-muted/30 text-foreground rounded-bl-none border border-border/50 backdrop-blur-sm'
-                                }`}>
-                                {getMessageContent(m)}
-                            </div>
-                        </motion.div>
-                    ))}
+                    {displayableMessages.map((m, idx) => {
+                        // Find the user message before this assistant message (for context)
+                        const prevUserMessage = m.role === 'assistant'
+                            ? displayableMessages.slice(0, idx).reverse().find(msg => msg.role === 'user')
+                            : null;
+                        const userMsgContent = prevUserMessage ? getMessageContent(prevUserMessage) : undefined;
+                        const aiMsgContent = getMessageContent(m);
+
+                        return (
+                            <motion.div
+                                key={m.id}
+                                initial={{ opacity: 0, y: 10, scale: 0.98 }}
+                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                                className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'}`}
+                            >
+                                <div className={`max-w-[95%] rounded-[24px] px-5 py-3.5 text-sm leading-relaxed whitespace-pre-wrap shadow-sm ${m.role === 'user'
+                                    ? 'bg-foreground text-background rounded-br-none'
+                                    : 'bg-muted/30 text-foreground rounded-bl-none border border-border/50 backdrop-blur-sm'
+                                    }`}>
+                                    {aiMsgContent}
+                                </div>
+
+                                {/* Feedback buttons for assistant messages */}
+                                {m.role === 'assistant' && aiMsgContent && (
+                                    <div className="flex items-center gap-1 mt-1.5 ml-2">
+                                        {!feedbackGiven[m.id] ? (
+                                            <>
+                                                <button
+                                                    onClick={() => submitFeedback(m.id, 'positive', userMsgContent, aiMsgContent, m)}
+                                                    className="p-1.5 rounded-full text-muted-foreground/50 hover:text-green-500 hover:bg-green-500/10 transition-all"
+                                                    title="Helpful response"
+                                                >
+                                                    <ThumbsUp size={12} />
+                                                </button>
+                                                <button
+                                                    onClick={() => submitFeedback(m.id, 'negative', userMsgContent, aiMsgContent, m)}
+                                                    className="p-1.5 rounded-full text-muted-foreground/50 hover:text-red-500 hover:bg-red-500/10 transition-all"
+                                                    title="Not helpful"
+                                                >
+                                                    <ThumbsDown size={12} />
+                                                </button>
+                                            </>
+                                        ) : (
+                                            <span className="text-[10px] text-muted-foreground/60 italic">
+                                                Thanks for the feedback!
+                                            </span>
+                                        )}
+                                    </div>
+                                )}
+                            </motion.div>
+                        );
+                    })}
 
                     {isLoading && (
                         <motion.div

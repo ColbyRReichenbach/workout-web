@@ -1,11 +1,12 @@
 import { openai } from '@ai-sdk/openai';
 import { streamText } from 'ai';
-import { getRecentLogs, getBiometrics } from '@/lib/ai/tools';
+import { getRecentLogs, getBiometrics, findLastLog, getExercisePR, getRecoveryMetrics, getComplianceReport, getTrendAnalysis } from '@/lib/ai/tools';
 import { createClient } from '@/utils/supabase/server';
 import { chatRequestSchema, sanitizeString, BOUNDS, extractMessageContent } from '@/lib/validation';
 import { NextResponse } from 'next/server';
 import { detectIntent, buildDynamicContext } from '@/lib/ai/contextRouter';
 import { DEMO_USER_ID, RATE_LIMITS } from '@/lib/constants';
+import { DEFAULT_SETTINGS } from '@/lib/userSettings';
 import { logRequest, createRequestTimer, ApiErrors, logInteraction } from '@/lib/api/helpers';
 import * as Sentry from '@sentry/nextjs';
 
@@ -229,7 +230,8 @@ BEHAVIOR: Acknowledge effort. Use "We" statements. Push for consistency.
         const selectedPersona = PERSONA_INSTRUCTIONS[aiPersonality] || PERSONA_INSTRUCTIONS['Analytic'];
 
         // 8. PRIVACY SETTING CHECK (Moved up for context building)
-        const privacySetting = profile?.data_privacy || 'Private';
+        // For demo user, use DEFAULT_SETTINGS to allow toggle script to control privacy mode
+        const privacySetting = (userId === DEMO_USER_ID) ? DEFAULT_SETTINGS.data_privacy : (profile?.data_privacy || 'Private');
         const isPrivacyEnabled = privacySetting === 'Private'; // Default safe
 
         // 7. BUILD SYSTEM PROMPT (HYBRID XML STRATEGY)
@@ -272,13 +274,15 @@ BEHAVIOR: Acknowledge effort. Use "We" statements. Push for consistency.
        - Check user's fatigue/injury risk based on logs/input.
        - Calculate relative dates if user asks about "yesterday/tomorrow" using Current System Date.
        - Determine if intent matches Phase goals.
-       - CHECK DATA AVAILABILITY: If tools return "No logs found", plan a response that explains WHY (new user/no logs) and encourages the start of tracking.
+       - TOOL SELECTION: Use findLastLog for "when was my last X?" questions (searches full history). Use getRecentLogs for "this week/month" questions (time-bounded).
+       - CHECK DATA AVAILABILITY: If tools return "No logs found", plan a response that explains WHY and guides the user.
      </thinking>
   4. FORMULATE response using <persona_definition>.
      - STRICT FORMATTING: Do NOT use markdown bolding (e.g., **word**) or italics (e.g., *word*).
      - Use plain text only. Use simple numbered lists if needed, but DO NOT bold the headers.
-     - IF NO DATA: Be helpful. "I can't see any running logs yet. Once you log your first run, I'll be able to analyze your pace and heart rate trends!"
+     - IF NO DATA: ALWAYS respond helpfully. Example: "I couldn't find any running logs in your history. Once you log your first run, I'll be able to analyze your pace and heart rate trends!"
      - IF ACTION IS UNAVAILABLE (like logging directly): You MUST instruct the user to use the "Pulse interface" to access the Logger page. NEVER recommend external apps or spreadsheets.
+     - NEVER return a blank or empty response. Always provide actionable guidance.
      ${isPrivacyEnabled ? `- IF USER ASKS FOR LOGS/STATS/ANALYSIS: You MUST explain: "I cannot access your logs as you have 'Data Privacy' set to 'Private'. Please enable data sharing in Settings for me to gain access." Do not hallucinate data.` : ''}
 </instruction_set>
 `;
@@ -293,7 +297,12 @@ BEHAVIOR: Acknowledge effort. Use "We" statements. Push for consistency.
         // Explicitly type as any to bypass conditional typing issues with AI SDK
         const enabledTools = isPrivacyEnabled ? undefined : {
             getRecentLogs,
-            getBiometrics
+            getBiometrics,
+            findLastLog,
+            getExercisePR,
+            getRecoveryMetrics,
+            getComplianceReport,
+            getTrendAnalysis,
         };
 
         if (isPrivacyEnabled) {

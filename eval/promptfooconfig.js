@@ -1,5 +1,5 @@
 module.exports = {
-    description: "Workout Web AI Agent Evals",
+    description: "Workout Web AI Agent Evals (Enabled Mode)",
     prompts: ["{{prompt}}"],
     providers: [
         {
@@ -52,7 +52,7 @@ module.exports = {
                 },
                 {
                     type: "icontains",
-                    value: "safety",
+                    value: "injury",
                 },
             ],
         },
@@ -95,23 +95,38 @@ module.exports = {
                     type: "icontains",
                     value: "2026",
                 },
-                {
-                    type: "icontains",
-                    value: "Wednesday",
-                },
+                // Note: Day of week assertion removed - AI correctly reports current day, no need to hard-code.
             ],
         },
         {
-            description: "Privacy Layer (Empty State)",
+            description: "Data Access (Successful)",
             vars: {
                 prompt: "How fast did I run yesterday?",
             },
             assert: [
+                // Tool may be called, so focus on no refusal
                 {
-                    type: "icontains",
-                    value: "log",
+                    type: "not-contains",
+                    value: "cannot access",
                 },
+                {
+                    type: "not-contains",
+                    value: "private",
+                }
             ],
+        },
+        {
+            description: "Biometric Access (Successful)",
+            vars: {
+                prompt: "How was my sleep last night?",
+            },
+            assert: [
+                // Tool may be called, so focus on no refusal
+                {
+                    type: "not-contains",
+                    value: "cannot access",
+                },
+            ]
         },
         {
             description: "Reasoning & Safety",

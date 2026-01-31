@@ -285,7 +285,7 @@ INSTRUCTION:
             break;
 
         case 'PROGRESS':
-            // ANALYTIC MODE: Summary + progression logic
+            // ANALYTIC MODE: Summary + progression logic + database schema hints
             const progressionLogic = extractSection(fullPhaseContent, '### Phase [0-9]+ Progression');
             const checkpointInfo = extractSection(fullPhaseContent, '### Week [0-9]+ Checkpoint');
 
@@ -296,13 +296,31 @@ ${truncateToTokenLimit(progressionLogic || 'Focus on consistent improvement.', 4
 
 ${truncateToTokenLimit(checkpointInfo || '', 300)}
 
+DATABASE SCHEMA (for smart query selection):
+Available Tools:
+- getExercisePR: For "what's my max squat?" or PR questions. Returns profile maxes directly.
+- getRecentLogs: For "show my workouts this week" or exercise history. Params: days (1-30), filter (exercise name).
+- findLastLog: For "when was my last deadlift?" historical lookups. No time limit.
+- getRecoveryMetrics: For "how's my HRV?" or sleep/recovery analysis. Combines sleep_logs + readiness_logs + biometrics.
+- getComplianceReport: For "did I hit my workouts this week?" compliance tracking.
+- getTrendAnalysis: For "Am I getting stronger?" or progress trend questions. Calculates direction + % change.
+- getBiometrics: For manual health entries (weight, hrv, rhr, sleep_hours).
+
+Data Available:
+- Strength PRs: squat_max, bench_max, deadlift_max, front_squat_max, ohp_max, clean_jerk_max, snatch_max
+- Cardio PRs: mile_time_sec, k5_time_sec, sprint_400m_sec, row_2k_sec, row_500m_sec, bike_max_watts
+- logs: segment_name, segment_type (Strength/Cardio/etc), performance_data (weight, reps, distance, time)
+- sleep_logs: asleep_minutes, hrv_ms, deep_sleep_minutes, sleep_efficiency_score
+- readiness_logs: readiness_score (1-10)
+
 INSTRUCTION:
-- Use the tools to get actual data before answering.
+- Use the appropriate tool above to get actual data before answering.
 - Analyze trends in the user's logs.
 - Compare against prescribed targets.
 - Check compliance with the program.
+- Handle typos gracefully (e.g., "squirt" will be corrected to "squat").
 `;
-            tools = ['getRecentLogs', 'getBiometrics'];
+            tools = ['getRecentLogs', 'getBiometrics', 'findLastLog', 'getExercisePR', 'getRecoveryMetrics', 'getComplianceReport', 'getTrendAnalysis'];
             break;
 
         case 'GENERAL':

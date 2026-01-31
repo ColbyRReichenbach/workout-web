@@ -20,7 +20,7 @@ const DEFAULT_SETTINGS: Omit<UserSettings, 'id'> = {
     units: 'Imperial (lb)',
     theme: 'Pulse Light',
     notifications_enabled: true,
-    data_privacy: 'Private',
+    data_privacy: 'Analysis',
     is_demo_account: false,
 };
 
@@ -54,7 +54,7 @@ export async function getUserSettingsServer(): Promise<UserSettings> {
         units: data.units || DEFAULT_SETTINGS.units,
         theme: data.theme || DEFAULT_SETTINGS.theme,
         notifications_enabled: data.notifications_enabled ?? DEFAULT_SETTINGS.notifications_enabled,
-        data_privacy: data.data_privacy || DEFAULT_SETTINGS.data_privacy,
+        data_privacy: (userId === DEMO_USER_ID) ? DEFAULT_SETTINGS.data_privacy : (data.data_privacy || DEFAULT_SETTINGS.data_privacy),
         is_demo_account: data.is_demo_account || false,
     };
 }
