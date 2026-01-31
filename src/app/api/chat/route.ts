@@ -1,5 +1,5 @@
 import { openai } from '@ai-sdk/openai';
-import { streamText } from 'ai';
+import { streamText, convertToModelMessages } from 'ai';
 import { getRecentLogs, getBiometrics, findLastLog, getExercisePR, getRecoveryMetrics, getComplianceReport, getTrendAnalysis } from '@/lib/ai/tools';
 import { createClient } from '@/utils/supabase/server';
 import { chatRequestSchema, sanitizeString, BOUNDS, extractMessageContent } from '@/lib/validation';
@@ -9,6 +9,8 @@ import { DEMO_USER_ID, RATE_LIMITS } from '@/lib/constants';
 import { DEFAULT_SETTINGS } from '@/lib/userSettings';
 import { logRequest, createRequestTimer, ApiErrors, logInteraction } from '@/lib/api/helpers';
 import * as Sentry from '@sentry/nextjs';
+import * as fs from 'fs';
+import * as path from 'path';
 
 export const maxDuration = 30;
 
@@ -146,20 +148,59 @@ export async function POST(req: Request) {
 
         const { messages, userDay, intentTag } = validation.data;
 
-        // 4. SANITIZE INPUT - Prevent XSS and clean content
-        // Handle both legacy content format and AI SDK v6 parts format
-        const sanitizedMessages = messages.map(msg => {
-            const textContent = extractMessageContent(msg);
-            const sanitizedContent = sanitizeString(textContent, BOUNDS.MESSAGE_MAX_LENGTH);
-            return {
-                role: msg.role,
-                content: sanitizedContent,
-            };
+        // 4. PRESERVE AND SANITIZE MESSAGE HISTORY
+        // 4. SANITIZE AND CONVERT MESSAGES
+        // We must pass tool calls and results back to the model for multi-turn context
+        // We use convertToModelMessages to ensure the final array matches the ModelMessage[] schema
+        const modelMessages = await convertToModelMessages(messages.map(msg => {
+            const m = msg as any;
+            const sanitized: any = { ...m };
+
+            // Preliminary sanitization of top-level content
+            if (typeof m.content === 'string') {
+                sanitized.content = sanitizeString(m.content, BOUNDS.MESSAGE_MAX_LENGTH);
+            }
+
+            // Handle legacy tool results if present
+            if (typeof m.result === 'string') {
+                sanitized.result = sanitizeString(m.result, BOUNDS.MESSAGE_MAX_LENGTH);
+            }
+
+            return sanitized;
+        }));
+
+        // Second pass: Deep sanitize the official ModelMessage objects
+        const sanitizedMessages = modelMessages.map(m => {
+            if (m.role === 'user' || m.role === 'assistant' || m.role === 'system') {
+                if (typeof m.content === 'string') {
+                    m.content = sanitizeString(m.content, BOUNDS.MESSAGE_MAX_LENGTH);
+                } else if (Array.isArray(m.content)) {
+                    m.content = m.content.map((part: any) => {
+                        if (part.type === 'text') return { ...part, text: sanitizeString(part.text, BOUNDS.MESSAGE_MAX_LENGTH) };
+                        return part;
+                    });
+                }
+            } else if (m.role === 'tool') {
+                m.content = m.content.map((part: any) => {
+                    if (part.type === 'tool-result' && typeof part.output === 'string') {
+                        return { ...part, output: sanitizeString(part.output, BOUNDS.MESSAGE_MAX_LENGTH) };
+                    }
+                    return part;
+                });
+            }
+            return m;
         });
 
+        console.log('[API/Chat] Sanitized Model Messages summary:', (sanitizedMessages as any[]).map(m => ({
+            role: m.role,
+            contentType: typeof m.content,
+            contentLength: Array.isArray(m.content) ? m.content.length : 0
+        })));
+
         // 5. PROMPT INJECTION DETECTION - Check for malicious patterns
-        const userMessages = sanitizedMessages.filter(m => m.role === 'user');
-        const hasInjection = userMessages.some(m => detectPromptInjection(m.content));
+        const userMessages = (sanitizedMessages as any[]).filter(m => m.role === 'user');
+        const userMessageContent = userMessages.map(m => extractMessageContent(m)).join(' ');
+        const hasInjection = detectPromptInjection(userMessageContent);
 
         if (hasInjection) {
             console.warn(`[AI Security] Potential prompt injection detected from user: ${userId}`);
@@ -187,15 +228,16 @@ export async function POST(req: Request) {
         const currentWeek = profile?.current_week || 1;
 
         // Detect Intent & Build Context
-        let intent = detectIntent(sanitizedMessages);
+        let intent = detectIntent(sanitizedMessages as any[]);
 
         // Force intent if tag is present (metadata binning)
-        if (intentTag) {
-            if (['injury', 'safety'].includes(intentTag.toLowerCase())) {
+        if (intentTag && typeof intentTag === 'string') {
+            const tagLower = intentTag.toLowerCase();
+            if (['injury', 'safety'].includes(tagLower)) {
                 intent = 'INJURY';
-            } else if (['logistics', 'routine', 'substitution'].includes(intentTag.toLowerCase())) {
+            } else if (['logistics', 'routine', 'substitution'].includes(tagLower)) {
                 intent = 'LOGISTICS';
-            } else if (['progress', 'analytics', 'explanation'].includes(intentTag.toLowerCase())) {
+            } else if (['progress', 'analytics', 'explanation'].includes(tagLower)) {
                 intent = 'PROGRESS';
             }
             console.log(`[API/Chat] Forcing intent via tag: ${intentTag} -> ${intent}`);
@@ -206,7 +248,7 @@ export async function POST(req: Request) {
             intent,
             currentPhase,
             currentWeek,
-            sanitizedMessages,
+            sanitizedMessages as any[],
             userDay
         );
 
@@ -282,7 +324,12 @@ BEHAVIOR: Acknowledge effort. Use "We" statements. Push for consistency.
      - Use plain text only. Use simple numbered lists if needed, but DO NOT bold the headers.
      - IF NO DATA: ALWAYS respond helpfully. Example: "I couldn't find any running logs in your history. Once you log your first run, I'll be able to analyze your pace and heart rate trends!"
      - IF ACTION IS UNAVAILABLE (like logging directly): You MUST instruct the user to use the "Pulse interface" to access the Logger page. NEVER recommend external apps or spreadsheets.
-     - NEVER return a blank or empty response. Always provide actionable guidance.
+      - NEVER return a blank or empty response. Always provide actionable guidance.
+      - VERBAL FEEDBACK IS MANDATORY: You MUST always provide a human-readable text summary of tool results. Never just let the data speak for itself.
+      - AFTER ANY TOOL CALL: You must interpret the data for the user. 
+        * Bad: (Tool result only)
+        * Good: "I found 3 runs in your history. Your average pace was 8:30/mile."
+      - SUMMARY REQUIREMENT: After EVERY tool call, you MUST append a text section summarizing the findings or confirming the action taken. Even if the data is complex, provide a high-level overview.
      ${isPrivacyEnabled ? `- IF USER ASKS FOR LOGS/STATS/ANALYSIS: You MUST explain: "I cannot access your logs as you have 'Data Privacy' set to 'Private'. Please enable data sharing in Settings for me to gain access." Do not hallucinate data.` : ''}
 </instruction_set>
 `;
@@ -316,17 +363,28 @@ BEHAVIOR: Acknowledge effort. Use "We" statements. Push for consistency.
                 messages: sanitizedMessages as any,
                 maxSteps: 5,
                 tools: enabledTools,
+                onStepFinish: ({ text, toolCalls, toolResults, finishReason }: any) => {
+                    try {
+                        const resultStrs = toolResults?.map((r: any) => `Tool: ${r.toolName}, Success: ${!r.isError}, Len: ${JSON.stringify(r.result).length}`).join(', ') || 'NONE';
+                        const logData = `\n[Step Finish] Reason: ${finishReason}\nTextLen: ${text?.length || 0}\nResults: ${resultStrs}\n`;
+                        fs.appendFileSync('/tmp/ai_chat_debug.log', logData);
+                    } catch (e) { }
+                },
                 onFinish: ({ text, toolCalls, toolResults, finishReason }: any) => {
-                    console.log('[API/Chat] Stream finished:', {
-                        finishReason,
-                        hasText: !!text,
-                        textLength: text?.length || 0,
-                        toolCallCount: toolCalls?.length || 0,
-                        toolResultCount: toolResults?.length || 0
-                    });
+                    // Debug Logging to file
+                    try {
+                        const logData = `\n--- [${new Date().toISOString()}] ---\nFinishReason: ${finishReason}\nHasText: ${!!text}\nTextLength: ${text?.length || 0}\nToolCalls: ${toolCalls?.length || 0}\nToolResults: ${toolResults?.length || 0}\nText: ${text || 'EMPTY'}\n-------------------\n`;
+                        fs.appendFileSync('/tmp/ai_chat_debug.log', logData);
+                    } catch (e) {
+                        console.error('Failed to write to debug log:', e);
+                    }
+
+                    // Server-Side Fallback for Empty Assistant Text
+                    if (text === '' && toolResults && toolResults.length > 0) {
+                        console.warn('[API/Chat] Assistant emitted empty text after tool calls.');
+                    }
 
                     // RESPONSE VALIDATION (Audit/Logging)
-                    // We don't block the stream (it's already sent), but we log violations for the golden dataset.
                     let flagged = false;
                     let refusalReason: string | undefined;
 
@@ -344,7 +402,7 @@ BEHAVIOR: Acknowledge effort. Use "We" statements. Push for consistency.
                     logInteraction({
                         userId,
                         intent: intent || 'UNKNOWN',
-                        userMessage: userMessages[userMessages.length - 1]?.content || '',
+                        userMessage: extractMessageContent(userMessages[userMessages.length - 1] || {}),
                         aiResponse: text,
                         toolCalls: toolCalls?.length || 0,
                         durationMs: timer.getDuration(),
@@ -358,6 +416,7 @@ BEHAVIOR: Acknowledge effort. Use "We" statements. Push for consistency.
             console.log('[API/Chat] streamText created. Converting to data stream response...');
 
             // Return protocol-compliant data stream response
+            // toDataStreamResponse enables tool-recursive streaming loops
             const response = result.toUIMessageStreamResponse();
 
             // Request logging is handled by logInteraction now for success cases, 

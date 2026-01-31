@@ -1,7 +1,6 @@
 "use client";
 
 import { useChat, type UIMessage } from '@ai-sdk/react';
-import { DefaultChatTransport } from 'ai';
 import { Send, Bot, HeartPulse, AlertCircle, Flag, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -26,14 +25,8 @@ export default function AiCoach() {
     const [isReportOpen, setIsReportOpen] = useState(false);
     const [feedbackGiven, setFeedbackGiven] = useState<Record<string, 'positive' | 'negative' | null>>({});
     const [messageStartTimes, setMessageStartTimes] = useState<Record<string, number>>({});
-    const messagesEndRef = useRef<HTMLDivElement>(null);
-
-    // Create transport once
-    const transport = useMemo(() => new DefaultChatTransport({
-        api: '/api/chat',
-    }), []);
-
     const [activeTag, setActiveTag] = useState<string | null>(null);
+    const messagesEndRef = useRef<HTMLDivElement>(null);
 
     const {
         messages,
@@ -41,7 +34,7 @@ export default function AiCoach() {
         status,
         error: chatError,
     } = useChat({
-        transport,
+        api: '/api/chat',
         body: {
             userDay: new Date().toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase(),
             intentTag: activeTag
@@ -127,7 +120,7 @@ export default function AiCoach() {
         try {
             // Track start time for latency calculation
             const startTime = Date.now();
-            await sendMessage({ text: messageText });
+            await (sendMessage as any)({ text: messageText });
             // Store start time keyed by next message (will be set in onFinish)
             setMessageStartTimes(prev => ({ ...prev, _pending: startTime }));
         } catch (err) {
@@ -175,45 +168,79 @@ export default function AiCoach() {
 
     // Extract displayable content from message
     const getMessageContent = (message: UIMessage): string => {
-        // Cast to any to bypass strict type checking for legacy/flexible fields
         const m = message as any;
 
-        // Log message for debugging
-        console.log(`[AiCoach] Processing message ${m.id}:`, {
-            role: m.role,
-            contentLength: m.content?.length,
-            partsCount: m.parts?.length,
-            toolInvocations: m.toolInvocations?.length
-        });
+        // 1. Tool-role messages (SDK v6 fallback)
+        if (m.role === 'tool') {
+            const result = m.result !== undefined ? m.result : '';
+            return typeof result === 'string' ? result : JSON.stringify(result, null, 2);
+        }
 
-        // 1. Check for legacy/standard content property first
-        if (m.content) return m.content;
-
-        // 2. Check parts array for text content (SDK v6+)
+        // 2. Check parts array (SDK v6+)
         if (m.parts && Array.isArray(m.parts)) {
-            const textParts = m.parts
-                .filter((part: any) =>
-                    part.type === 'text' && typeof part.text === 'string'
-                )
-                .map((part: any) => part.text);
+            const displayParts = m.parts
+                .map((part: any) => {
+                    // Text parts
+                    if (part.type === 'text' && typeof part.text === 'string') {
+                        return part.text;
+                    }
 
-            if (textParts.length > 0) {
-                return textParts.join('\n');
+                    // Tool parts (tool-name or dynamic-tool)
+                    if (part.type.startsWith('tool-') || part.type === 'dynamic-tool') {
+                        if (part.state === 'output-available' && part.output !== undefined) {
+                            const resultTitle = `[Result: ${part.toolName || part.type.replace('tool-', '')}]`;
+                            const resultContent = typeof part.output === 'string'
+                                ? part.output
+                                : JSON.stringify(part.output, null, 2);
+                            return `${resultTitle}\n${resultContent}`;
+                        }
+
+                        // Show "Analyzing..." or similar for pending tools
+                        if (part.state === 'input-available' || part.state === 'input-streaming') {
+                            return `_Analyzing ${part.toolName || part.type.replace('tool-', '')}..._`;
+                        }
+
+                        return '';
+                    }
+
+                    // Legacy tool-result type
+                    if (part.type === 'tool-result') {
+                        const result = part.result !== undefined ? part.result : '';
+                        const resultTitle = `[Tool Result: ${part.toolName}]`;
+                        const resultContent = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
+                        return `${resultTitle}\n${resultContent}`;
+                    }
+
+                    return '';
+                })
+                .filter(Boolean);
+
+            if (displayParts.length > 0) {
+                return displayParts.join('\n\n');
             }
         }
+
+        // 3. Fallback to standard content property
+        if (typeof m.content === 'string') return m.content;
 
         return '';
     };
 
     // Filter out messages that genuinely have no content
-    const displayableMessages = messages.filter(m => {
+    const displayableMessages = messages.filter(message => {
+        const m = message as any;
         if (m.role === 'user') return true;
-        const content = getMessageContent(m);
-        // Only hide Assistant messages that are COMPLETELY empty and have tool calls
-        if (m.role === 'assistant' && !content) {
-            const tools = (m as any).toolInvocations;
-            if (tools && tools.length > 0) return false;
-        }
+        if (m.role === 'tool') return true;
+
+        const content = getMessageContent(message);
+
+        // Show assistant messages if they have any content (text or tool results)
+        if (m.role === 'assistant' && content) return true;
+
+        // Also show if it has active/pending tools to provide feedback that logic is working
+        const toolParts = m.parts?.filter((p: any) => p.type.startsWith('tool-') || p.type === 'dynamic-tool') || [];
+        if (m.role === 'assistant' && toolParts.length > 0) return true;
+
         return content.length > 0;
     });
 
