@@ -625,7 +625,7 @@ export const getExercisePR = tool({
                     if (matchingLog && matchingLog.date) {
                         prDate = matchingLog.date;
                         prActivity = matchingLog.segment_name;
-                        const logDate = new Date(prDate);
+                        const logDate = new Date(matchingLog.date);
                         const today = new Date();
                         logDate.setHours(0, 0, 0, 0);
                         today.setHours(0, 0, 0, 0);
