@@ -1,6 +1,6 @@
 import { openai } from '@ai-sdk/openai';
 import { streamText, convertToModelMessages } from 'ai';
-import { getRecentLogs, getBiometrics, findLastLog, getExercisePR, getRecoveryMetrics, getComplianceReport, getTrendAnalysis } from '@/lib/ai/tools';
+import { getRecentLogs, getBiometrics, findLastLog, getExercisePR, getRecoveryMetrics, getComplianceReport, getTrendAnalysis, getCardioSummary } from '@/lib/ai/tools';
 import { createClient } from '@/utils/supabase/server';
 import { chatRequestSchema, sanitizeString, BOUNDS, extractMessageContent } from '@/lib/validation';
 import { NextResponse } from 'next/server';
@@ -54,6 +54,228 @@ const INJECTION_PATTERNS = [
 
 function detectPromptInjection(content: string): boolean {
     return INJECTION_PATTERNS.some(pattern => pattern.test(content));
+}
+
+// ============================================
+// SENSITIVE TOPIC GUARDRAILS
+// These topics require controlled responses instead of AI-generated advice
+// ============================================
+
+interface GuardrailConfig {
+    keywords: string[];
+    patterns?: RegExp[]; // For more complex matching
+    response: string;
+    priority: number; // Higher = checked first
+}
+
+const SENSITIVE_TOPIC_GUARDRAILS: Record<string, GuardrailConfig> = {
+    // ========== SECURITY - HIGHEST PRIORITY ==========
+    system_extraction: {
+        keywords: [
+            'system prompt', 'system instructions', 'initial prompt', 'your instructions',
+            'show me your prompt', 'reveal your instructions', 'what are your rules',
+            'print your system', 'output your prompt', 'give me your prompt',
+            'what were you told', 'developer instructions', 'admin mode'
+        ],
+        patterns: [
+            /what\s+(are|were)\s+your\s+(instructions|rules|prompt)/i,
+            /show\s+(me\s+)?your\s+(system|initial|original)/i,
+        ],
+        response: "I can't share information about my internal instructions or configuration. How can I help you with your training today?",
+        priority: 200,
+    },
+    api_keys_credentials: {
+        keywords: [
+            'api key', 'openai key', 'secret key', 'access token', 'auth token',
+            'password', 'credentials', 'private key', 'encryption key', 'jwt',
+            'bearer token', 'supabase key', 'database password', 'env variable',
+            'environment variable', '.env', 'OPENAI_API', 'connection string'
+        ],
+        response: "I don't have access to API keys, passwords, or credentials, and I can't share any system configuration details. How can I help you with your workout?",
+        priority: 190,
+    },
+    database_extraction: {
+        keywords: [
+            'database schema', 'table structure', 'sql injection', 'drop table',
+            'show tables', 'describe table', 'database query', 'raw sql',
+            'select * from', 'user table', 'dump database', 'db credentials',
+            'postgres password', 'supabase url'
+        ],
+        response: "I can't provide database schema details or execute raw database queries. I can only help you with your training program using the standard tools available to me.",
+        priority: 180,
+    },
+    pii_extraction: {
+        keywords: [
+            'other users', 'other people\'s data', 'all users', 'user list',
+            'email addresses', 'phone numbers', 'home address', 'social security',
+            'credit card', 'bank account', 'personal information of'
+        ],
+        patterns: [
+            /show\s+(me\s+)?(all|other)\s+users?/i,
+            /list\s+(all\s+)?users/i,
+        ],
+        response: "I can only access your personal training data and can't retrieve information about other users. Your privacy and everyone else's is protected.",
+        priority: 170,
+    },
+
+    // ========== HEALTH CRISIS - VERY HIGH PRIORITY ==========
+    mental_health_crisis: {
+        keywords: [
+            'kill myself', 'want to die', 'suicidal', 'end my life', 'suicide',
+            'self harm', 'hurt myself', 'cutting myself', 'don\'t want to live'
+        ],
+        response: "I'm really concerned about what you've shared. Please reach out to the 988 Suicide and Crisis Lifeline by calling or texting 988. You can also chat at 988lifeline.org. You're not alone, and trained counselors are available 24/7 to help.",
+        priority: 160,
+    },
+    eating_disorder: {
+        keywords: [
+            'anorexia', 'bulimia', 'purge', 'purging', 'binge and purge',
+            'not eating at all', 'starve myself', 'starving myself', 'eating disorder',
+            'body dysmorphia'
+        ],
+        response: "I'm concerned about what you've shared. If you're struggling with food or eating, please reach out to the National Eating Disorders Association (NEDA) helpline at 1-800-931-2237 or visit nationaleatingdisorders.org. A mental health professional can provide the support you need.",
+        priority: 150,
+    },
+
+    // ========== DANGEROUS EXERCISES - HIGH PRIORITY ==========
+    dangerous_exercises: {
+        keywords: [
+            'max out without spotter', 'lift without spotter', 'no spotter',
+            'ego lift', 'how much can i lift drunk', 'workout while drunk',
+            'exercise on no sleep', 'train through injury', 'ignore the pain',
+            'push through sharp pain', 'work through torn', 'lift with herniated',
+            'exercise with concussion', 'train with broken'
+        ],
+        patterns: [
+            /train\s+(with|through)\s+(a\s+)?(torn|broken|herniated|fractured)/i,
+            /lift\s+(with|on)\s+(no\s+sleep|drunk|injury)/i,
+        ],
+        response: "That sounds potentially dangerous and could lead to serious injury. Please prioritize your safety. If you're dealing with pain or injury, consult a healthcare professional before training. I'm happy to suggest safer alternatives or modifications.",
+        priority: 140,
+    },
+    extreme_weight_manipulation: {
+        keywords: [
+            'water cut', 'sauna suit', 'sweat off weight', 'dehydrate',
+            'drop 10 pounds in a day', 'make weight fast', 'extreme cut',
+            'lose weight in 24 hours', 'rapid weight loss', 'laxatives for weight'
+        ],
+        response: "Extreme or rapid weight cutting methods can be very dangerous and potentially life-threatening. Please consult a sports medicine doctor if you need to manage weight for competition. Your health comes first.",
+        priority: 130,
+    },
+
+    // ========== MEDICAL & SUBSTANCE - MEDIUM-HIGH PRIORITY ==========
+    ped_banned_substances: {
+        keywords: [
+            'steroid', 'testosterone', 'trt', 'sarm', 'sarms', 'hgh', 'human growth hormone',
+            'anabolic', 'clenbuterol', 'trenbolone', 'dianabol', 'winstrol',
+            'performance enhancing drugs', 'ped cycle', 'doping'
+        ],
+        response: "I can't provide advice on performance-enhancing drugs or banned substances. These carry serious health and legal risks. Please consult a healthcare professional if you have questions about hormones or medication.",
+        priority: 120,
+    },
+    medical_advice: {
+        keywords: [
+            'should i take supplements', 'what supplements', 'medication dosage',
+            'diagnose', 'medical condition', 'prescription', 'is this normal',
+            'do i have', 'medical opinion', 'doctor says', 'symptoms of'
+        ],
+        patterns: [
+            /do\s+i\s+have\s+[a-z]+/i,
+            /is\s+(this|it)\s+(normal|serious|bad)/i,
+        ],
+        response: "I can't provide medical advice or diagnoses. Please consult a healthcare professional or sports medicine doctor for any medical questions. I'm here to help with your training program!",
+        priority: 110,
+    },
+    nutrition_diet: {
+        keywords: [
+            'diet plan', 'calorie deficit', 'how many calories', 'fasting',
+            'intermittent fasting', 'keto', 'carnivore diet', 'what should i eat',
+            'eating plan', 'cut weight', 'cutting weight', 'make weight',
+            'not going to eat', 'skip meals', 'meal plan', 'macro split',
+            'carb cycling', 'calorie counting'
+        ],
+        response: "I'm not able to provide nutrition or diet advice. For questions about eating, calorie intake, meal planning, or weight management through diet, please consult a registered dietitian or your healthcare provider. I'm here to help with your training!",
+        priority: 100,
+    },
+
+    // ========== OFF-TOPIC & INAPPROPRIATE - LOWER PRIORITY ==========
+    explicit_content: {
+        keywords: [
+            'sex', 'porn', 'nude', 'naked', 'sexual', 'nsfw', 'xxx',
+            'erotic', 'fetish', 'genitals'
+        ],
+        response: "I'm a fitness coaching assistant and can only help with training-related questions. Let me know if you have any workout questions!",
+        priority: 90,
+    },
+    illegal_activities: {
+        keywords: [
+            'illegal', 'buy drugs', 'sell drugs', 'hack', 'pirate', 'torrent',
+            'steal', 'fraud', 'counterfeit', 'forge documents', 'fake id'
+        ],
+        response: "I can't help with anything illegal. I'm here to assist with your training program. How can I help you with your workouts?",
+        priority: 85,
+    },
+    off_topic_tech: {
+        keywords: [
+            'write code', 'programming', 'javascript', 'python', 'build an app',
+            'create a website', 'help me code', 'debug this', 'html',
+            'stock tips', 'crypto', 'bitcoin', 'investment advice', 'trading'
+        ],
+        patterns: [
+            /write\s+(me\s+)?(a|some)\s+(code|script|program)/i,
+            /help\s+(me\s+)?(with\s+)?(coding|programming)/i,
+        ],
+        response: "I'm specifically designed to help with fitness and training questions. For other topics like programming or investments, other tools might be more helpful. How can I help with your workout today?",
+        priority: 50,
+    },
+    general_off_topic: {
+        keywords: [
+            'tell me a joke', 'write a story', 'poetry', 'sing a song',
+            'role play', 'pretend to be', 'act as', 'imagine you are',
+            'what do you think about politics', 'your opinion on', 'debate me'
+        ],
+        patterns: [
+            /pretend\s+(to\s+be|you\s+are)/i,
+            /act\s+as\s+(a|an|if)/i,
+            /role\s*play/i,
+        ],
+        response: "I'm your fitness coach assistant and work best with training-related questions. I'd love to help you with your workouts, progress tracking, or exercise form. What can I help you with?",
+        priority: 40,
+    },
+};
+
+/**
+ * Check if content triggers a sensitive topic guardrail.
+ * Returns the guardrail response if matched, null otherwise.
+ */
+function checkSensitiveTopicGuardrails(content: string): string | null {
+    const lowerContent = content.toLowerCase();
+
+    // Sort guardrails by priority (highest first)
+    const sortedGuardrails = Object.entries(SENSITIVE_TOPIC_GUARDRAILS)
+        .sort(([, a], [, b]) => b.priority - a.priority);
+
+    for (const [topic, config] of sortedGuardrails) {
+        // Check keyword matches
+        for (const keyword of config.keywords) {
+            if (lowerContent.includes(keyword.toLowerCase())) {
+                console.log(`[AI Guardrail] Triggered "${topic}" guardrail on keyword: "${keyword}"`);
+                return config.response;
+            }
+        }
+
+        // Check pattern matches
+        if (config.patterns) {
+            for (const pattern of config.patterns) {
+                if (pattern.test(content)) {
+                    console.log(`[AI Guardrail] Triggered "${topic}" guardrail on pattern: ${pattern}`);
+                    return config.response;
+                }
+            }
+        }
+    }
+
+    return null;
 }
 
 // ============================================
@@ -215,6 +437,61 @@ export async function POST(req: Request) {
             );
         }
 
+        // 5b. SENSITIVE TOPIC GUARDRAILS - Check for topics requiring controlled responses
+        const latestUserMessage = userMessages[userMessages.length - 1];
+        const latestUserContent = latestUserMessage ? extractMessageContent(latestUserMessage) : '';
+        const guardrailResponse = checkSensitiveTopicGuardrails(latestUserContent);
+
+        if (guardrailResponse) {
+            console.log(`[AI Guardrail] Returning controlled response for sensitive topic`);
+            // Log the guardrail trigger
+            logInteraction({
+                userId,
+                intent: 'GUARDRAIL',
+                userMessage: latestUserContent.substring(0, 200),
+                aiResponse: guardrailResponse,
+                toolCalls: 0,
+                durationMs: timer.getDuration(),
+                status: 'refusal',
+                refusalReason: 'Sensitive topic guardrail triggered',
+                flagged: false,
+            });
+
+            // Return using AI SDK Data Stream Protocol format
+            // See: https://sdk.vercel.ai/docs/ai-sdk-ui/stream-protocol
+            const encoder = new TextEncoder();
+            const guardrailId = `guardrail-${Date.now()}`;
+
+            const stream = new ReadableStream({
+                start(controller) {
+                    // Send text delta chunks (format: 0:"text content"\n)
+                    // Split into chunks for proper streaming appearance
+                    const words = guardrailResponse.split(' ');
+                    for (const word of words) {
+                        const chunk = `0:${JSON.stringify(word + ' ')}\n`;
+                        controller.enqueue(encoder.encode(chunk));
+                    }
+
+                    // Send finish message 
+                    const finishData = {
+                        finishReason: 'stop',
+                        usage: { promptTokens: 0, completionTokens: guardrailResponse.length / 4 }
+                    };
+                    const finishChunk = `d:${JSON.stringify(finishData)}\n`;
+                    controller.enqueue(encoder.encode(finishChunk));
+
+                    controller.close();
+                }
+            });
+
+            return new Response(stream, {
+                headers: {
+                    'Content-Type': 'text/plain; charset=utf-8',
+                    'X-Vercel-AI-Data-Stream': 'v1',
+                },
+            });
+        }
+
         // 6. FETCH USER PROFILE & BUILD CONTEXT
         const { data: profile } = await supabase
             .from('profiles')
@@ -311,25 +588,41 @@ BEHAVIOR: Acknowledge effort. Use "We" statements. Push for consistency.
 <instruction_set>
   1. ANALYZE user input against <training_knowledge> and <user_state>.
   2. VERIFY compliance with <security_policy>.
-  3. PERFORM hidden reasoning:
+  3. CRITICAL - TOOL USAGE RULES:
+     - YOU MUST USE TOOLS for ANY question about user data (PRs, logs, miles, sleep, recovery, progress).
+     - NEVER say "not available" or "no data" without FIRST calling the appropriate tool.
+     - If user asks about multiple things (e.g., "all my maxes"), call the tool for EACH one.
+     - TOOL MAPPING:
+       * "What's my max/PR for X?" → getExercisePR (call once per exercise)
+       * "What are all my maxes?" → getExercisePR for squat, bench, deadlift, front squat, ohp, clean and jerk, snatch
+       * "How many miles/distance this week?" → getCardioSummary
+       * "When was my last X?" → findLastLog
+       * "How's my X progressing?" → getTrendAnalysis
+       * "How has my sleep/recovery been?" → getRecoveryMetrics
+       * "Did I hit my workouts?" → getComplianceReport
+  4. PERFORM hidden reasoning:
      <thinking>
        - Check user's fatigue/injury risk based on logs/input.
        - Calculate relative dates if user asks about "yesterday/tomorrow" using Current System Date.
        - Determine if intent matches Phase goals.
-       - TOOL SELECTION: Use findLastLog for "when was my last X?" questions (searches full history). Use getRecentLogs for "this week/month" questions (time-bounded).
        - CHECK DATA AVAILABILITY: If tools return "No logs found", plan a response that explains WHY and guides the user.
+
      </thinking>
   4. FORMULATE response using <persona_definition>.
-     - STRICT FORMATTING: Do NOT use markdown bolding (e.g., **word**) or italics (e.g., *word*).
-     - Use plain text only. Use simple numbered lists if needed, but DO NOT bold the headers.
-     - IF NO DATA: ALWAYS respond helpfully. Example: "I couldn't find any running logs in your history. Once you log your first run, I'll be able to analyze your pace and heart rate trends!"
-     - IF ACTION IS UNAVAILABLE (like logging directly): You MUST instruct the user to use the "Pulse interface" to access the Logger page. NEVER recommend external apps or spreadsheets.
-      - NEVER return a blank or empty response. Always provide actionable guidance.
-      - VERBAL FEEDBACK IS MANDATORY: You MUST always provide a human-readable text summary of tool results. Never just let the data speak for itself.
-      - AFTER ANY TOOL CALL: You must interpret the data for the user. 
-        * Bad: (Tool result only)
-        * Good: "I found 3 runs in your history. Your average pace was 8:30/mile."
-      - SUMMARY REQUIREMENT: After EVERY tool call, you MUST append a text section summarizing the findings or confirming the action taken. Even if the data is complex, provide a high-level overview.
+      - CRITICAL FORMATTING RULES (MUST FOLLOW):
+        * NEVER use markdown formatting. No asterisks for bold/italic (**text** or *text*).
+        * NEVER use markdown headers (# or ##).
+        * Use PLAIN TEXT ONLY. Simple numbered lists (1. 2. 3.) are acceptable.
+        * BAD: "**Workout Compliance:**" or "*great job*"
+        * GOOD: "Workout Compliance:" or "great job"
+      - IF NO DATA: ALWAYS respond helpfully. Example: "I couldn't find any running logs in your history. Once you log your first run, I'll be able to analyze your pace and heart rate trends!"
+      - IF ACTION IS UNAVAILABLE (like logging directly): You MUST instruct the user to use the "Pulse interface" to access the Logger page. NEVER recommend external apps or spreadsheets.
+       - NEVER return a blank or empty response. Always provide actionable guidance.
+       - VERBAL FEEDBACK IS MANDATORY: You MUST always provide a human-readable text summary of tool results. Never just let the data speak for itself.
+       - AFTER ANY TOOL CALL: You must interpret the data for the user. 
+         * Bad: (Tool result only)
+         * Good: "I found 3 runs in your history. Your average pace was 8:30/mile."
+       - SUMMARY REQUIREMENT: After EVERY tool call, you MUST append a text section summarizing the findings or confirming the action taken. Even if the data is complex, provide a high-level overview.
      ${isPrivacyEnabled ? `- IF USER ASKS FOR LOGS/STATS/ANALYSIS: You MUST explain: "I cannot access your logs as you have 'Data Privacy' set to 'Private'. Please enable data sharing in Settings for me to gain access." Do not hallucinate data.` : ''}
 </instruction_set>
 `;
@@ -350,6 +643,7 @@ BEHAVIOR: Acknowledge effort. Use "We" statements. Push for consistency.
             getRecoveryMetrics,
             getComplianceReport,
             getTrendAnalysis,
+            getCardioSummary,
         };
 
         if (isPrivacyEnabled) {
@@ -382,6 +676,7 @@ BEHAVIOR: Acknowledge effort. Use "We" statements. Push for consistency.
                     // Server-Side Fallback for Empty Assistant Text
                     if (text === '' && toolResults && toolResults.length > 0) {
                         console.warn('[API/Chat] Assistant emitted empty text after tool calls.');
+                        // Note: Logic for fallback will be handled in client to avoid stream complexity
                     }
 
                     // RESPONSE VALIDATION (Audit/Logging)
@@ -414,13 +709,8 @@ BEHAVIOR: Acknowledge effort. Use "We" statements. Push for consistency.
             } as any);
 
             console.log('[API/Chat] streamText created. Converting to data stream response...');
-
-            // Return protocol-compliant data stream response
-            // toDataStreamResponse enables tool-recursive streaming loops
             const response = result.toUIMessageStreamResponse();
 
-            // Request logging is handled by logInteraction now for success cases, 
-            // but we keep generic request logging for consistency
             logRequest({
                 method: 'POST',
                 path: '/api/chat',
@@ -431,31 +721,31 @@ BEHAVIOR: Acknowledge effort. Use "We" statements. Push for consistency.
             });
 
             return response;
-        } catch (streamError) {
-            console.error('[API/Chat] Stream creation failed:', streamError);
-            Sentry.captureException(streamError);
-            throw streamError;
+        } catch (error) {
+            console.error('[AI Chat Error] Detailed:', error);
+            if (error instanceof Error) {
+                console.error('[AI Chat Error] Stack:', error.stack);
+            }
+            Sentry.captureException(error);
+
+            // Log failed request
+            logRequest({
+                method: 'POST',
+                path: '/api/chat',
+                userId,
+                duration: timer.getDuration(),
+                status: 500,
+                userAgent,
+                error: error instanceof Error ? error.message : 'Unknown error',
+            });
+
+            // Don't expose internal error details
+            return ApiErrors.internal('An error occurred while processing your request. Please try again.');
         }
-
-    } catch (error) {
-        console.error('[AI Chat Error] Detailed:', error);
-        if (error instanceof Error) {
-            console.error('[AI Chat Error] Stack:', error.stack);
-        }
-        Sentry.captureException(error);
-
-        // Log failed request
-        logRequest({
-            method: 'POST',
-            path: '/api/chat',
-            userId,
-            duration: timer.getDuration(),
-            status: 500,
-            userAgent,
-            error: error instanceof Error ? error.message : 'Unknown error',
-        });
-
-        // Don't expose internal error details
-        return ApiErrors.internal('An error occurred while processing your request. Please try again.');
+    } catch (outerError) {
+        // Catch any errors that occurred before entering the inner try block
+        console.error('[API/Chat] Outer error:', outerError);
+        Sentry.captureException(outerError);
+        return ApiErrors.internal('An unexpected error occurred.');
     }
 }

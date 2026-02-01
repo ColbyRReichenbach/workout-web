@@ -632,6 +632,106 @@ export const getRecoveryMetrics = tool({
 });
 
 /**
+ * Get total cardio distance and duration across ALL cardio activities.
+ * Use for "How many miles have I done?", "Total distance this week?", or cardio volume questions.
+ */
+export const getCardioSummary = tool({
+    description: 'REQUIRED for questions about total miles, total distance, or cardio volume. Aggregates distance across ALL activities: runs, bike erg, row erg, ski erg, multi-machine, etc. Use this instead of findLastLog when user asks "how many miles/kilometers" or "total distance".',
+    inputSchema: z.object({
+        days: z.number()
+            .min(1)
+            .max(30)
+            .default(7)
+            .describe('Days to look back (1-30)'),
+    }),
+    execute: async ({ days = 7 }) => {
+        console.log('[AI Tool] getCardioSummary called with days:', days);
+        try {
+            const supabase = await createClient();
+            const { data: { user } } = await supabase.auth.getUser();
+            const userId = user?.id || DEMO_USER_ID;
+
+            const date = new Date();
+            date.setDate(date.getDate() - days);
+            const dateStr = date.toISOString().split('T')[0];
+
+            // Fetch all CARDIO segment logs
+            const { data: logs, error } = await supabase
+                .from('logs')
+                .select('date, segment_name, segment_type, performance_data')
+                .eq('user_id', userId)
+                .eq('segment_type', 'CARDIO')
+                .gte('date', dateStr)
+                .order('date', { ascending: false });
+
+            if (error) {
+                console.error('[AI Tool Error] getCardioSummary:', error.message);
+                Sentry.captureException(error);
+                return 'I had trouble fetching your cardio data. Please try again.';
+            }
+
+            if (!logs || logs.length === 0) {
+                return `No cardio activities found in the last ${days} days. Log some runs, bikes, rows, or other cardio to track your distance!`;
+            }
+
+            // Aggregate totals by activity type
+            const activityTotals: Record<string, { distance: number; duration: number; count: number }> = {};
+            let totalDistance = 0;
+            let totalDuration = 0;
+
+            logs.forEach(log => {
+                const perf = log.performance_data;
+                const distance = perf?.distance || 0;
+                const duration = perf?.duration_min || 0;
+                const activityName = log.segment_name || 'Unknown';
+
+                // Aggregate by activity type
+                if (!activityTotals[activityName]) {
+                    activityTotals[activityName] = { distance: 0, duration: 0, count: 0 };
+                }
+                activityTotals[activityName].distance += distance;
+                activityTotals[activityName].duration += duration;
+                activityTotals[activityName].count += 1;
+
+                totalDistance += distance;
+                totalDuration += duration;
+            });
+
+            // Sort activities by distance
+            const sortedActivities = Object.entries(activityTotals)
+                .map(([name, data]) => ({
+                    activity: name,
+                    distance: Math.round(data.distance * 100) / 100,
+                    duration: Math.round(data.duration),
+                    sessions: data.count
+                }))
+                .sort((a, b) => b.distance - a.distance)
+                .slice(0, 5);
+
+            const result = {
+                period: `Last ${days} days`,
+                summary: {
+                    total_distance_miles: Math.round(totalDistance * 100) / 100,
+                    total_duration_min: Math.round(totalDuration),
+                    total_sessions: logs.length,
+                },
+                by_activity: sortedActivities,
+            };
+
+            // Log token usage
+            const tokens = estimateJsonTokens(result);
+            logTokenUsage('getCardioSummary', tokens, MAX_TOOL_RESULT_TOKENS);
+
+            return JSON.stringify(result, null, 2);
+        } catch (error) {
+            console.error('[AI Tool Error] getCardioSummary:', error);
+            Sentry.captureException(error);
+            return 'An error occurred while fetching cardio summary. Please try again.';
+        }
+    }
+});
+
+/**
  * Get workout compliance report for a given time period.
  * Use for "Did I hit my workouts this week?" or "How consistent have I been?"
  */
@@ -739,9 +839,9 @@ export const getTrendAnalysis = tool({
     description: 'Analyze strength or endurance progression for an exercise. Use for "Am I getting stronger?", "How\'s my squat progressing?", or trend questions. Returns data points and calculated trend direction.',
     inputSchema: z.object({
         exercise: z.string().describe('Exercise name (e.g., "squat", "bench", "deadlift", "run")'),
-        days: z.number().min(7).max(90).default(30).describe('Days to analyze (7-90, default 30)'),
+        days: z.number().min(7).max(365).default(90).describe('Days to analyze (7-365, default 90)'),
     }),
-    execute: async ({ exercise, days = 30 }) => {
+    execute: async ({ exercise, days = 90 }) => {
         console.log('[AI Tool] getTrendAnalysis called with:', { exercise, days });
         try {
             const supabase = await createClient();
@@ -806,15 +906,30 @@ export const getTrendAnalysis = tool({
                         dataPoints.push({ date: log.date, value: calculatedPace, label: 'pace (sec/mi)' });
                     }
                 } else {
-                    // For strength: track weight or volume
-                    const weight = perf.weight || perf.weight_lbs;
-                    const reps = perf.reps || 1;
+                    // For strength: extract from sets array if present
+                    let weight: number | null = null;
+                    let reps: number = 1;
+
+                    // Check for sets array (primary structure: {sets: [{weight, reps, rpe}]})
+                    if (perf.sets && Array.isArray(perf.sets) && perf.sets.length > 0) {
+                        // Find the heaviest set
+                        const maxSet = perf.sets.reduce((max: any, set: any) => {
+                            const setWeight = set.weight || set.weight_lbs || 0;
+                            const maxWeight = max?.weight || max?.weight_lbs || 0;
+                            return setWeight > maxWeight ? set : max;
+                        }, perf.sets[0]);
+
+                        weight = maxSet?.weight || maxSet?.weight_lbs || null;
+                        reps = maxSet?.reps || 1;
+                    } else {
+                        // Fallback to top-level properties
+                        weight = perf.weight || perf.weight_lbs || null;
+                        reps = perf.reps || 1;
+                    }
 
                     if (weight) {
                         dataPoints.push({ date: log.date, value: weight, label: 'weight (lbs)' });
-                    }
-                    // Also track volume (weight × reps) for overall strength trend
-                    if (weight && reps) {
+                        // Also track volume (weight × reps) for overall strength trend
                         dataPoints.push({ date: log.date, value: weight * reps, label: 'volume (lbs×reps)' });
                     }
                 }

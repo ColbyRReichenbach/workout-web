@@ -166,33 +166,247 @@ export default function AiCoach() {
         }
     }, []);
 
+    // Comprehensive formatter for all known tool response types
+    const formatToolResult = (result: unknown): string => {
+        // Handle string that might be JSON
+        if (typeof result === 'string') {
+            const trimmed = result.trim();
+            // Try to parse if it looks like JSON
+            if ((trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+                (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+                try {
+                    const parsed = JSON.parse(trimmed);
+                    return formatToolResult(parsed); // Recursively format parsed JSON
+                } catch {
+                    return result; // Return original if not valid JSON
+                }
+            }
+            return result;
+        }
+
+        if (!result || typeof result !== 'object') return String(result);
+
+        // Handle arrays (like multiple PR results)
+        if (Array.isArray(result)) {
+            if (result.length === 0) return 'No data found.';
+
+            // Check if it's an array of PR-like objects
+            if (result[0]?.exercise && result[0]?.formatted) {
+                return result.map(item =>
+                    `• ${item.exercise}: ${item.formatted}`
+                ).join('\n');
+            }
+
+            // Check if it's an array of log entries
+            if (result[0]?.date || result[0]?.segment) {
+                return result.slice(0, 5).map(log => {
+                    const date = log.date || 'Unknown date';
+                    const segment = log.segment || log.type || 'Activity';
+                    const daysAgo = log.days_ago !== undefined ? ` (${log.days_ago} days ago)` : '';
+                    return `• ${date}${daysAgo}: ${segment}`;
+                }).join('\n') + (result.length > 5 ? `\n... and ${result.length - 5} more` : '');
+            }
+
+            // Generic array handling
+            return result.slice(0, 5).map((item, i) =>
+                typeof item === 'object' ? formatToolResult(item) : `• ${item}`
+            ).join('\n');
+        }
+
+        const obj = result as Record<string, any>;
+
+        // Handle PR/Exercise result: { exercise, pr, formatted, type }
+        if (obj.exercise !== undefined && (obj.pr !== undefined || obj.formatted !== undefined)) {
+            const exerciseName = obj.exercise.charAt(0).toUpperCase() + obj.exercise.slice(1);
+            return `Your ${exerciseName} PR is ${obj.formatted || obj.pr}.`;
+        }
+
+        // Handle findLastLog result: { filter, count, logs: [...] }
+        if (obj.filter !== undefined && obj.logs !== undefined) {
+            const logCount = obj.count || obj.logs.length;
+            if (logCount === 0 || !obj.logs.length) {
+                return `No ${obj.filter} logs found in your history.`;
+            }
+            const lastLog = obj.logs[0];
+            const date = lastLog.date || 'Unknown date';
+            const daysAgo = lastLog.days_ago !== undefined ? ` (${lastLog.days_ago} days ago)` : '';
+            const segment = lastLog.segment || lastLog.type || '';
+            let response = `Your last ${obj.filter} was on ${date}${daysAgo}.`;
+            if (segment) response += ` Activity: ${segment}.`;
+            if (lastLog.data) {
+                const data = lastLog.data;
+                if (data.distance) response += ` Distance: ${data.distance} miles.`;
+                if (data.duration_min) response += ` Duration: ${data.duration_min} min.`;
+                if (data.avg_hr) response += ` Avg HR: ${data.avg_hr} bpm.`;
+            }
+            return response;
+        }
+
+        // Handle getRecentLogs result: { period, count, logs: [...] }
+        if (obj.period !== undefined && obj.logs !== undefined) {
+            const logCount = obj.count || obj.logs.length;
+            if (logCount === 0) {
+                return `No logs found for ${obj.period}.`;
+            }
+            let response = `Found ${logCount} logs for ${obj.period}.`;
+            if (obj.logs.length > 0) {
+                const types = [...new Set(obj.logs.map((l: any) => l.type || l.segment))].slice(0, 3);
+                if (types.length) response += ` Types: ${types.join(', ')}.`;
+            }
+            return response;
+        }
+
+        // Handle getBiometrics result: { period, count, summary, data }
+        if (obj.period !== undefined && obj.data !== undefined && obj.summary) {
+            return `${obj.period}: ${obj.summary}`;
+        }
+
+        // Handle getComplianceReport result: { period, summary: { workout_days, compliance_percent, ... } }
+        if (obj.summary !== undefined && obj.summary.compliance_percent !== undefined) {
+            const s = obj.summary;
+            let response = `${obj.period || 'Recent'} Workout Compliance:\n`;
+            response += `• ${s.workout_days}/${s.expected_days} workout days (${s.compliance_percent}%)\n`;
+            response += `• ${s.total_segments || 0} total segments logged`;
+            if (s.avg_rpe) response += `, Avg RPE: ${s.avg_rpe}`;
+            return response;
+        }
+
+
+        // Handle getRecoveryMetrics output: { period, data_sources, averages, latest }
+        if (obj.averages !== undefined && obj.latest !== undefined) {
+            const avgs = obj.averages;
+            const latest = obj.latest;
+            const period = obj.period || 'Recent';
+
+            let response = `${period} Recovery Summary:\n`;
+
+            // Latest data (most relevant for "how did I sleep last night?")
+            if (latest.sleep_hrs !== null && latest.sleep_hrs !== undefined) {
+                response += `• Last night: ${latest.sleep_hrs} hours of sleep`;
+                if (latest.hrv) response += `, HRV ${latest.hrv}ms`;
+                if (latest.readiness) response += `, Readiness ${latest.readiness}`;
+                response += `\n`;
+            }
+
+            // Averages
+            if (avgs.sleep_hrs !== null && avgs.sleep_hrs !== undefined) {
+                response += `• Average sleep: ${avgs.sleep_hrs}h`;
+            }
+            if (avgs.hrv_ms !== null && avgs.hrv_ms !== undefined) {
+                response += `, HRV: ${avgs.hrv_ms}ms`;
+            }
+            if (avgs.resting_hr !== null && avgs.resting_hr !== undefined) {
+                response += `, RHR: ${avgs.resting_hr}bpm`;
+            }
+            if (avgs.readiness !== null && avgs.readiness !== undefined) {
+                response += `, Readiness: ${avgs.readiness}`;
+            }
+
+            return response.trim();
+        }
+
+        // Handle recovery metrics: { recovery_score, hrv, sleep_quality }
+        if (obj.recovery_score !== undefined || obj.hrv !== undefined) {
+            let response = 'Recovery Metrics:';
+            if (obj.recovery_score !== undefined) response += ` Score: ${obj.recovery_score}.`;
+            if (obj.hrv !== undefined) response += ` HRV: ${obj.hrv}.`;
+            if (obj.sleep_quality !== undefined) response += ` Sleep: ${obj.sleep_quality}.`;
+            return response;
+        }
+
+        // Handle biometrics: { weight, body_fat, etc }
+        if (obj.weight !== undefined || obj.body_fat !== undefined) {
+            let response = 'Current Biometrics:';
+            if (obj.weight !== undefined) response += ` Weight: ${obj.weight} lbs.`;
+            if (obj.body_fat !== undefined) response += ` Body Fat: ${obj.body_fat}%.`;
+            return response;
+        }
+
+        // Handle trend analysis: { trend, summary }
+        if (obj.trend !== undefined || obj.analysis !== undefined) {
+            return obj.summary || obj.analysis || `Trend: ${obj.trend}`;
+        }
+
+        // Handle error responses
+        if (obj.error) {
+            return `Unable to retrieve data: ${obj.error}`;
+        }
+
+        // Handle generic summary/message
+        const summary = obj.summary || obj.message;
+        if (summary) return summary;
+
+        // Last resort: format key-value pairs nicely (avoid raw JSON)
+        const entries = Object.entries(obj).filter(([k]) => !['originalQuery', 'wasCorrected', 'normalizedFilter'].includes(k));
+        if (entries.length > 0 && entries.length <= 6) {
+            return entries
+                .map(([k, v]) => {
+                    const key = k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                    const val = typeof v === 'object' ? (Array.isArray(v) ? `${v.length} items` : '(details)') : v;
+                    return `${key}: ${val}`;
+                })
+                .join('\n');
+        }
+
+        return 'Data retrieved successfully.';
+    };
+
+    // Detect and sanitize raw JSON in AI text responses
+    const sanitizeJsonText = (text: string): string => {
+        const trimmed = text.trim();
+
+        // Check if the entire response looks like JSON
+        if ((trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+            (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+            try {
+                const parsed = JSON.parse(trimmed);
+                return formatToolResult(parsed);
+            } catch {
+                // Not valid JSON, return as-is
+            }
+        }
+
+        // Check for multiple JSON objects (common pattern when multiple tool results)
+        const jsonPattern = /\{[\s\S]*?\}(?=\s*\{|\s*$)/g;
+        const matches = trimmed.match(jsonPattern);
+        if (matches && matches.length > 1) {
+            try {
+                const results = matches.map(m => JSON.parse(m));
+                return results.map(r => formatToolResult(r)).join('\n\n');
+            } catch {
+                // Not all valid JSON, return as-is
+            }
+        }
+
+        return text;
+    };
+
+
     // Extract displayable content from message
     const getMessageContent = (message: UIMessage): string => {
         const m = message as any;
 
         // 1. Tool-role messages (SDK v6 fallback)
         if (m.role === 'tool') {
-            const result = m.result !== undefined ? m.result : '';
-            return typeof result === 'string' ? result : JSON.stringify(result, null, 2);
+            return formatToolResult(m.result !== undefined ? m.result : '');
         }
 
         // 2. Check parts array (SDK v6+)
         if (m.parts && Array.isArray(m.parts)) {
             const displayParts = m.parts
                 .map((part: any) => {
-                    // Text parts
+                    // Text parts - sanitize any raw JSON
                     if (part.type === 'text' && typeof part.text === 'string') {
-                        return part.text;
+                        return sanitizeJsonText(part.text);
                     }
 
                     // Tool parts (tool-name or dynamic-tool)
                     if (part.type.startsWith('tool-') || part.type === 'dynamic-tool') {
                         if (part.state === 'output-available' && part.output !== undefined) {
-                            const resultTitle = `[Result: ${part.toolName || part.type.replace('tool-', '')}]`;
-                            const resultContent = typeof part.output === 'string'
-                                ? part.output
-                                : JSON.stringify(part.output, null, 2);
-                            return `${resultTitle}\n${resultContent}`;
+                            const toolName = part.toolName || part.type.replace('tool-', '');
+                            // We skip the [Result: ...] header to keep it clean, or keep it if helpful
+                            // The prompt asked for "readable summaries", so let's format the output nicely
+                            return formatToolResult(part.output);
                         }
 
                         // Show "Analyzing..." or similar for pending tools
@@ -205,10 +419,7 @@ export default function AiCoach() {
 
                     // Legacy tool-result type
                     if (part.type === 'tool-result') {
-                        const result = part.result !== undefined ? part.result : '';
-                        const resultTitle = `[Tool Result: ${part.toolName}]`;
-                        const resultContent = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
-                        return `${resultTitle}\n${resultContent}`;
+                        return formatToolResult(part.result !== undefined ? part.result : '');
                     }
 
                     return '';
@@ -221,7 +432,19 @@ export default function AiCoach() {
         }
 
         // 3. Fallback to standard content property
-        if (typeof m.content === 'string') return m.content;
+        if (typeof m.content === 'string' && m.content.trim()) return sanitizeJsonText(m.content);
+
+        // 4. Client-side fallback if assistant text is empty but tool results exist
+        if (m.role === 'assistant') {
+            const invocations = m.toolInvocations || [];
+            if (invocations.length > 0) {
+                const lastResultInvocation = [...invocations].reverse().find((i: any) => i.state === 'result');
+                if (lastResultInvocation) {
+                    const summary = formatToolResult(lastResultInvocation.result);
+                    return `I retrieved your data, but could not format a full response. Here is a summary:\n\n${summary}`;
+                }
+            }
+        }
 
         return '';
     };
@@ -415,7 +638,9 @@ export default function AiCoach() {
                             className="flex justify-start"
                         >
                             <div className="bg-muted/50 text-muted-foreground rounded-full px-5 py-2 text-[9px] uppercase font-bold tracking-[0.2em] animate-pulse border border-border/50">
-                                Analyzing
+                                {messages[messages.length - 1]?.parts?.some((p: any) => p.type.startsWith('tool-') && (p.state === 'input-available' || p.state === 'input-streaming'))
+                                    ? `Analyzing (${(messages[messages.length - 1].parts as any[]).find(p => p.type.startsWith('tool-') && (p.state === 'input-available' || p.state === 'input-streaming'))?.toolName || 'Protocol'})`
+                                    : 'Analyzing'}
                             </div>
                         </motion.div>
                     )}

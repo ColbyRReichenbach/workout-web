@@ -201,8 +201,17 @@ export const EXERCISE_KEYWORDS: Record<string, string[]> = {
     'metcon': [
         'metcon', 'conditioning', 'wod', 'amrap', 'emom', 'for time',
         'aerobic flow', 'aerobic flow amrap', 'flow amrap',
+        'long aerobic', 'long aerobic session', 'aerobic session',
         // Typos
         'metocn', 'amra', 'ameracp', 'condtioning', 'amrpa', 'amrapp'
+    ],
+    'cardio': [
+        // General cardio umbrella - matches any cardio activity
+        'cardio', 'aerobic', 'aerobics', 'long aerobic', 'aerobic session',
+        'cardio session', 'endurance', 'steady state', 'continuous',
+        'multi-modal', 'continuous multi-modal', 'mixed modal',
+        // Typos
+        'carido', 'caridio', 'aroebic', 'aeorbic'
     ],
     'superset': [
         'superset', 'super set', 'superset a', 'superset b', 'ss', 'ss a', 'ss b',
@@ -457,7 +466,10 @@ export const SEGMENT_TYPE_MAP: Record<string, string> = {
     '400m': 'Cardio',
     'row_erg': 'Cardio',
     'bike': 'Cardio',
+    'bike_erg': 'Cardio',
     'ski_erg': 'Cardio',
+    'cardio': 'Cardio',
+    'cardio_rotation': 'Cardio',
 
     // Conditioning
     'metcon': 'Conditioning',
