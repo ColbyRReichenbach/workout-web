@@ -364,6 +364,55 @@ const SENSITIVE_TOPIC_GUARDRAILS: Record<string, GuardrailConfig> = {
         response: "I'm your fitness coach assistant and work best with training-related questions. I'd love to help you with your workouts, progress tracking, or exercise form. What can I help you with?",
         priority: 40,
     },
+
+    // ========== OFF-TOPIC SPORTS & TRIVIA ==========
+    off_topic_sports: {
+        keywords: [
+            'shoot a basketball', 'throw a football', 'kick a soccer', 'hit a baseball',
+            'golf swing', 'tennis serve', 'hockey', 'cricket', 'rugby',
+            'best player', 'best team', 'who won', 'championship', 'world cup',
+            'super bowl', 'playoffs', 'mvp', 'hall of fame', 'sports trivia',
+            'favorite team', 'favorite player', 'game score', 'match result'
+        ],
+        patterns: [
+            /who\s+(is|was)\s+(the\s+)?(best|greatest|goat)/i,
+            /how\s+(do|to)\s+(i\s+)?(shoot|throw|kick|hit|serve|swing)/i,
+            /(basketball|football|soccer|baseball|tennis|golf)\s+(tips|technique|form)/i,
+        ],
+        response: "I specialize in fitness training, not sports techniques or trivia. For sport-specific skills, a coach for that sport would be more helpful. I can help with strength, conditioning, and athletic performance training though - what are your fitness goals?",
+        priority: 35,
+    },
+    off_topic_entertainment: {
+        keywords: [
+            'movie', 'tv show', 'netflix', 'celebrity', 'actor', 'actress',
+            'music', 'song', 'album', 'concert', 'video game', 'gaming',
+            'book recommendation', 'what to watch', 'favorite movie'
+        ],
+        response: "I'm focused on fitness coaching and can't help with entertainment recommendations. How can I help with your training today?",
+        priority: 30,
+    },
+    off_topic_general_knowledge: {
+        keywords: [
+            'capital of', 'president of', 'history of', 'when did', 'who invented',
+            'how does', 'what is the meaning', 'translate', 'weather', 'news',
+            'current events', 'election', 'war', 'economy'
+        ],
+        patterns: [
+            /what\s+(is|are)\s+(the\s+)?(capital|president|population)/i,
+            /who\s+(invented|discovered|created|founded)/i,
+            /when\s+(did|was|were)\s+.+\s+(happen|start|end|born|die)/i,
+        ],
+        response: "I'm your fitness coach and specialize in training questions. For general knowledge, a search engine or AI assistant would be better suited. What can I help you with regarding your workouts?",
+        priority: 25,
+    },
+    off_topic_relationships: {
+        keywords: [
+            'relationship advice', 'dating', 'boyfriend', 'girlfriend', 'marriage',
+            'breakup', 'divorce', 'love life', 'crush', 'romantic'
+        ],
+        response: "I'm not equipped to give relationship advice - I'm here for your fitness journey. If you'd like to talk about how stress or life changes are affecting your training, I can help with that!",
+        priority: 20,
+    },
 };
 
 /**
@@ -818,9 +867,8 @@ BEHAVIOR: Acknowledge effort. Use "We" statements. Push for consistency.
        - Calculate relative dates if user asks about "yesterday/tomorrow" using Current System Date.
        - Determine if intent matches Phase goals.
        - CHECK DATA AVAILABILITY: If tools return "No logs found", plan a response that explains WHY and guides the user.
-
      </thinking>
-  4. FORMULATE response using <persona_definition>.
+  5. FORMULATE response using <persona_definition>.
       - CRITICAL FORMATTING RULES (MUST FOLLOW):
         * NEVER use markdown formatting. No asterisks for bold/italic (**text** or *text*).
         * NEVER use markdown headers (# or ##).
