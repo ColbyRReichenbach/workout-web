@@ -1,5 +1,5 @@
 import { openai } from '@ai-sdk/openai';
-import { streamText, convertToModelMessages } from 'ai';
+import { streamText, convertToModelMessages, createUIMessageStream, createUIMessageStreamResponse } from 'ai';
 import { getRecentLogs, getBiometrics, findLastLog, getExercisePR, getRecoveryMetrics, getComplianceReport, getTrendAnalysis, getCardioSummary } from '@/lib/ai/tools';
 import { createClient } from '@/utils/supabase/server';
 import { chatRequestSchema, sanitizeString, BOUNDS, extractMessageContent } from '@/lib/validation';
@@ -457,39 +457,39 @@ export async function POST(req: Request) {
                 flagged: false,
             });
 
-            // Return using AI SDK Data Stream Protocol format
-            // See: https://sdk.vercel.ai/docs/ai-sdk-ui/stream-protocol
-            const encoder = new TextEncoder();
-            const guardrailId = `guardrail-${Date.now()}`;
+            // Use AI SDK 6's UI Message Stream for proper format compatibility with useChat
+            const textId = `guardrail-text-${Date.now()}`;
+            const stream = createUIMessageStream({
+                execute: async ({ writer }) => {
+                    // Start the message
+                    writer.write({ type: 'start' });
 
-            const stream = new ReadableStream({
-                start(controller) {
-                    // Send text delta chunks (format: 0:"text content"\n)
-                    // Split into chunks for proper streaming appearance
-                    const words = guardrailResponse.split(' ');
-                    for (const word of words) {
-                        const chunk = `0:${JSON.stringify(word + ' ')}\n`;
-                        controller.enqueue(encoder.encode(chunk));
-                    }
+                    // Start text block with unique ID
+                    writer.write({ type: 'text-start', id: textId });
 
-                    // Send finish message 
-                    const finishData = {
+                    // Write the guardrail response text as a delta
+                    writer.write({
+                        type: 'text-delta',
+                        id: textId,
+                        delta: guardrailResponse,
+                    });
+
+                    // End text block
+                    writer.write({ type: 'text-end', id: textId });
+
+                    // Finish the message
+                    writer.write({
+                        type: 'finish',
                         finishReason: 'stop',
-                        usage: { promptTokens: 0, completionTokens: guardrailResponse.length / 4 }
-                    };
-                    const finishChunk = `d:${JSON.stringify(finishData)}\n`;
-                    controller.enqueue(encoder.encode(finishChunk));
-
-                    controller.close();
-                }
-            });
-
-            return new Response(stream, {
-                headers: {
-                    'Content-Type': 'text/plain; charset=utf-8',
-                    'X-Vercel-AI-Data-Stream': 'v1',
+                    });
+                },
+                onError: (error) => {
+                    console.error('[Guardrail Stream Error]', error);
+                    return 'An error occurred while processing your request.';
                 },
             });
+
+            return createUIMessageStreamResponse({ stream });
         }
 
         // 6. FETCH USER PROFILE & BUILD CONTEXT
