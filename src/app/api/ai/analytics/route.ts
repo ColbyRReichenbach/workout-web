@@ -74,6 +74,28 @@ export async function GET(request: NextRequest) {
             return acc;
         }, {} as Record<string, number>);
 
+        // Calculate per-user stats
+        const userStats: Record<string, { requests: number; tokens: number; cost: number }> = {};
+        for (const l of logs) {
+            const uid = l.user_id || 'anonymous';
+            if (!userStats[uid]) {
+                userStats[uid] = { requests: 0, tokens: 0, cost: 0 };
+            }
+            userStats[uid].requests++;
+            userStats[uid].tokens += (l.total_tokens || 0);
+            userStats[uid].cost += Number(l.estimated_cost_usd || 0);
+        }
+
+        const topUsers = Object.entries(userStats)
+            .map(([userId, stats]) => ({
+                userId,
+                requests: stats.requests,
+                totalTokens: stats.tokens,
+                totalCostUsd: Number(stats.cost.toFixed(4))
+            }))
+            .sort((a, b) => b.requests - a.requests)
+            .slice(0, 10);
+
         // Intent breakdown (from feedback primarily, or logs if we want broader data)
         const intentCounts: Record<string, { positive: number; negative: number; total: number }> = {};
         for (const f of feedback) {
@@ -137,7 +159,8 @@ export async function GET(request: NextRequest) {
                 totalTokens,
                 totalCostUsd: Number(totalCost.toFixed(4)),
                 avgLatencyMs: avgLatency,
-                modelDistribution
+                modelDistribution,
+                topUsers
             },
             intents: Object.entries(intentCounts)
                 .map(([intent, counts]) => ({

@@ -39,6 +39,12 @@ interface AnalyticsData {
         totalCostUsd: number;
         avgLatencyMs: number | null;
         modelDistribution: Record<string, number>;
+        topUsers: Array<{
+            userId: string;
+            requests: number;
+            totalTokens: number;
+            totalCostUsd: number;
+        }>;
     };
     intents: Array<{
         intent: string;
@@ -124,14 +130,14 @@ export default function AdminAnalyticsPage() {
     if (!data) return null;
 
     return (
-        <div className="min-h-screen bg-background text-foreground selection:bg-primary/30 relative overflow-hidden font-sans">
+        <div className="min-h-screen bg-background text-foreground selection:bg-primary/30 relative overflow-x-hidden font-sans">
             {/* Scanline Diagnostic Overlay */}
             <div className="fixed inset-0 pointer-events-none z-[100] overflow-hidden opacity-20">
                 <div className="absolute top-0 left-0 w-full h-[1px] bg-primary shadow-[0_0_15px_rgba(239,68,68,0.5)] scan-line-admin" />
             </div>
 
             {/* Header Area - Sticky under main navbar */}
-            <header className="sticky top-[96px] z-40 bg-background/60 backdrop-blur-3xl border-b border-border shadow-sm">
+            <header className="sticky top-[96px] z-40 bg-background/95 backdrop-blur-3xl border-b border-border shadow-sm">
                 <div className="max-w-[1600px] mx-auto px-8 h-20 flex items-center justify-between">
                     <div className="flex items-center gap-6">
                         <div className="flex items-center gap-3">
@@ -179,9 +185,9 @@ export default function AdminAnalyticsPage() {
                 </div>
             </header>
 
-            <main className="max-w-[1600px] mx-auto px-8 pt-32 pb-20 relative z-10">
+            <main className="max-w-[1600px] mx-auto px-8 pt-48 pb-20 relative z-10">
                 {/* Status HUD (Top Cards) */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 mb-12">
                     <AuditCard
                         icon={<ThumbsUp size={24} />}
                         label="User Sentiment"
@@ -190,11 +196,25 @@ export default function AdminAnalyticsPage() {
                         color="emerald"
                     />
                     <AuditCard
+                        icon={<Activity size={24} />}
+                        label="Total Requests"
+                        value={data.engineering.totalLogs.toLocaleString()}
+                        subtext="Cumulative Interactions"
+                        color="indigo"
+                    />
+                    <AuditCard
                         icon={<Zap size={24} />}
                         label="Operational Cost"
                         value={`$${data.engineering.totalCostUsd}`}
                         subtext={`${data.engineering.totalTokens.toLocaleString()} Total Tokens`}
                         color="amber"
+                    />
+                    <AuditCard
+                        icon={<Database size={24} />}
+                        label="Token Efficiency"
+                        value={data.engineering.totalLogs > 0 ? Math.round(data.engineering.totalTokens / data.engineering.totalLogs).toString() : "0"}
+                        subtext="Avg Tokens / Request"
+                        color="emerald" // Reusing emerald or maybe blue
                     />
                     <AuditCard
                         icon={<Clock size={24} />}
@@ -384,6 +404,38 @@ export default function AdminAnalyticsPage() {
                                                     />
                                                 </div>
                                                 <span className="text-[10px] font-mono font-bold text-primary">{Math.round((count / data.engineering.totalLogs) * 100)}%</span>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </section>
+
+                        {/* Power Users */}
+                        <section className="bg-card border border-border rounded-[40px] p-8">
+                            <h3 className="text-lg font-serif font-bold text-foreground mb-8 border-b border-border pb-4 flex items-center gap-2">
+                                <Activity size={18} className="text-primary" />
+                                Power Users
+                            </h3>
+                            <div className="space-y-4 font-mono">
+                                {data.engineering.topUsers?.length === 0 ? (
+                                    <div className="py-8 text-center border border-dashed border-border rounded-3xl">
+                                        <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">No Active Users</p>
+                                    </div>
+                                ) : (
+                                    data.engineering.topUsers?.map((user, i) => (
+                                        <div key={user.userId} className="flex items-center justify-between group">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-6 h-6 rounded-lg bg-primary/5 flex items-center justify-center border border-primary/10 text-[10px] font-bold text-primary">
+                                                    {i + 1}
+                                                </div>
+                                                <span className="text-[10px] text-muted-foreground group-hover:text-foreground transition-colors" title={user.userId}>
+                                                    {user.userId.substring(0, 8)}...
+                                                </span>
+                                            </div>
+                                            <div className="text-right">
+                                                <span className="block text-[10px] font-bold text-primary">{user.requests} reqs</span>
+                                                <span className="block text-[9px] text-muted-foreground">{user.totalTokens.toLocaleString()} toks</span>
                                             </div>
                                         </div>
                                     ))
