@@ -16,7 +16,7 @@ export const PulseCoordinator = () => {
     const [triggerPulse, setTriggerPulse] = useState(false);
 
     // Easing from Apple guidelines
-    const transition = { duration: 0.8, ease: [0.16, 1, 0.3, 1] };
+    const transition = { duration: 0.8, ease: [0.16, 1, 0.3, 1] as const };
 
     const handleLoginSuccess = () => {
         setView('ONBOARDING');
