@@ -57,6 +57,124 @@ function detectPromptInjection(content: string): boolean {
 }
 
 // ============================================
+// FUZZY MATCHING UTILITIES
+// Industry standard: Levenshtein distance for typo tolerance
+// ============================================
+
+/**
+ * Calculate Levenshtein distance between two strings
+ * Used for fuzzy keyword matching to catch typos
+ */
+function levenshteinDistance(a: string, b: string): number {
+    const matrix: number[][] = [];
+
+    for (let i = 0; i <= b.length; i++) {
+        matrix[i] = [i];
+    }
+    for (let j = 0; j <= a.length; j++) {
+        matrix[0][j] = j;
+    }
+
+    for (let i = 1; i <= b.length; i++) {
+        for (let j = 1; j <= a.length; j++) {
+            if (b.charAt(i - 1) === a.charAt(j - 1)) {
+                matrix[i][j] = matrix[i - 1][j - 1];
+            } else {
+                matrix[i][j] = Math.min(
+                    matrix[i - 1][j - 1] + 1, // substitution
+                    matrix[i][j - 1] + 1,     // insertion
+                    matrix[i - 1][j] + 1      // deletion
+                );
+            }
+        }
+    }
+
+    return matrix[b.length][a.length];
+}
+
+/**
+ * Check if a word fuzzy-matches a keyword within tolerance
+ * Tolerance scales with word length (longer words allow more typos)
+ */
+function fuzzyMatch(word: string, keyword: string, maxDistance?: number): boolean {
+    const distance = levenshteinDistance(word.toLowerCase(), keyword.toLowerCase());
+    // Allow 1 typo for words 4-6 chars, 2 typos for 7+ chars
+    const tolerance = maxDistance ?? (keyword.length >= 7 ? 2 : keyword.length >= 4 ? 1 : 0);
+    return distance <= tolerance;
+}
+
+/**
+ * Simple stemming for common word endings
+ * Reduces "eating" -> "eat", "steroids" -> "steroid", etc.
+ */
+function simpleStem(word: string): string {
+    return word
+        .replace(/ing$/i, '')
+        .replace(/ed$/i, '')
+        .replace(/s$/i, '')
+        .replace(/ly$/i, '')
+        .replace(/tion$/i, 't')
+        .replace(/ment$/i, '');
+}
+
+/**
+ * Extract words from content for fuzzy matching
+ */
+function extractWords(content: string): string[] {
+    return content.toLowerCase().match(/\b[a-z]{3,}\b/g) || [];
+}
+
+// ============================================
+// OPENAI MODERATION API (Industry Standard - FREE)
+// ============================================
+
+interface ModerationResult {
+    flagged: boolean;
+    categories: Record<string, boolean>;
+    category_scores: Record<string, number>;
+}
+
+/**
+ * Call OpenAI's free Moderation API for semantic content analysis
+ * Catches nuanced harmful content that keywords miss
+ */
+async function checkOpenAIModeration(content: string): Promise<{ flagged: boolean; reason?: string }> {
+    try {
+        const response = await fetch('https://api.openai.com/v1/moderations', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+            },
+            body: JSON.stringify({ input: content }),
+        });
+
+        if (!response.ok) {
+            console.error('[Moderation API] Failed:', response.status);
+            return { flagged: false }; // Fail open, let other guardrails catch it
+        }
+
+        const data = await response.json();
+        const result: ModerationResult = data.results?.[0];
+
+        if (result?.flagged) {
+            // Find which category triggered
+            const triggeredCategories = Object.entries(result.categories)
+                .filter(([, flagged]) => flagged)
+                .map(([category]) => category);
+
+            console.log('[Moderation API] Flagged categories:', triggeredCategories);
+            return { flagged: true, reason: triggeredCategories.join(', ') };
+        }
+
+        return { flagged: false };
+    } catch (error) {
+        console.error('[Moderation API] Error:', error);
+        return { flagged: false }; // Fail open
+    }
+}
+
+// ============================================
 // SENSITIVE TOPIC GUARDRAILS
 // These topics require controlled responses instead of AI-generated advice
 // ============================================
@@ -250,29 +368,62 @@ const SENSITIVE_TOPIC_GUARDRAILS: Record<string, GuardrailConfig> = {
 
 /**
  * Check if content triggers a sensitive topic guardrail.
+ * Uses a layered approach:
+ * 1. Exact keyword matching (fastest)
+ * 2. Fuzzy matching with Levenshtein distance (catches typos)
+ * 3. Stemmed word matching (catches word variations)
+ * 4. Pattern matching (catches phrases)
+ *
  * Returns the guardrail response if matched, null otherwise.
  */
 function checkSensitiveTopicGuardrails(content: string): string | null {
     const lowerContent = content.toLowerCase();
+    const contentWords = extractWords(content);
+    const stemmedContentWords = contentWords.map(simpleStem);
 
     // Sort guardrails by priority (highest first)
     const sortedGuardrails = Object.entries(SENSITIVE_TOPIC_GUARDRAILS)
         .sort(([, a], [, b]) => b.priority - a.priority);
 
     for (const [topic, config] of sortedGuardrails) {
-        // Check keyword matches
+        // 1. EXACT KEYWORD MATCH (fastest path)
         for (const keyword of config.keywords) {
             if (lowerContent.includes(keyword.toLowerCase())) {
-                console.log(`[AI Guardrail] Triggered "${topic}" guardrail on keyword: "${keyword}"`);
+                console.log(`[AI Guardrail] Triggered "${topic}" on exact keyword: "${keyword}"`);
                 return config.response;
             }
         }
 
-        // Check pattern matches
+        // 2. FUZZY MATCH for single-word keywords (catches typos like "steriods")
+        const singleWordKeywords = config.keywords.filter(k => !k.includes(' '));
+        for (const keyword of singleWordKeywords) {
+            for (const word of contentWords) {
+                if (word.length >= 4 && fuzzyMatch(word, keyword)) {
+                    console.log(`[AI Guardrail] Triggered "${topic}" on fuzzy match: "${word}" ≈ "${keyword}"`);
+                    return config.response;
+                }
+            }
+        }
+
+        // 3. STEMMED MATCH (catches "eating" -> "eat", "dieting" -> "diet")
+        const stemmedKeywords = singleWordKeywords.map(simpleStem);
+        for (const stemmedKeyword of stemmedKeywords) {
+            if (stemmedKeyword.length >= 3) {
+                for (const stemmedWord of stemmedContentWords) {
+                    if (stemmedWord === stemmedKeyword ||
+                        (stemmedWord.length >= 4 && fuzzyMatch(stemmedWord, stemmedKeyword, 1))) {
+                        console.log(`[AI Guardrail] Triggered "${topic}" on stemmed match: stemmed word matches "${stemmedKeyword}"`);
+                        return config.response;
+                    }
+                }
+            }
+        }
+
+        // 4. PATTERN MATCH (regex for complex phrases)
         if (config.patterns) {
             for (const pattern of config.patterns) {
                 if (pattern.test(content)) {
-                    console.log(`[AI Guardrail] Triggered "${topic}" guardrail on pattern: ${pattern}`);
+                    console.log(`[AI Guardrail] Triggered "${topic}" on pattern: ${pattern}`);
                     return config.response;
                 }
             }
@@ -280,6 +431,26 @@ function checkSensitiveTopicGuardrails(content: string): string | null {
     }
 
     return null;
+}
+
+/**
+ * Get a generic guardrail response for OpenAI Moderation API flags
+ */
+function getModerationGuardrailResponse(reason: string): string {
+    const lowerReason = reason.toLowerCase();
+
+    if (lowerReason.includes('self-harm') || lowerReason.includes('self_harm')) {
+        return SENSITIVE_TOPIC_GUARDRAILS.mental_health_crisis.response;
+    }
+    if (lowerReason.includes('sexual')) {
+        return SENSITIVE_TOPIC_GUARDRAILS.explicit_content.response;
+    }
+    if (lowerReason.includes('violence') || lowerReason.includes('hate')) {
+        return "I can't engage with content that involves violence or hate. I'm here to help with your fitness journey. How can I assist with your training?";
+    }
+
+    // Generic fallback
+    return "I'm not able to help with that request. I'm your fitness coach assistant - let me know if you have any training questions!";
 }
 
 // ============================================
@@ -489,6 +660,43 @@ export async function POST(req: Request) {
                 },
                 onError: (error) => {
                     console.error('[Guardrail Stream Error]', error);
+                    return 'An error occurred while processing your request.';
+                },
+            });
+
+            return createUIMessageStreamResponse({ stream });
+        }
+
+        // 5c. OPENAI MODERATION API - Semantic safety net (FREE, catches what keywords miss)
+        // Only check if keyword guardrails didn't catch it
+        const moderationResult = await checkOpenAIModeration(latestUserContent);
+        if (moderationResult.flagged) {
+            console.log(`[AI Moderation] OpenAI flagged content: ${moderationResult.reason}`);
+            const moderationResponse = getModerationGuardrailResponse(moderationResult.reason || '');
+
+            logInteraction({
+                userId,
+                intent: 'GUARDRAIL',
+                userMessage: latestUserContent.substring(0, 200),
+                aiResponse: moderationResponse,
+                toolCalls: 0,
+                durationMs: timer.getDuration(),
+                status: 'refusal',
+                refusalReason: `OpenAI Moderation: ${moderationResult.reason}`,
+                flagged: true,
+            });
+
+            const textId = `moderation-text-${Date.now()}`;
+            const stream = createUIMessageStream({
+                execute: async ({ writer }) => {
+                    writer.write({ type: 'start' });
+                    writer.write({ type: 'text-start', id: textId });
+                    writer.write({ type: 'text-delta', id: textId, delta: moderationResponse });
+                    writer.write({ type: 'text-end', id: textId });
+                    writer.write({ type: 'finish', finishReason: 'stop' });
+                },
+                onError: (error) => {
+                    console.error('[Moderation Stream Error]', error);
                     return 'An error occurred while processing your request.';
                 },
             });
