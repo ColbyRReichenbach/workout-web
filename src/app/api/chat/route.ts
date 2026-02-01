@@ -99,8 +99,9 @@ function levenshteinDistance(a: string, b: string): number {
  */
 function fuzzyMatch(word: string, keyword: string, maxDistance?: number): boolean {
     const distance = levenshteinDistance(word.toLowerCase(), keyword.toLowerCase());
-    // Allow 1 typo for words 4-6 chars, 2 typos for 7+ chars
-    const tolerance = maxDistance ?? (keyword.length >= 7 ? 2 : keyword.length >= 4 ? 1 : 0);
+    // Allow 1 typo for words 6+ chars, 2 typos for 8+ chars
+    // Rigid matching for short keywords (4-5 chars) to avoid false positives like last/fast
+    const tolerance = maxDistance ?? (keyword.length >= 8 ? 2 : keyword.length >= 6 ? 1 : 0);
     return distance <= tolerance;
 }
 
@@ -143,7 +144,10 @@ const FITNESS_CONTEXT_KEYWORDS = [
     'program', 'routine', 'split', 'phase', 'week', 'day', 'session', 'pr', 'max',
     'volume', 'intensity', 'rpe', 'rir', 'tempo', 'rest', 'recovery', 'deload',
     // Goals
-    'stronger', 'faster', 'endurance', 'stamina', 'performance', 'athletic'
+    'stronger', 'faster', 'endurance', 'stamina', 'performance', 'athletic',
+    // Tracking & History
+    'track', 'tracking', 'history', 'logs', 'logged', 'stats', 'stat', 'entry',
+    'last', 'previous', 'when', 'yesterday', 'today', 'recent', 'progress', 'improvement'
 ];
 
 /**
@@ -168,6 +172,8 @@ const AMBIGUOUS_KEYWORDS: Record<string, string[]> = {
     'cutting': ['eating_disorder'],
     'shredded': ['eating_disorder'],
     'lean': ['eating_disorder'],
+    'fasting': ['nutrition_diet'],
+    'fast': ['nutrition_diet'],
     'boyfriend': ['off_topic_relationships'], // "my boyfriend and I train together"
     'girlfriend': ['off_topic_relationships'],
     'husband': ['off_topic_relationships'],
@@ -922,12 +928,20 @@ function checkSensitiveTopicGuardrails(content: string): string | null {
         // 3. STEMMED MATCH (catches "eating" -> "eat", "dieting" -> "diet")
         // Only for high-priority guardrails (safety-related)
         if (config.priority >= 100) {
-            const stemmedKeywords = singleWordKeywords.map(simpleStem);
-            for (const stemmedKeyword of stemmedKeywords) {
+            for (const keyword of singleWordKeywords) {
+                const stemmedKeyword = simpleStem(keyword);
                 if (stemmedKeyword.length >= 3) {
                     for (const stemmedWord of stemmedContentWords) {
                         if (stemmedWord === stemmedKeyword ||
                             (stemmedWord.length >= 4 && fuzzyMatch(stemmedWord, stemmedKeyword, 1))) {
+
+                            // Check if this is an ambiguous keyword that needs fitness context check
+                            const ambiguousCategories = AMBIGUOUS_KEYWORDS[keyword.toLowerCase()];
+                            if (ambiguousCategories?.includes(topic) && hasStrongFitnessContext) {
+                                console.log(`[AI Guardrail] Skipping "${topic}" for stemmed match on "${keyword}" - fitness context detected`);
+                                continue;
+                            }
+
                             console.log(`[AI Guardrail] Triggered "${topic}" on stemmed match: stemmed word matches "${stemmedKeyword}"`);
                             return config.response;
                         }
