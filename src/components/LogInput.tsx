@@ -209,6 +209,7 @@ export function LogCardioBasic({ segment, idx, onLog }: LogProps) {
     const [distance, setDistance] = useState("");
     const [duration, setDuration] = useState(segment.target?.duration_min || "");
     const [hr, setHr] = useState("");
+    const [watts, setWatts] = useState("");
     const [notes] = useState("");
     const [saved, setSaved] = useState(false);
 
@@ -218,6 +219,7 @@ export function LogCardioBasic({ segment, idx, onLog }: LogProps) {
             unit: getUnitLabel(units, 'distance'), // Pass the unit context for validation
             duration_min: duration,
             avg_hr: hr,
+            watts: watts,
             notes
         });
         setSaved(true);
@@ -234,9 +236,15 @@ export function LogCardioBasic({ segment, idx, onLog }: LogProps) {
 
     const inputInner = "bg-card border border-border rounded-xl px-2 py-3 text-lg font-serif focus:bg-background focus:ring-4 focus:ring-primary/5 outline-none text-center text-foreground shadow-inner w-full placeholder:text-muted-foreground";
 
+    // Detect if we should show watts based on segment name
+    const showWatts = segment.name.toLowerCase().includes('bike') ||
+        segment.name.toLowerCase().includes('row') ||
+        segment.name.toLowerCase().includes('ski') ||
+        segment.name.toLowerCase().includes('watt');
+
     return (
         <div className="space-y-4 w-full md:min-w-[300px]">
-            <div className="grid grid-cols-3 gap-3">
+            <div className={`grid ${showWatts ? 'grid-cols-4' : 'grid-cols-3'} gap-3`}>
                 <div className="space-y-1.5">
                     <label className="text-[10px] text-muted-foreground uppercase font-bold block text-center">{getUnitLabel(units, 'distance').toUpperCase()}</label>
                     <input
@@ -258,6 +266,18 @@ export function LogCardioBasic({ segment, idx, onLog }: LogProps) {
                         className={inputInner}
                     />
                 </div>
+                {showWatts && (
+                    <div className="space-y-1.5">
+                        <label className="text-[10px] text-muted-foreground uppercase font-bold block text-center">Watts</label>
+                        <input
+                            type="number"
+                            placeholder="0"
+                            value={watts}
+                            onChange={(e) => setWatts(e.target.value)}
+                            className={inputInner}
+                        />
+                    </div>
+                )}
                 <div className="space-y-1.5">
                     <label className="text-[10px] text-muted-foreground uppercase font-bold block text-center">Avg HR</label>
                     <input

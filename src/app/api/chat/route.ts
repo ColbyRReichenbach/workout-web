@@ -845,8 +845,8 @@ const SENSITIVE_TOPIC_GUARDRAILS: Record<string, GuardrailConfig> = {
     },
     off_topic_general_knowledge: {
         keywords: [
-            'capital of', 'president of', 'history of', 'when did', 'who invented',
-            'how does', 'what is the meaning', 'translate', 'weather', 'news',
+            'capital of', 'president of', 'history of', 'who invented',
+            'what is the meaning', 'translate', 'weather', 'news',
             'current events', 'election', 'war', 'economy'
         ],
         patterns: [
@@ -991,6 +991,7 @@ function getModerationGuardrailResponse(reason: string): string {
 export async function POST(req: Request) {
     const timer = createRequestTimer();
     const userAgent = req.headers.get('user-agent') || undefined;
+    const messageId = crypto.randomUUID();
     let userId: string | undefined;
 
     console.log('[API/Chat] Request received');
@@ -1384,13 +1385,14 @@ BEHAVIOR: Acknowledge effort. Use "We" statements. Push for consistency.
      - NEVER say "not available" or "no data" without FIRST calling the appropriate tool.
      - If user asks about multiple things (e.g., "all my maxes"), call the tool for EACH one.
      - TOOL MAPPING:
-       * "What's my max/PR for X?" → getExercisePR (call once per exercise)
-       * "What are all my maxes?" → getExercisePR for squat, bench, deadlift, front squat, ohp, clean and jerk, snatch
-       * "How many miles/distance this week?" → getCardioSummary
-       * "When was my last X?" → findLastLog
-       * "How's my X progressing?" → getTrendAnalysis
-       * "How has my sleep/recovery been?" → getRecoveryMetrics
-       * "Did I hit my workouts?" → getComplianceReport
+       * "What's my max/PR for X?" -> getExercisePR (call once per exercise)
+       * "When/what date did I hit my PR/max?" -> getExercisePR (it returns the date of the record)
+       * "What are all my maxes?" OR "When did I hit my maxes?" -> YOU MUST CALL getExercisePR MULTIPLE TIMES (once for EACH major exercise: Squat, Bench, Deadlift, Press, Clean, Snatch, Mile, 5k). Do not just call it once.
+       * "How many miles/distance this week?" -> getCardioSummary
+       * "When was my last workout/session for X?" -> findLastLog
+       * "How's my X progressing?" -> getTrendAnalysis
+       * "How has my sleep/recovery been?" -> getRecoveryMetrics
+       * "Did I hit my workouts?" -> getComplianceReport
   4. PERFORM hidden reasoning:
      <thinking>
        - Check user's fatigue/injury risk based on logs/input.
@@ -1449,7 +1451,7 @@ BEHAVIOR: Acknowledge effort. Use "We" statements. Push for consistency.
                 tools: enabledTools,
                 onStepFinish: ({ text, toolCalls, toolResults, finishReason }: any) => {
                     try {
-                        const resultStrs = toolResults?.map((r: any) => `Tool: ${r.toolName}, Success: ${!r.isError}, Len: ${JSON.stringify(r.result).length}`).join(', ') || 'NONE';
+                        const resultStrs = toolResults?.map((r: any) => `Tool: ${r.toolName}, Success: ${!r.isError}, Len: ${(JSON.stringify(r.result) || '').length}`).join(', ') || 'NONE';
                         const logData = `\n[Step Finish] Reason: ${finishReason}\nTextLen: ${text?.length || 0}\nResults: ${resultStrs}\n`;
                         fs.appendFileSync('/tmp/ai_chat_debug.log', logData);
                     } catch (e) { }
@@ -1553,7 +1555,7 @@ BEHAVIOR: Acknowledge effort. Use "We" statements. Push for consistency.
                             toolResults: toolResults?.map((tr: any) => ({
                                 tool: tr.toolName,
                                 success: !tr.isError,
-                                length: JSON.stringify(tr.result).length
+                                length: (JSON.stringify(tr.result) || '').length
                             }))
                         }
                     }).then(({ error }) => {

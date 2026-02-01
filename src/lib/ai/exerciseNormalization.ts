@@ -90,8 +90,8 @@ export const EXERCISE_KEYWORDS: Record<string, string[]> = {
         'pul up', 'pulup', 'wieghted pullup', 'weighed pullup'
     ],
     'row': [
-        'row', 'rows', 'barbell row', 'bent over row', 'pendlay', 'pendlay row',
-        'bb row', 'bor', 'bent row',
+        'barbell row', 'bent over row', 'pendlay', 'pendlay row',
+        'bb row', 'bor', 'bent row', 'strength row',
         // Typos
         'pendley', 'penlay', 'pendaly', 'pendlayr ow', 'pendley row', 'pndlay'
     ],
@@ -160,7 +160,7 @@ export const EXERCISE_KEYWORDS: Record<string, string[]> = {
     // CARDIO: ERG MACHINES (Enhanced)
     // =====================================================
     'row_erg': [
-        'row erg', 'rowing', 'erg row', 'rower', 'concept 2', 'c2', 'c2 row',
+        'row', 'rows', 'row erg', 'rowing', 'erg row', 'rower', 'concept 2', 'c2', 'c2 row',
         'row intervals', 'erg intervals', 'row erg intervals', 'erg', 'ergo',
         // Typos
         'row erg intervlas', 'row ergy', 'rwo erg', 'rowign', 'row ergo'

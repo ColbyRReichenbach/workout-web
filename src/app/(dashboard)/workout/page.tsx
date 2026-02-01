@@ -322,6 +322,11 @@ export default function WorkoutPage() {
             }
         }
 
+        // Cardio Watts PRs
+        if (data.watts) {
+            await checkPr(segment.name, segment.type, Number(data.watts), 0);
+        }
+
         const supabase = createClient();
         const { data: { user } } = await supabase.auth.getUser();
         const currentUserId = user?.id || DEMO_USER_ID;
