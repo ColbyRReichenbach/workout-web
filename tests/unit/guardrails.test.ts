@@ -305,3 +305,233 @@ describe('False Positive Prevention', () => {
         // Without fitness context, this should be blocked
     });
 });
+
+// ============================================
+// OUTPUT FILTERING TESTS
+// Tests for AI response validation (copied patterns from route.ts)
+// ============================================
+
+// PII Detection Patterns
+const PII_PATTERNS = {
+    phone: /\b(\+?1[-.\s]?)?(\(?\d{3}\)?[-.\s]?)?\d{3}[-.\s]?\d{4}\b/g,
+    email: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g,
+    ssn: /\b\d{3}[-\s]?\d{2}[-\s]?\d{4}\b/g,
+    creditCard: /\b(?:\d{4}[-\s]?){3}\d{4}\b/g,
+};
+
+// Credential Detection Patterns
+const CREDENTIAL_PATTERNS = {
+    openaiKey: /\bsk-[A-Za-z0-9]{20,}\b/g,
+    jwt: /\beyJ[A-Za-z0-9_-]*\.eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*/g,
+    genericSecret: /\b(password|secret|token|credential)\s*[:=]\s*['"]?[^\s'"]{8,}['"]?/gi,
+};
+
+// System Leak Patterns
+const SYSTEM_LEAK_PATTERNS = {
+    systemPrompt: /\b(system\s*prompt|system\s*instructions|my\s*instructions)\b/gi,
+    xmlTags: /<(system_configuration|security_policy|persona_definition|instruction_set)[^>]*>/gi,
+    internalRef: /\b(internal\s*error|unauthorized\s*access|admin\s*mode)\b/gi,
+};
+
+describe('Output Filtering - PII Detection', () => {
+    it('should detect phone numbers', () => {
+        const responses = [
+            'Call me at 555-123-4567',
+            'My number is (555) 123-4567',
+            'Reach me at 5551234567',
+            'Contact: +1-555-123-4567',
+        ];
+
+        responses.forEach(response => {
+            const hasPhone = PII_PATTERNS.phone.test(response);
+            // Reset regex lastIndex
+            PII_PATTERNS.phone.lastIndex = 0;
+            expect(hasPhone).toBe(true);
+        });
+    });
+
+    it('should detect email addresses', () => {
+        const responses = [
+            'Email me at john@example.com',
+            'Contact support@fitness.co',
+            'Send to user.name+tag@domain.org',
+        ];
+
+        responses.forEach(response => {
+            const hasEmail = PII_PATTERNS.email.test(response);
+            PII_PATTERNS.email.lastIndex = 0;
+            expect(hasEmail).toBe(true);
+        });
+    });
+
+    it('should detect SSN patterns', () => {
+        const responses = [
+            'SSN: 123-45-6789',
+            'Social security: 123 45 6789',
+            'Number: 123456789',
+        ];
+
+        responses.forEach(response => {
+            const hasSSN = PII_PATTERNS.ssn.test(response);
+            PII_PATTERNS.ssn.lastIndex = 0;
+            expect(hasSSN).toBe(true);
+        });
+    });
+
+    it('should NOT flag fitness-related numbers as PII', () => {
+        const fitnessResponses = [
+            'Your squat PR is 315 lbs',
+            'Do 3x10 at 225',
+            'Rest for 90 seconds',
+            'Your pace was 8:30 per mile',
+        ];
+
+        fitnessResponses.forEach(response => {
+            // These should not match SSN or phone patterns in a meaningful way
+            // Note: Some may match phone regex but context would filter them
+            const hasSSN = PII_PATTERNS.ssn.test(response);
+            PII_PATTERNS.ssn.lastIndex = 0;
+            expect(hasSSN).toBe(false);
+        });
+    });
+});
+
+describe('Output Filtering - Credential Detection', () => {
+    it('should detect OpenAI API keys', () => {
+        const response = 'Your API key is sk-abcdefghijklmnopqrstuvwxyz123456';
+        const hasKey = CREDENTIAL_PATTERNS.openaiKey.test(response);
+        CREDENTIAL_PATTERNS.openaiKey.lastIndex = 0;
+        expect(hasKey).toBe(true);
+    });
+
+    it('should detect JWT tokens', () => {
+        const response = 'Token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c';
+        const hasJWT = CREDENTIAL_PATTERNS.jwt.test(response);
+        CREDENTIAL_PATTERNS.jwt.lastIndex = 0;
+        expect(hasJWT).toBe(true);
+    });
+
+    it('should detect generic password/secret patterns', () => {
+        const responses = [
+            'password: mysecretpassword123',
+            'secret = "super_secret_value"',
+            "token: 'abcdef123456789'",
+        ];
+
+        responses.forEach(response => {
+            const hasSecret = CREDENTIAL_PATTERNS.genericSecret.test(response);
+            CREDENTIAL_PATTERNS.genericSecret.lastIndex = 0;
+            expect(hasSecret).toBe(true);
+        });
+    });
+
+    it('should NOT flag normal fitness advice', () => {
+        const safeResponses = [
+            'Great job on your workout today!',
+            'Your deadlift form looks good.',
+            'Try increasing weight by 5 lbs next week.',
+        ];
+
+        safeResponses.forEach(response => {
+            const hasKey = CREDENTIAL_PATTERNS.openaiKey.test(response);
+            const hasJWT = CREDENTIAL_PATTERNS.jwt.test(response);
+            const hasSecret = CREDENTIAL_PATTERNS.genericSecret.test(response);
+            CREDENTIAL_PATTERNS.openaiKey.lastIndex = 0;
+            CREDENTIAL_PATTERNS.jwt.lastIndex = 0;
+            CREDENTIAL_PATTERNS.genericSecret.lastIndex = 0;
+            expect(hasKey).toBe(false);
+            expect(hasJWT).toBe(false);
+            expect(hasSecret).toBe(false);
+        });
+    });
+});
+
+describe('Output Filtering - System Prompt Leakage', () => {
+    it('should detect system prompt mentions', () => {
+        const leakyResponses = [
+            'According to my system prompt, I should...',
+            'My instructions say to always...',
+            'Based on my system instructions...',
+        ];
+
+        leakyResponses.forEach(response => {
+            const hasLeak = SYSTEM_LEAK_PATTERNS.systemPrompt.test(response);
+            SYSTEM_LEAK_PATTERNS.systemPrompt.lastIndex = 0;
+            expect(hasLeak).toBe(true);
+        });
+    });
+
+    it('should detect XML tag leakage', () => {
+        const leakyResponses = [
+            '<system_configuration> revealed...',
+            'The <security_policy> states...',
+            'Under <instruction_set>...',
+        ];
+
+        leakyResponses.forEach(response => {
+            const hasLeak = SYSTEM_LEAK_PATTERNS.xmlTags.test(response);
+            SYSTEM_LEAK_PATTERNS.xmlTags.lastIndex = 0;
+            expect(hasLeak).toBe(true);
+        });
+    });
+
+    it('should detect internal error references', () => {
+        const leakyResponses = [
+            'An internal error occurred...',
+            'Unauthorized access detected...',
+            'Switching to admin mode...',
+        ];
+
+        leakyResponses.forEach(response => {
+            const hasLeak = SYSTEM_LEAK_PATTERNS.internalRef.test(response);
+            SYSTEM_LEAK_PATTERNS.internalRef.lastIndex = 0;
+            expect(hasLeak).toBe(true);
+        });
+    });
+
+    it('should NOT flag normal coaching responses', () => {
+        const safeResponses = [
+            'Based on your training logs, your squat has improved 10%.',
+            'The system of progressive overload works by...',
+            'Your instructions for today: warm up, then 5x5 squats.',
+        ];
+
+        // Note: "The system of" might partially match, but full phrase shouldn't
+        safeResponses.forEach(response => {
+            const hasXML = SYSTEM_LEAK_PATTERNS.xmlTags.test(response);
+            const hasInternal = SYSTEM_LEAK_PATTERNS.internalRef.test(response);
+            SYSTEM_LEAK_PATTERNS.xmlTags.lastIndex = 0;
+            SYSTEM_LEAK_PATTERNS.internalRef.lastIndex = 0;
+            expect(hasXML).toBe(false);
+            expect(hasInternal).toBe(false);
+        });
+    });
+});
+
+describe('Output Filtering - Safe Responses', () => {
+    it('should pass typical fitness coaching responses', () => {
+        const safeResponses = [
+            'Your squat PR is 315 lbs. Great progress!',
+            'I recommend deloading this week given your fatigue.',
+            'Based on your logs, you completed 4 out of 5 planned workouts.',
+            'Your running pace has improved by 30 seconds per mile.',
+            'For hypertrophy, aim for 3-4 sets of 8-12 reps.',
+        ];
+
+        safeResponses.forEach(response => {
+            // Check all patterns - none should match
+            let hasIssue = false;
+
+            for (const pattern of Object.values(CREDENTIAL_PATTERNS)) {
+                if (pattern.test(response)) hasIssue = true;
+                pattern.lastIndex = 0;
+            }
+            for (const pattern of Object.values(SYSTEM_LEAK_PATTERNS)) {
+                if (pattern.test(response)) hasIssue = true;
+                pattern.lastIndex = 0;
+            }
+
+            expect(hasIssue).toBe(false);
+        });
+    });
+});

@@ -411,6 +411,215 @@ function stripMarkdown(text: string): string {
 }
 
 // ============================================
+// OUTPUT FILTERING (Response Validation)
+// Validates AI responses before/after they reach the user
+// ============================================
+
+interface OutputValidationResult {
+    isValid: boolean;
+    issues: OutputIssue[];
+    severity: 'none' | 'low' | 'medium' | 'high' | 'critical';
+    sanitizedText?: string;
+}
+
+interface OutputIssue {
+    type: 'pii' | 'credentials' | 'system_leak' | 'harmful' | 'off_brand';
+    description: string;
+    severity: 'low' | 'medium' | 'high' | 'critical';
+    match?: string;
+}
+
+/**
+ * PII Detection Patterns
+ * Catches common personally identifiable information in AI responses
+ */
+const PII_PATTERNS = {
+    // US Phone numbers (various formats)
+    phone: /\b(\+?1[-.\s]?)?(\(?\d{3}\)?[-.\s]?)?\d{3}[-.\s]?\d{4}\b/g,
+    // Email addresses
+    email: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g,
+    // US Social Security Numbers
+    ssn: /\b\d{3}[-\s]?\d{2}[-\s]?\d{4}\b/g,
+    // Credit card numbers (basic pattern)
+    creditCard: /\b(?:\d{4}[-\s]?){3}\d{4}\b/g,
+    // IP addresses
+    ipAddress: /\b(?:\d{1,3}\.){3}\d{1,3}\b/g,
+    // Street addresses (basic pattern)
+    streetAddress: /\b\d+\s+[A-Za-z]+\s+(Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Drive|Dr|Lane|Ln|Court|Ct)\b/gi,
+};
+
+/**
+ * Credential/Secret Detection Patterns
+ * Catches API keys, tokens, and other secrets that should never appear in responses
+ */
+const CREDENTIAL_PATTERNS = {
+    // Generic API key patterns
+    apiKey: /\b(api[_-]?key|apikey)\s*[:=]\s*['"]?[A-Za-z0-9_-]{20,}['"]?/gi,
+    // OpenAI API keys
+    openaiKey: /\bsk-[A-Za-z0-9]{20,}\b/g,
+    // Bearer tokens
+    bearerToken: /\bBearer\s+[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g,
+    // JWT tokens
+    jwt: /\beyJ[A-Za-z0-9_-]*\.eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*/g,
+    // Generic secrets
+    genericSecret: /\b(password|secret|token|credential)\s*[:=]\s*['"]?[^\s'"]{8,}['"]?/gi,
+    // Connection strings
+    connectionString: /\b(postgres|mysql|mongodb|redis):\/\/[^\s]+/gi,
+    // AWS keys
+    awsKey: /\bAKIA[A-Z0-9]{16}\b/g,
+    // Supabase URLs with keys
+    supabaseKey: /\bsbp_[A-Za-z0-9]{20,}\b/g,
+};
+
+/**
+ * System Prompt Leakage Patterns
+ * Catches when the AI accidentally reveals its instructions
+ */
+const SYSTEM_LEAK_PATTERNS = {
+    // Direct mentions of system configuration
+    systemPrompt: /\b(system\s*prompt|system\s*instructions|my\s*instructions|i\s*was\s*told\s*to|my\s*programming|my\s*training\s*data)\b/gi,
+    // XML tags from our prompt structure
+    xmlTags: /<(system_configuration|security_policy|persona_definition|context_data|instruction_set|training_knowledge)[^>]*>/gi,
+    // References to internal structure
+    internalRef: /\b(internal\s*error|unauthorized\s*access|admin\s*mode|developer\s*mode)\b/gi,
+    // Constitution or rules revelation
+    rulesReveal: /\b(my\s*rules\s*(are|include)|i\s*must\s*follow|i\s*am\s*programmed\s*to)\b/gi,
+};
+
+/**
+ * Harmful Content Patterns
+ * Additional safety checks for response content
+ */
+const HARMFUL_PATTERNS = {
+    // Self-harm encouragement (AI should never encourage this)
+    selfHarmEncourage: /\b(you\s*should|try\s*to|go\s*ahead\s*and)\s*(hurt|harm|kill|end)\s*(yourself|your\s*life)\b/gi,
+    // Dangerous advice patterns
+    dangerousAdvice: /\b(definitely|you\s*should)\s*(take|use|try)\s*(steroids|peds|drugs|cocaine|heroin)\b/gi,
+};
+
+/**
+ * Comprehensive output validation for AI responses
+ *
+ * @param text - The AI response text to validate
+ * @returns Validation result with issues found and severity
+ */
+function validateAIResponse(text: string): OutputValidationResult {
+    const issues: OutputIssue[] = [];
+
+    if (!text || text.trim() === '') {
+        return { isValid: true, issues: [], severity: 'none' };
+    }
+
+    // 1. Check for PII
+    for (const [piiType, pattern] of Object.entries(PII_PATTERNS)) {
+        const matches = text.match(pattern);
+        if (matches) {
+            // Filter out false positives (e.g., workout stats that look like phone numbers)
+            const realMatches = matches.filter(m => {
+                // Skip if it's clearly a workout stat (e.g., "225x5" or "3x10")
+                if (/^\d+x\d+$/.test(m)) return false;
+                // Skip if it's a time (e.g., "8:30")
+                if (/^\d{1,2}:\d{2}$/.test(m)) return false;
+                // Skip common fitness numbers
+                if (/^(100|200|225|275|315|365|405|495|500)$/.test(m)) return false;
+                return true;
+            });
+
+            if (realMatches.length > 0) {
+                issues.push({
+                    type: 'pii',
+                    description: `Potential ${piiType} detected in response`,
+                    severity: piiType === 'ssn' || piiType === 'creditCard' ? 'critical' : 'high',
+                    match: realMatches[0].substring(0, 20) + '...',
+                });
+            }
+        }
+    }
+
+    // 2. Check for credentials/secrets
+    for (const [credType, pattern] of Object.entries(CREDENTIAL_PATTERNS)) {
+        const matches = text.match(pattern);
+        if (matches) {
+            issues.push({
+                type: 'credentials',
+                description: `Potential ${credType} exposure detected`,
+                severity: 'critical',
+                match: '[REDACTED]', // Never log the actual credential
+            });
+        }
+    }
+
+    // 3. Check for system prompt leakage
+    for (const [leakType, pattern] of Object.entries(SYSTEM_LEAK_PATTERNS)) {
+        const matches = text.match(pattern);
+        if (matches) {
+            issues.push({
+                type: 'system_leak',
+                description: `Potential system information leakage: ${leakType}`,
+                severity: leakType === 'xmlTags' ? 'critical' : 'high',
+                match: matches[0].substring(0, 30),
+            });
+        }
+    }
+
+    // 4. Check for harmful content patterns
+    for (const [harmType, pattern] of Object.entries(HARMFUL_PATTERNS)) {
+        const matches = text.match(pattern);
+        if (matches) {
+            issues.push({
+                type: 'harmful',
+                description: `Harmful content detected: ${harmType}`,
+                severity: 'critical',
+                match: matches[0].substring(0, 30),
+            });
+        }
+    }
+
+    // 5. Check for off-brand content (formatting violations)
+    const hasExcessiveMarkdown = (text.match(/\*\*/g) || []).length > 5;
+    const hasHeaders = /^#{1,6}\s/m.test(text);
+    const hasCodeBlocks = /```/.test(text);
+
+    if (hasExcessiveMarkdown || hasHeaders || hasCodeBlocks) {
+        issues.push({
+            type: 'off_brand',
+            description: 'Response contains markdown formatting against guidelines',
+            severity: 'low',
+        });
+    }
+
+    // Determine overall severity
+    let severity: OutputValidationResult['severity'] = 'none';
+    if (issues.some(i => i.severity === 'critical')) severity = 'critical';
+    else if (issues.some(i => i.severity === 'high')) severity = 'high';
+    else if (issues.some(i => i.severity === 'medium')) severity = 'medium';
+    else if (issues.some(i => i.severity === 'low')) severity = 'low';
+
+    return {
+        isValid: issues.length === 0,
+        issues,
+        severity,
+        // Optionally provide sanitized text for low-severity issues
+        sanitizedText: severity === 'low' ? stripMarkdown(text) : undefined,
+    };
+}
+
+/**
+ * Get a safe fallback response when output validation fails
+ * Used when we need to replace a problematic AI response
+ */
+function getOutputFilterFallback(severity: OutputValidationResult['severity']): string {
+    switch (severity) {
+        case 'critical':
+            return "I apologize, but I encountered an issue generating that response. How else can I help with your training today?";
+        case 'high':
+            return "I'm not able to provide that information. Let me know if you have questions about your workouts or training program.";
+        default:
+            return "I encountered an issue with my response. Could you rephrase your question about your training?";
+    }
+}
+
+// ============================================
 // SENSITIVE TOPIC GUARDRAILS
 // These topics require controlled responses instead of AI-generated advice
 // ============================================
@@ -1237,17 +1446,61 @@ BEHAVIOR: Acknowledge effort. Use "We" statements. Push for consistency.
                         // Note: Logic for fallback will be handled in client to avoid stream complexity
                     }
 
-                    // RESPONSE VALIDATION (Audit/Logging)
+                    // ========================================
+                    // OUTPUT FILTERING - Comprehensive Response Validation
+                    // ========================================
                     let flagged = false;
                     let refusalReason: string | undefined;
 
                     if (text) {
-                        const forbiddenTerms = ['internal_error', 'system_prompt', 'unauthorized_access'];
-                        const hasForbiddenTerm = forbiddenTerms.some(term => text.toLowerCase().includes(term));
-                        if (hasForbiddenTerm) {
-                            console.warn(`[AI Safety] Response contained forbidden term: ${text.substring(0, 50)}...`);
+                        const validation = validateAIResponse(text);
+
+                        if (!validation.isValid) {
                             flagged = true;
-                            refusalReason = 'Forbidden term detected';
+                            refusalReason = validation.issues.map(i => i.description).join('; ');
+
+                            // Log all issues
+                            console.warn(`[Output Filter] Response validation failed:`, {
+                                severity: validation.severity,
+                                issueCount: validation.issues.length,
+                                issues: validation.issues.map(i => ({
+                                    type: i.type,
+                                    description: i.description,
+                                    severity: i.severity,
+                                })),
+                            });
+
+                            // CRITICAL: Alert Sentry for high-severity issues
+                            if (validation.severity === 'critical' || validation.severity === 'high') {
+                                Sentry.captureMessage(`[Output Filter] ${validation.severity.toUpperCase()} severity issue detected`, {
+                                    level: validation.severity === 'critical' ? 'error' : 'warning',
+                                    tags: {
+                                        'output_filter.severity': validation.severity,
+                                        'output_filter.issue_count': validation.issues.length.toString(),
+                                    },
+                                    extra: {
+                                        issues: validation.issues.map(i => ({
+                                            type: i.type,
+                                            description: i.description,
+                                            severity: i.severity,
+                                            // Don't include 'match' to avoid logging sensitive data
+                                        })),
+                                        userId,
+                                        responseLength: text.length,
+                                        // Include first 100 chars for context (safe portion)
+                                        responsePreview: text.substring(0, 100),
+                                    },
+                                });
+                            }
+
+                            // For PII or credential leaks, also log to dedicated security log
+                            if (validation.issues.some(i => i.type === 'pii' || i.type === 'credentials')) {
+                                console.error(`[SECURITY] Potential data leak detected in AI response`, {
+                                    userId,
+                                    issueTypes: validation.issues.filter(i => i.type === 'pii' || i.type === 'credentials').map(i => i.type),
+                                    timestamp: new Date().toISOString(),
+                                });
+                            }
                         }
                     }
 
