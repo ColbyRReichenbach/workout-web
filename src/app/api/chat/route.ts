@@ -184,8 +184,152 @@ interface ModerationResult {
     category_scores: Record<string, number>;
 }
 
-// Moderation API timeout in milliseconds
+// API timeouts in milliseconds
 const MODERATION_TIMEOUT_MS = 2000; // 2 seconds max
+const CLASSIFIER_TIMEOUT_MS = 1500; // 1.5 seconds max
+
+// ============================================
+// SEMANTIC INTENT CLASSIFICATION (Industry Standard)
+// Uses OpenAI to classify if message is fitness-related
+// More robust than keyword matching - understands meaning
+// ============================================
+
+/**
+ * Fitness topics that the chatbot should handle
+ * Used for semantic classification
+ */
+const FITNESS_TOPIC_EXAMPLES = [
+    "How do I improve my squat form?",
+    "What's a good workout split for building muscle?",
+    "My shoulder hurts after bench press",
+    "How many sets should I do for hypertrophy?",
+    "Can you check my workout compliance?",
+    "What's my deadlift PR?",
+    "How has my running improved?",
+    "Should I deload this week?",
+    "I'm feeling fatigued, should I train today?",
+    "What exercises target the lats?",
+];
+
+const OFF_TOPIC_EXAMPLES = [
+    "What's the capital of France?",
+    "Who won the Super Bowl?",
+    "Write me a poem",
+    "What movie should I watch?",
+    "Help me with my Python code",
+    "What's the weather like?",
+    "Tell me about World War 2",
+    "Who is the president?",
+    "Recommend a restaurant",
+    "What's Bitcoin worth?",
+];
+
+interface ClassificationResult {
+    isFitnessRelated: boolean;
+    confidence: number;
+    reasoning?: string;
+}
+
+/**
+ * Use GPT to classify if a message is fitness-related
+ * This is the industry-standard approach for domain restriction
+ *
+ * Uses a smaller, faster model (gpt-4o-mini) for classification
+ * Returns quickly with timeout to avoid blocking
+ */
+async function classifyFitnessIntent(content: string): Promise<ClassificationResult> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), CLASSIFIER_TIMEOUT_MS);
+
+    try {
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+            },
+            body: JSON.stringify({
+                model: 'gpt-4o-mini',
+                messages: [
+                    {
+                        role: 'system',
+                        content: `You are a classifier that determines if a user message is related to FITNESS, EXERCISE, TRAINING, WORKOUTS, or ATHLETIC PERFORMANCE.
+
+FITNESS-RELATED includes:
+- Exercise form and technique questions
+- Workout programming and splits
+- Strength training, cardio, conditioning
+- Recovery, fatigue, injury prevention
+- Progress tracking, PRs, performance
+- Gym equipment and exercises
+- Athletic performance improvement
+
+NOT FITNESS-RELATED includes:
+- Sports trivia (who won, best player, scores)
+- Sport-specific techniques (how to shoot basketball, throw football)
+- Diet/nutrition advice (what to eat, calories, meal plans)
+- Medical diagnoses or treatment
+- Entertainment (movies, music, games)
+- General knowledge (history, geography, science)
+- Programming, coding, technology
+- Relationships, politics, news
+
+Respond with ONLY a JSON object:
+{"isFitnessRelated": true/false, "confidence": 0.0-1.0, "reasoning": "brief reason"}`
+                    },
+                    {
+                        role: 'user',
+                        content: `Classify this message: "${content}"`
+                    }
+                ],
+                max_tokens: 100,
+                temperature: 0,
+            }),
+            signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+            console.error('[Intent Classifier] API failed:', response.status);
+            return { isFitnessRelated: true, confidence: 0 }; // Fail open
+        }
+
+        const data = await response.json();
+        const text = data.choices?.[0]?.message?.content || '';
+
+        try {
+            // Extract JSON from response
+            const jsonMatch = text.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                const result = JSON.parse(jsonMatch[0]);
+                console.log('[Intent Classifier] Result:', result);
+                return {
+                    isFitnessRelated: result.isFitnessRelated ?? true,
+                    confidence: result.confidence ?? 0,
+                    reasoning: result.reasoning,
+                };
+            }
+        } catch (parseError) {
+            console.error('[Intent Classifier] Parse error:', parseError);
+        }
+
+        return { isFitnessRelated: true, confidence: 0 }; // Fail open
+    } catch (error) {
+        clearTimeout(timeoutId);
+        if (error instanceof Error && error.name === 'AbortError') {
+            console.warn('[Intent Classifier] Timed out after', CLASSIFIER_TIMEOUT_MS, 'ms');
+        } else {
+            console.error('[Intent Classifier] Error:', error);
+        }
+        return { isFitnessRelated: true, confidence: 0 }; // Fail open
+    }
+}
+
+/**
+ * Generic response for off-topic messages caught by semantic classifier
+ */
+const SEMANTIC_OFF_TOPIC_RESPONSE = "I'm your fitness coach assistant and specialize in training, workouts, and exercise. That question seems outside my area of expertise. How can I help with your fitness goals today?";
 
 /**
  * Call OpenAI's free Moderation API for semantic content analysis
@@ -860,6 +1004,46 @@ export async function POST(req: Request) {
                 },
                 onError: (error) => {
                     console.error('[Moderation Stream Error]', error);
+                    return 'An error occurred while processing your request.';
+                },
+            });
+
+            return createUIMessageStreamResponse({ stream });
+        }
+
+        // 5d. SEMANTIC INTENT CLASSIFICATION - Industry-standard domain restriction
+        // Uses GPT-4o-mini to classify if the message is fitness-related
+        // This catches off-topic messages that slip through keyword matching
+        const classification = await classifyFitnessIntent(latestUserContent);
+        console.log(`[Intent Classifier] Result: isFitness=${classification.isFitnessRelated}, confidence=${classification.confidence}, reason=${classification.reasoning}`);
+
+        // Only block if high confidence off-topic (>0.7 confidence it's NOT fitness-related)
+        if (!classification.isFitnessRelated && classification.confidence >= 0.7) {
+            console.log(`[AI Guardrail] Semantic classifier blocked off-topic message: ${classification.reasoning}`);
+
+            logInteraction({
+                userId,
+                intent: 'GUARDRAIL',
+                userMessage: latestUserContent.substring(0, 200),
+                aiResponse: SEMANTIC_OFF_TOPIC_RESPONSE,
+                toolCalls: 0,
+                durationMs: timer.getDuration(),
+                status: 'refusal',
+                refusalReason: `Semantic classifier: ${classification.reasoning}`,
+                flagged: false,
+            });
+
+            const textId = `semantic-text-${Date.now()}`;
+            const stream = createUIMessageStream({
+                execute: async ({ writer }) => {
+                    writer.write({ type: 'start' });
+                    writer.write({ type: 'text-start', id: textId });
+                    writer.write({ type: 'text-delta', id: textId, delta: SEMANTIC_OFF_TOPIC_RESPONSE });
+                    writer.write({ type: 'text-end', id: textId });
+                    writer.write({ type: 'finish', finishReason: 'stop' });
+                },
+                onError: (error) => {
+                    console.error('[Semantic Classifier Stream Error]', error);
                     return 'An error occurred while processing your request.';
                 },
             });
