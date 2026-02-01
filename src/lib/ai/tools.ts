@@ -622,7 +622,7 @@ export const getExercisePR = tool({
                         return false;
                     });
 
-                    if (matchingLog) {
+                    if (matchingLog && matchingLog.date) {
                         prDate = matchingLog.date;
                         prActivity = matchingLog.segment_name;
                         const logDate = new Date(prDate);
