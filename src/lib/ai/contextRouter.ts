@@ -11,7 +11,42 @@ export type IntentType = 'INJURY' | 'PROGRESS' | 'LOGISTICS' | 'GENERAL';
 
 export interface Message {
     role: 'user' | 'assistant' | 'system' | 'tool';
-    content: string;
+    content?: string | any[];
+    parts?: any[];
+}
+
+/**
+ * Safely extracts text content from a message, handling both string and array-of-parts formats.
+ */
+function extractMessageContent(message: Message | any): string {
+    if (!message) return '';
+    if (typeof message.content === 'string') return message.content;
+
+    // Handle SDK v6 parts array in content (from convertToModelMessages)
+    if (Array.isArray(message.content)) {
+        return message.content
+            .map((p: any) => {
+                if (typeof p === 'string') return p;
+                if (p.type === 'text' && typeof p.text === 'string') return p.text;
+                return '';
+            })
+            .filter(Boolean)
+            .join('\n');
+    }
+
+    // Handle legacy parts array
+    if (message.parts && Array.isArray(message.parts)) {
+        return message.parts
+            .map((p: any) => {
+                if (p.type === 'text' && typeof p.text === 'string') return p.text;
+                if (p.type === 'reasoning' && typeof p.reasoning === 'string') return p.reasoning;
+                return '';
+            })
+            .filter(Boolean)
+            .join('\n');
+    }
+
+    return '';
 }
 
 export interface ContextPayload {
@@ -46,8 +81,9 @@ const KEYWORDS = {
 /**
  * Heuristic keyword scoring for a single message.
  */
-function calculateIntent(content: string): IntentType {
-    const text = content.toLowerCase();
+function calculateIntent(content: any): IntentType {
+    const text = (typeof content === 'string' ? content : extractMessageContent({ content })).toLowerCase();
+    if (!text) return 'GENERAL';
 
     // 1. Safety/Injury checks (Highest Priority)
     if (KEYWORDS.INJURY.some(k => text.includes(k))) {
@@ -77,18 +113,20 @@ export function detectIntent(messages: Message[]): IntentType {
     const userMessages = messages.filter(m => m.role === 'user');
     if (userMessages.length === 0) return 'GENERAL';
 
-    const lastUserMessage = userMessages[userMessages.length - 1].content;
-    const currentIntent = calculateIntent(lastUserMessage);
+    const lastUserMessage = userMessages[userMessages.length - 1];
+    const lastUserContent = extractMessageContent(lastUserMessage);
+    const currentIntent = calculateIntent(lastUserContent);
 
     // If current intent is GENERAL, check if it's a follow-up to a previous specific intent
     if (currentIntent === 'GENERAL') {
-        const text = lastUserMessage.toLowerCase();
+        const text = lastUserContent.toLowerCase();
         const isFollowUp = KEYWORDS.CONTINUATION.some(k => text.includes(k)) || text.length < 20;
 
         if (isFollowUp && userMessages.length > 1) {
             // Traverse backwards through user messages to find the last specific intent
             for (let i = userMessages.length - 2; i >= 0; i--) {
-                const prevIntent = calculateIntent(userMessages[i].content);
+                const prevContent = extractMessageContent(userMessages[i]);
+                const prevIntent = calculateIntent(prevContent);
                 if (prevIntent !== 'GENERAL') {
                     console.log(`[ContextRouter] Carry-over intent detected: ${prevIntent} (from follow-up: "${text}")`);
                     return prevIntent;
@@ -209,7 +247,7 @@ export async function buildDynamicContext(
     const lastAssistantMessages = messages
         .filter(m => m.role === 'assistant')
         .slice(-2)
-        .map(m => m.content)
+        .map(m => extractMessageContent(m))
         .join('\n');
 
     // Simple heuristic to extract exercise-like lines from recent history
@@ -285,7 +323,7 @@ INSTRUCTION:
             break;
 
         case 'PROGRESS':
-            // ANALYTIC MODE: Summary + progression logic
+            // ANALYTIC MODE: Summary + progression logic + database schema hints
             const progressionLogic = extractSection(fullPhaseContent, '### Phase [0-9]+ Progression');
             const checkpointInfo = extractSection(fullPhaseContent, '### Week [0-9]+ Checkpoint');
 
@@ -296,13 +334,31 @@ ${truncateToTokenLimit(progressionLogic || 'Focus on consistent improvement.', 4
 
 ${truncateToTokenLimit(checkpointInfo || '', 300)}
 
+DATABASE SCHEMA (for smart query selection):
+Available Tools:
+- getExercisePR: For "what's my max squat?" or PR questions. Returns profile maxes directly.
+- getRecentLogs: For "show my workouts this week" or exercise history. Params: days (1-30), filter (exercise name).
+- findLastLog: For "when was my last deadlift?" historical lookups. No time limit.
+- getRecoveryMetrics: For "how's my HRV?" or sleep/recovery analysis. Combines sleep_logs + readiness_logs + biometrics.
+- getComplianceReport: For "did I hit my workouts this week?" compliance tracking.
+- getTrendAnalysis: For "Am I getting stronger?" or progress trend questions. Calculates direction + % change.
+- getBiometrics: For manual health entries (weight, hrv, rhr, sleep_hours).
+
+Data Available:
+- Strength PRs: squat_max, bench_max, deadlift_max, front_squat_max, ohp_max, clean_jerk_max, snatch_max
+- Cardio PRs: mile_time_sec, k5_time_sec, sprint_400m_sec, row_2k_sec, row_500m_sec, bike_max_watts
+- logs: segment_name, segment_type (Strength/Cardio/etc), performance_data (weight, reps, distance, time)
+- sleep_logs: asleep_minutes, hrv_ms, deep_sleep_minutes, sleep_efficiency_score
+- readiness_logs: readiness_score (1-10)
+
 INSTRUCTION:
-- Use the tools to get actual data before answering.
+- Use the appropriate tool above to get actual data before answering.
 - Analyze trends in the user's logs.
 - Compare against prescribed targets.
 - Check compliance with the program.
+- Handle typos gracefully (e.g., "squirt" will be corrected to "squat").
 `;
-            tools = ['getRecentLogs', 'getBiometrics'];
+            tools = ['getRecentLogs', 'getBiometrics', 'findLastLog', 'getExercisePR', 'getRecoveryMetrics', 'getComplianceReport', 'getTrendAnalysis'];
             break;
 
         case 'GENERAL':

@@ -405,10 +405,22 @@ export const chatRequestSchema = z.object({
 /**
  * Extract text content from a message (handles both legacy and v6 formats)
  */
-export function extractMessageContent(message: { content?: string; parts?: Array<{ type: string; text?: string; reasoning?: string }> }): string {
-    if (message.content) {
+export function extractMessageContent(message: { content?: string | any[]; parts?: Array<{ type: string; text?: string; reasoning?: string }> }): string {
+    if (typeof message.content === 'string') {
         return message.content;
     }
+
+    if (Array.isArray(message.content)) {
+        return message.content
+            .map((p: any) => {
+                if (typeof p === 'string') return p;
+                if (p.type === 'text' && typeof p.text === 'string') return p.text;
+                return '';
+            })
+            .filter(Boolean)
+            .join('\n');
+    }
+
     if (message.parts) {
         return message.parts
             .map(p => {

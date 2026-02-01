@@ -196,17 +196,17 @@ export function summarizeBiometrics(
 
     const recentData = biometrics.slice(0, maxDays);
 
-    // Calculate averages
+    // Calculate averages (using sanitized field names from sanitizeBiometricForAI)
     const hrvValues = recentData
-        .map(b => b.hrv_ms as number)
+        .map(b => b.hrv as number)
         .filter(v => typeof v === 'number' && !isNaN(v));
 
     const sleepValues = recentData
-        .map(b => b.asleep_minutes as number)
+        .map(b => b.sleep_hrs as number)
         .filter(v => typeof v === 'number' && !isNaN(v));
 
     const rhrValues = recentData
-        .map(b => b.resting_hr as number)
+        .map(b => b.rhr as number)
         .filter(v => typeof v === 'number' && !isNaN(v));
 
     const avgHrv = hrvValues.length > 0
@@ -214,7 +214,7 @@ export function summarizeBiometrics(
         : null;
 
     const avgSleep = sleepValues.length > 0
-        ? (sleepValues.reduce((a, b) => a + b, 0) / sleepValues.length / 60).toFixed(1)
+        ? (sleepValues.reduce((a, b) => a + b, 0) / sleepValues.length).toFixed(1)
         : null;
 
     const avgRhr = rhrValues.length > 0
