@@ -130,7 +130,7 @@ export default function AdminAnalyticsPage() {
     if (!data) return null;
 
     return (
-        <div className="min-h-screen bg-background text-foreground selection:bg-primary/30 relative overflow-x-hidden font-sans">
+        <div className="min-h-screen bg-background text-foreground selection:bg-primary/30 relative font-sans">
             {/* Scanline Diagnostic Overlay */}
             <div className="fixed inset-0 pointer-events-none z-[100] overflow-hidden opacity-20">
                 <div className="absolute top-0 left-0 w-full h-[1px] bg-primary shadow-[0_0_15px_rgba(239,68,68,0.5)] scan-line-admin" />
@@ -146,7 +146,6 @@ export default function AdminAnalyticsPage() {
                             </div>
                             <div>
                                 <h1 className="text-xl font-serif font-bold text-foreground tracking-tight leading-none">Diagnostic Terminal</h1>
-                                <p className="text-[10px] text-primary font-bold uppercase tracking-[0.2em] mt-1 opacity-60">System Version 2.1.0-ENG</p>
                             </div>
                         </div>
                     </div>
