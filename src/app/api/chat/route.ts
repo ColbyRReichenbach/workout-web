@@ -125,6 +125,56 @@ function extractWords(content: string): string[] {
 }
 
 // ============================================
+// FITNESS CONTEXT ALLOW-LIST
+// Reduces false positives when message is clearly fitness-related
+// ============================================
+
+const FITNESS_CONTEXT_KEYWORDS = [
+    // Training terms
+    'workout', 'exercise', 'training', 'gym', 'lift', 'lifting', 'squat', 'deadlift',
+    'bench', 'press', 'curl', 'row', 'pull', 'push', 'cardio', 'running', 'run',
+    'sprint', 'jog', 'swim', 'cycling', 'bike', 'hiit', 'crossfit', 'strength',
+    'conditioning', 'warm up', 'cool down', 'stretch', 'mobility', 'flexibility',
+    // Body parts for exercise context
+    'muscle', 'gains', 'reps', 'sets', 'weight', 'barbell', 'dumbbell', 'kettlebell',
+    'resistance', 'band', 'machine', 'cable', 'bodyweight', 'calisthenics',
+    // Program terms
+    'program', 'routine', 'split', 'phase', 'week', 'day', 'session', 'pr', 'max',
+    'volume', 'intensity', 'rpe', 'rir', 'tempo', 'rest', 'recovery', 'deload',
+    // Goals
+    'stronger', 'faster', 'endurance', 'stamina', 'performance', 'athletic'
+];
+
+/**
+ * Check if message has strong fitness context
+ * Used to reduce false positives on edge-case keywords
+ */
+function hasFitnessContext(content: string): boolean {
+    const lowerContent = content.toLowerCase();
+    const matchCount = FITNESS_CONTEXT_KEYWORDS.filter(keyword =>
+        lowerContent.includes(keyword)
+    ).length;
+    // Require at least 2 fitness keywords for strong context
+    return matchCount >= 2;
+}
+
+/**
+ * Keywords that are ambiguous and need fitness context to be allowed
+ * Maps keyword -> guardrail category it might falsely trigger
+ */
+const AMBIGUOUS_KEYWORDS: Record<string, string[]> = {
+    'cut': ['eating_disorder'], // "cut weight" for competition vs self-harm
+    'cutting': ['eating_disorder'],
+    'shredded': ['eating_disorder'],
+    'lean': ['eating_disorder'],
+    'boyfriend': ['off_topic_relationships'], // "my boyfriend and I train together"
+    'girlfriend': ['off_topic_relationships'],
+    'husband': ['off_topic_relationships'],
+    'wife': ['off_topic_relationships'],
+    'partner': ['off_topic_relationships'],
+};
+
+// ============================================
 // OPENAI MODERATION API (Industry Standard - FREE)
 // ============================================
 
@@ -134,11 +184,22 @@ interface ModerationResult {
     category_scores: Record<string, number>;
 }
 
+// Moderation API timeout in milliseconds
+const MODERATION_TIMEOUT_MS = 2000; // 2 seconds max
+
 /**
  * Call OpenAI's free Moderation API for semantic content analysis
  * Catches nuanced harmful content that keywords miss
+ *
+ * Features:
+ * - 2 second timeout to prevent blocking
+ * - Fails open (allows content through) on errors
+ * - Runs asynchronously to minimize latency impact
  */
 async function checkOpenAIModeration(content: string): Promise<{ flagged: boolean; reason?: string }> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), MODERATION_TIMEOUT_MS);
+
     try {
         const response = await fetch('https://api.openai.com/v1/moderations', {
             method: 'POST',
@@ -147,7 +208,10 @@ async function checkOpenAIModeration(content: string): Promise<{ flagged: boolea
                 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
             },
             body: JSON.stringify({ input: content }),
+            signal: controller.signal,
         });
+
+        clearTimeout(timeoutId);
 
         if (!response.ok) {
             console.error('[Moderation API] Failed:', response.status);
@@ -169,9 +233,37 @@ async function checkOpenAIModeration(content: string): Promise<{ flagged: boolea
 
         return { flagged: false };
     } catch (error) {
-        console.error('[Moderation API] Error:', error);
+        clearTimeout(timeoutId);
+        if (error instanceof Error && error.name === 'AbortError') {
+            console.warn('[Moderation API] Timed out after', MODERATION_TIMEOUT_MS, 'ms');
+        } else {
+            console.error('[Moderation API] Error:', error);
+        }
         return { flagged: false }; // Fail open
     }
+}
+
+/**
+ * Strip markdown formatting from text
+ * Used to clean AI responses that ignore formatting instructions
+ */
+function stripMarkdown(text: string): string {
+    return text
+        // Remove bold markers **text** and __text__
+        .replace(/\*\*([^*]+)\*\*/g, '$1')
+        .replace(/__([^_]+)__/g, '$1')
+        // Remove italic markers *text* and _text_
+        .replace(/\*([^*]+)\*/g, '$1')
+        .replace(/_([^_]+)_/g, '$1')
+        // Remove markdown headers
+        .replace(/^#{1,6}\s+/gm, '')
+        // Remove inline code backticks
+        .replace(/`([^`]+)`/g, '$1')
+        // Remove code blocks
+        .replace(/```[\s\S]*?```/g, '')
+        // Clean up extra whitespace
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
 }
 
 // ============================================
@@ -423,12 +515,15 @@ const SENSITIVE_TOPIC_GUARDRAILS: Record<string, GuardrailConfig> = {
  * 3. Stemmed word matching (catches word variations)
  * 4. Pattern matching (catches phrases)
  *
+ * Also checks fitness context to reduce false positives on ambiguous terms.
+ *
  * Returns the guardrail response if matched, null otherwise.
  */
 function checkSensitiveTopicGuardrails(content: string): string | null {
     const lowerContent = content.toLowerCase();
     const contentWords = extractWords(content);
     const stemmedContentWords = contentWords.map(simpleStem);
+    const hasStrongFitnessContext = hasFitnessContext(content);
 
     // Sort guardrails by priority (highest first)
     const sortedGuardrails = Object.entries(SENSITIVE_TOPIC_GUARDRAILS)
@@ -438,16 +533,32 @@ function checkSensitiveTopicGuardrails(content: string): string | null {
         // 1. EXACT KEYWORD MATCH (fastest path)
         for (const keyword of config.keywords) {
             if (lowerContent.includes(keyword.toLowerCase())) {
+                // Check if this is an ambiguous keyword that needs fitness context check
+                const ambiguousCategories = AMBIGUOUS_KEYWORDS[keyword.toLowerCase()];
+                if (ambiguousCategories?.includes(topic) && hasStrongFitnessContext) {
+                    console.log(`[AI Guardrail] Skipping "${topic}" for "${keyword}" - fitness context detected`);
+                    continue; // Skip this keyword, check others
+                }
+
                 console.log(`[AI Guardrail] Triggered "${topic}" on exact keyword: "${keyword}"`);
                 return config.response;
             }
         }
 
         // 2. FUZZY MATCH for single-word keywords (catches typos like "steriods")
+        // Skip fuzzy matching for low-priority off-topic guardrails to reduce false positives
+        if (config.priority < 50) continue; // Skip fuzzy for entertainment, general knowledge, etc.
+
         const singleWordKeywords = config.keywords.filter(k => !k.includes(' '));
         for (const keyword of singleWordKeywords) {
             for (const word of contentWords) {
                 if (word.length >= 4 && fuzzyMatch(word, keyword)) {
+                    // Check ambiguous keywords
+                    const ambiguousCategories = AMBIGUOUS_KEYWORDS[keyword.toLowerCase()];
+                    if (ambiguousCategories?.includes(topic) && hasStrongFitnessContext) {
+                        continue;
+                    }
+
                     console.log(`[AI Guardrail] Triggered "${topic}" on fuzzy match: "${word}" ≈ "${keyword}"`);
                     return config.response;
                 }
@@ -455,14 +566,17 @@ function checkSensitiveTopicGuardrails(content: string): string | null {
         }
 
         // 3. STEMMED MATCH (catches "eating" -> "eat", "dieting" -> "diet")
-        const stemmedKeywords = singleWordKeywords.map(simpleStem);
-        for (const stemmedKeyword of stemmedKeywords) {
-            if (stemmedKeyword.length >= 3) {
-                for (const stemmedWord of stemmedContentWords) {
-                    if (stemmedWord === stemmedKeyword ||
-                        (stemmedWord.length >= 4 && fuzzyMatch(stemmedWord, stemmedKeyword, 1))) {
-                        console.log(`[AI Guardrail] Triggered "${topic}" on stemmed match: stemmed word matches "${stemmedKeyword}"`);
-                        return config.response;
+        // Only for high-priority guardrails (safety-related)
+        if (config.priority >= 100) {
+            const stemmedKeywords = singleWordKeywords.map(simpleStem);
+            for (const stemmedKeyword of stemmedKeywords) {
+                if (stemmedKeyword.length >= 3) {
+                    for (const stemmedWord of stemmedContentWords) {
+                        if (stemmedWord === stemmedKeyword ||
+                            (stemmedWord.length >= 4 && fuzzyMatch(stemmedWord, stemmedKeyword, 1))) {
+                            console.log(`[AI Guardrail] Triggered "${topic}" on stemmed match: stemmed word matches "${stemmedKeyword}"`);
+                            return config.response;
+                        }
                     }
                 }
             }
