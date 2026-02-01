@@ -131,7 +131,8 @@ const SENSITIVE_TOPIC_GUARDRAILS: Record<string, GuardrailConfig> = {
         keywords: [
             'anorexia', 'bulimia', 'purge', 'purging', 'binge and purge',
             'not eating at all', 'starve myself', 'starving myself', 'eating disorder',
-            'body dysmorphia'
+            'body dysmorphia', 'stop eating', 'quit eating', 'won\'t eat', 'refuse to eat',
+            'not gonna eat', 'not going to eat'
         ],
         response: "I'm concerned about what you've shared. If you're struggling with food or eating, please reach out to the National Eating Disorders Association (NEDA) helpline at 1-800-931-2237 or visit nationaleatingdisorders.org. A mental health professional can provide the support you need.",
         priority: 150,
@@ -166,9 +167,10 @@ const SENSITIVE_TOPIC_GUARDRAILS: Record<string, GuardrailConfig> = {
     // ========== MEDICAL & SUBSTANCE - MEDIUM-HIGH PRIORITY ==========
     ped_banned_substances: {
         keywords: [
-            'steroid', 'testosterone', 'trt', 'sarm', 'sarms', 'hgh', 'human growth hormone',
+            'steroid', 'steroids', 'steriod', 'steriods', 'roids',
+            'testosterone', 'trt', 'sarm', 'sarms', 'hgh', 'human growth hormone',
             'anabolic', 'clenbuterol', 'trenbolone', 'dianabol', 'winstrol',
-            'performance enhancing drugs', 'ped cycle', 'doping'
+            'performance enhancing drugs', 'ped cycle', 'doping', 'juice up'
         ],
         response: "I can't provide advice on performance-enhancing drugs or banned substances. These carry serious health and legal risks. Please consult a healthcare professional if you have questions about hormones or medication.",
         priority: 120,
@@ -188,11 +190,13 @@ const SENSITIVE_TOPIC_GUARDRAILS: Record<string, GuardrailConfig> = {
     },
     nutrition_diet: {
         keywords: [
-            'diet plan', 'calorie deficit', 'how many calories', 'fasting',
+            'diet plan', 'my diet', 'diet be', 'diet advice', 'diet tips',
+            'calorie deficit', 'how many calories', 'fasting',
             'intermittent fasting', 'keto', 'carnivore diet', 'what should i eat',
             'eating plan', 'cut weight', 'cutting weight', 'make weight',
-            'not going to eat', 'skip meals', 'meal plan', 'macro split',
-            'carb cycling', 'calorie counting'
+            'skip meals', 'meal plan', 'macro split',
+            'carb cycling', 'calorie counting', 'what to eat', 'nutrition advice',
+            'lose weight diet', 'gain weight diet', 'bulk diet', 'cutting diet'
         ],
         response: "I'm not able to provide nutrition or diet advice. For questions about eating, calorie intake, meal planning, or weight management through diet, please consult a registered dietitian or your healthcare provider. I'm here to help with your training!",
         priority: 100,
