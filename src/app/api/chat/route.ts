@@ -8,6 +8,7 @@ import { detectIntent, buildDynamicContext } from '@/lib/ai/contextRouter';
 import { DEMO_USER_ID, RATE_LIMITS } from '@/lib/constants';
 import { DEFAULT_SETTINGS } from '@/lib/userSettings';
 import { logRequest, createRequestTimer, ApiErrors, logInteraction } from '@/lib/api/helpers';
+import { calculateCost } from '@/lib/ai/cost';
 import * as Sentry from '@sentry/nextjs';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -98,8 +99,9 @@ function levenshteinDistance(a: string, b: string): number {
  */
 function fuzzyMatch(word: string, keyword: string, maxDistance?: number): boolean {
     const distance = levenshteinDistance(word.toLowerCase(), keyword.toLowerCase());
-    // Allow 1 typo for words 4-6 chars, 2 typos for 7+ chars
-    const tolerance = maxDistance ?? (keyword.length >= 7 ? 2 : keyword.length >= 4 ? 1 : 0);
+    // Allow 1 typo for words 6+ chars, 2 typos for 8+ chars
+    // Rigid matching for short keywords (4-5 chars) to avoid false positives like last/fast
+    const tolerance = maxDistance ?? (keyword.length >= 8 ? 2 : keyword.length >= 6 ? 1 : 0);
     return distance <= tolerance;
 }
 
@@ -142,7 +144,10 @@ const FITNESS_CONTEXT_KEYWORDS = [
     'program', 'routine', 'split', 'phase', 'week', 'day', 'session', 'pr', 'max',
     'volume', 'intensity', 'rpe', 'rir', 'tempo', 'rest', 'recovery', 'deload',
     // Goals
-    'stronger', 'faster', 'endurance', 'stamina', 'performance', 'athletic'
+    'stronger', 'faster', 'endurance', 'stamina', 'performance', 'athletic',
+    // Tracking & History
+    'track', 'tracking', 'history', 'logs', 'logged', 'stats', 'stat', 'entry',
+    'last', 'previous', 'when', 'yesterday', 'today', 'recent', 'progress', 'improvement'
 ];
 
 /**
@@ -167,6 +172,8 @@ const AMBIGUOUS_KEYWORDS: Record<string, string[]> = {
     'cutting': ['eating_disorder'],
     'shredded': ['eating_disorder'],
     'lean': ['eating_disorder'],
+    'fasting': ['nutrition_diet'],
+    'fast': ['nutrition_diet'],
     'boyfriend': ['off_topic_relationships'], // "my boyfriend and I train together"
     'girlfriend': ['off_topic_relationships'],
     'husband': ['off_topic_relationships'],
@@ -838,8 +845,8 @@ const SENSITIVE_TOPIC_GUARDRAILS: Record<string, GuardrailConfig> = {
     },
     off_topic_general_knowledge: {
         keywords: [
-            'capital of', 'president of', 'history of', 'when did', 'who invented',
-            'how does', 'what is the meaning', 'translate', 'weather', 'news',
+            'capital of', 'president of', 'history of', 'who invented',
+            'what is the meaning', 'translate', 'weather', 'news',
             'current events', 'election', 'war', 'economy'
         ],
         patterns: [
@@ -921,12 +928,20 @@ function checkSensitiveTopicGuardrails(content: string): string | null {
         // 3. STEMMED MATCH (catches "eating" -> "eat", "dieting" -> "diet")
         // Only for high-priority guardrails (safety-related)
         if (config.priority >= 100) {
-            const stemmedKeywords = singleWordKeywords.map(simpleStem);
-            for (const stemmedKeyword of stemmedKeywords) {
+            for (const keyword of singleWordKeywords) {
+                const stemmedKeyword = simpleStem(keyword);
                 if (stemmedKeyword.length >= 3) {
                     for (const stemmedWord of stemmedContentWords) {
                         if (stemmedWord === stemmedKeyword ||
                             (stemmedWord.length >= 4 && fuzzyMatch(stemmedWord, stemmedKeyword, 1))) {
+
+                            // Check if this is an ambiguous keyword that needs fitness context check
+                            const ambiguousCategories = AMBIGUOUS_KEYWORDS[keyword.toLowerCase()];
+                            if (ambiguousCategories?.includes(topic) && hasStrongFitnessContext) {
+                                console.log(`[AI Guardrail] Skipping "${topic}" for stemmed match on "${keyword}" - fitness context detected`);
+                                continue;
+                            }
+
                             console.log(`[AI Guardrail] Triggered "${topic}" on stemmed match: stemmed word matches "${stemmedKeyword}"`);
                             return config.response;
                         }
@@ -976,6 +991,7 @@ function getModerationGuardrailResponse(reason: string): string {
 export async function POST(req: Request) {
     const timer = createRequestTimer();
     const userAgent = req.headers.get('user-agent') || undefined;
+    const messageId = crypto.randomUUID();
     let userId: string | undefined;
 
     console.log('[API/Chat] Request received');
@@ -1369,13 +1385,14 @@ BEHAVIOR: Acknowledge effort. Use "We" statements. Push for consistency.
      - NEVER say "not available" or "no data" without FIRST calling the appropriate tool.
      - If user asks about multiple things (e.g., "all my maxes"), call the tool for EACH one.
      - TOOL MAPPING:
-       * "What's my max/PR for X?" → getExercisePR (call once per exercise)
-       * "What are all my maxes?" → getExercisePR for squat, bench, deadlift, front squat, ohp, clean and jerk, snatch
-       * "How many miles/distance this week?" → getCardioSummary
-       * "When was my last X?" → findLastLog
-       * "How's my X progressing?" → getTrendAnalysis
-       * "How has my sleep/recovery been?" → getRecoveryMetrics
-       * "Did I hit my workouts?" → getComplianceReport
+       * "What's my max/PR for X?" -> getExercisePR (call once per exercise)
+       * "When/what date did I hit my PR/max?" -> getExercisePR (it returns the date of the record)
+       * "What are all my maxes?" OR "When did I hit my maxes?" -> YOU MUST CALL getExercisePR MULTIPLE TIMES (once for EACH major exercise: Squat, Bench, Deadlift, Press, Clean, Snatch, Mile, 5k). Do not just call it once.
+       * "How many miles/distance this week?" -> getCardioSummary
+       * "When was my last workout/session for X?" -> findLastLog
+       * "How's my X progressing?" -> getTrendAnalysis
+       * "How has my sleep/recovery been?" -> getRecoveryMetrics
+       * "Did I hit my workouts?" -> getComplianceReport
   4. PERFORM hidden reasoning:
      <thinking>
        - Check user's fatigue/injury risk based on logs/input.
@@ -1434,12 +1451,12 @@ BEHAVIOR: Acknowledge effort. Use "We" statements. Push for consistency.
                 tools: enabledTools,
                 onStepFinish: ({ text, toolCalls, toolResults, finishReason }: any) => {
                     try {
-                        const resultStrs = toolResults?.map((r: any) => `Tool: ${r.toolName}, Success: ${!r.isError}, Len: ${JSON.stringify(r.result).length}`).join(', ') || 'NONE';
+                        const resultStrs = toolResults?.map((r: any) => `Tool: ${r.toolName}, Success: ${!r.isError}, Len: ${(JSON.stringify(r.result) || '').length}`).join(', ') || 'NONE';
                         const logData = `\n[Step Finish] Reason: ${finishReason}\nTextLen: ${text?.length || 0}\nResults: ${resultStrs}\n`;
                         fs.appendFileSync('/tmp/ai_chat_debug.log', logData);
                     } catch (e) { }
                 },
-                onFinish: ({ text, toolCalls, toolResults, finishReason }: any) => {
+                onFinish: ({ text, toolCalls, toolResults, finishReason, usage }: any) => {
                     // Debug Logging to file
                     try {
                         const logData = `\n--- [${new Date().toISOString()}] ---\nFinishReason: ${finishReason}\nHasText: ${!!text}\nTextLength: ${text?.length || 0}\nToolCalls: ${toolCalls?.length || 0}\nToolResults: ${toolResults?.length || 0}\nText: ${text || 'EMPTY'}\n-------------------\n`;
@@ -1512,13 +1529,49 @@ BEHAVIOR: Acknowledge effort. Use "We" statements. Push for consistency.
                         }
                     }
 
-                    // AUDIT LOG
+                    // AUDIT LOG (Enhanced for Engineering)
+                    const modelId = 'gpt-4o-mini';
+                    const promptTokens = usage?.promptTokens || 0;
+                    const completionTokens = usage?.completionTokens || 0;
+                    const totalTokens = usage?.totalTokens || 0;
+                    const cost = calculateCost(modelId, promptTokens, completionTokens);
+
+                    // Fire and forget database log
+                    supabase.from('ai_logs').insert({
+                        user_id: userId,
+                        message_id: messageId || `msg_${Date.now()}`,
+                        model_id: modelId,
+                        prompt_tokens: promptTokens,
+                        completion_tokens: completionTokens,
+                        total_tokens: totalTokens,
+                        estimated_cost_usd: cost,
+                        latency_ms: timer.getDuration(),
+                        intent: intent || 'UNKNOWN',
+                        tools_used: toolCalls?.map((tc: any) => tc.toolName) || [],
+                        user_message: latestUserContent.substring(0, 1000), // Truncate for log
+                        ai_response: text?.substring(0, 1000),
+                        status: flagged ? 'refusal' : 'success',
+                        metadata: {
+                            toolResults: toolResults?.map((tr: any) => ({
+                                tool: tr.toolName,
+                                success: !tr.isError,
+                                length: (JSON.stringify(tr.result) || '').length
+                            }))
+                        }
+                    }).then(({ error }) => {
+                        if (error) console.error('[AI Audit] Failed to save log:', error);
+                    });
+
                     logInteraction({
                         userId,
                         intent: intent || 'UNKNOWN',
                         userMessage: extractMessageContent(userMessages[userMessages.length - 1] || {}),
                         aiResponse: text,
                         toolCalls: toolCalls?.length || 0,
+                        tokens: {
+                            prompt: promptTokens,
+                            completion: completionTokens
+                        },
                         durationMs: timer.getDuration(),
                         status: flagged ? 'refusal' : 'success',
                         refusalReason,

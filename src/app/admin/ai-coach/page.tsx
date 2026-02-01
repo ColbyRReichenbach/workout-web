@@ -1,9 +1,17 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { BarChart3, ThumbsUp, ThumbsDown, Clock, TrendingUp, AlertCircle, RefreshCw, ArrowLeft, ExternalLink, ShieldAlert, Target } from 'lucide-react';
+import {
+    Activity, ThumbsUp, ThumbsDown, Clock, TrendingUp, AlertCircle,
+    RefreshCw, ArrowLeft, ShieldAlert, Target, Terminal, Search,
+    Cpu, Database, Microscope, Zap, LayoutDashboard, ChevronRight
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useSettings } from '@/context/SettingsContext';
+import { TiltCard } from '@/components/TiltCard';
+import { cn } from '@/lib/utils';
 
 interface AnalyticsData {
     period: {
@@ -25,9 +33,18 @@ interface AnalyticsData {
             ai_response?: string;
         }>;
     };
-    performance: {
+    engineering: {
+        totalLogs: number;
+        totalTokens: number;
+        totalCostUsd: number;
         avgLatencyMs: number | null;
-        latencyCount: number;
+        modelDistribution: Record<string, number>;
+        topUsers: Array<{
+            userId: string;
+            requests: number;
+            totalTokens: number;
+            totalCostUsd: number;
+        }>;
     };
     intents: Array<{
         intent: string;
@@ -48,61 +65,64 @@ interface AnalyticsData {
     };
 }
 
-/**
- * STANDALONE ADMIN DASHBOARD
- * For internal model improvement only.
- */
 export default function AdminAnalyticsPage() {
+    const { isAdmin, isLoading: settingsLoading } = useSettings();
+    const router = useRouter();
     const [data, setData] = useState<AnalyticsData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [days, setDays] = useState(7);
-    const [activeTab, setActiveTab] = useState<'overview' | 'quality' | 'performance'>('overview');
+    const [activeFailure, setActiveFailure] = useState<number | null>(null);
 
     const fetchAnalytics = async () => {
         setLoading(true);
         setError(null);
         try {
             const res = await fetch(`/api/ai/analytics?days=${days}`);
-            if (!res.ok) throw new Error('Failed to fetch analytics. Are you logged in?');
+            if (!res.ok) throw new Error('System Access Denied. Elevated privileges required.');
             const json = await res.json();
             setData(json);
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Unknown error');
+            setError(err instanceof Error ? err.message : 'Unknown link failure');
         } finally {
             setLoading(false);
         }
     };
 
     useEffect(() => {
-        fetchAnalytics();
-    }, [days]);
+        if (!settingsLoading && !isAdmin) {
+            router.push('/');
+        }
+    }, [isAdmin, settingsLoading, router]);
 
-    if (loading) {
+    useEffect(() => {
+        if (isAdmin) fetchAnalytics();
+    }, [days, isAdmin]);
+
+    if (settingsLoading || (!isAdmin && !error)) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-screen bg-[#0a0a0b] text-white">
-                <RefreshCw size={32} className="text-primary animate-spin mb-4" />
-                <p className="text-muted-foreground font-mono uppercase tracking-widest text-xs">Initializing Admin Link...</p>
+            <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white">
+                <div className="relative">
+                    <div className="w-16 h-16 rounded-full border-t-2 border-primary animate-spin" />
+                    <Activity size={24} className="absolute inset-0 m-auto text-primary animate-pulse" />
+                </div>
+                <p className="mt-6 text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground">Authenticating Pulse Link...</p>
             </div>
         );
     }
 
     if (error) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-screen bg-[#0a0a0b] p-6 text-center">
-                <div className="w-16 h-16 rounded-2xl bg-destructive/10 flex items-center justify-center mb-6">
-                    <ShieldAlert size={32} className="text-destructive" />
+            <div className="flex flex-col items-center justify-center min-h-screen bg-background p-6 text-center">
+                <div className="w-20 h-20 rounded-[32px] bg-primary/10 border border-primary/20 flex items-center justify-center mb-8 relative group overflow-hidden">
+                    <div className="absolute inset-0 bg-primary/20 animate-pulse" />
+                    <ShieldAlert size={40} className="relative text-primary" />
                 </div>
-                <h1 className="text-xl font-bold text-white mb-2">Access Control Error</h1>
-                <p className="text-muted-foreground mb-8 max-w-sm">{error}</p>
-                <div className="flex gap-4">
-                    <button onClick={fetchAnalytics} className="px-6 py-2 bg-muted rounded-xl text-sm font-medium hover:bg-muted/80 transition-all">
-                        Try Again
-                    </button>
-                    <Link href="/" className="px-6 py-2 bg-primary text-primary-foreground rounded-xl text-sm font-medium hover:opacity-90 transition-all">
-                        Return to App
-                    </Link>
-                </div>
+                <h1 className="text-4xl font-serif font-bold text-foreground mb-4 tracking-tighter">Access Denied</h1>
+                <p className="text-muted-foreground mb-10 max-w-sm italic font-light">Your biometric profile does not match the required clearance level for internal analytics.</p>
+                <Link href="/" className="px-8 py-3 bg-primary text-primary-foreground rounded-2xl text-sm font-bold uppercase tracking-widest hover:opacity-90 transition-all shadow-lg shadow-primary/20">
+                    Return to Safe Zone
+                </Link>
             </div>
         );
     }
@@ -110,269 +130,448 @@ export default function AdminAnalyticsPage() {
     if (!data) return null;
 
     return (
-        <div className="min-h-screen bg-[#0a0a0b] text-slate-200 selection:bg-primary/30">
-            {/* Top Bar */}
-            <header className="border-b border-white/5 bg-black/40 backdrop-blur-xl sticky top-0 z-50">
-                <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+        <div className="min-h-screen bg-background text-foreground selection:bg-primary/30 relative font-sans">
+            {/* Scanline Diagnostic Overlay */}
+            <div className="fixed inset-0 pointer-events-none z-[100] overflow-hidden opacity-20">
+                <div className="absolute top-0 left-0 w-full h-[1px] bg-primary shadow-[0_0_15px_rgba(239,68,68,0.5)] scan-line-admin" />
+            </div>
+
+            {/* Header Area - Sticky under main navbar */}
+            <header className="sticky top-[96px] z-40 bg-background/95 backdrop-blur-3xl border-b border-border shadow-sm">
+                <div className="max-w-[1600px] mx-auto px-8 h-20 flex items-center justify-between">
                     <div className="flex items-center gap-6">
                         <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/20">
-                                <TrendingUp size={20} className="text-primary-foreground" />
+                            <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/20">
+                                <LayoutDashboard size={20} className="text-primary-foreground" />
                             </div>
                             <div>
-                                <h1 className="text-lg font-bold text-white tracking-tight">AI Internal Dashboard</h1>
-                                <p className="text-[10px] text-muted-foreground font-mono uppercase tracking-widest leading-none mt-1">Model Precision Layer</p>
+                                <h1 className="text-xl font-serif font-bold text-foreground tracking-tight leading-none">Diagnostic Terminal</h1>
                             </div>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-4">
-                        <select
-                            value={days}
-                            onChange={(e) => setDays(Number(e.target.value))}
-                            className="bg-zinc-900 border border-white/10 rounded-lg px-3 py-1.5 text-xs font-medium focus:ring-2 focus:ring-primary/50 outline-none transition-all"
-                        >
-                            <option value={1}>Last 24h</option>
-                            <option value={7}>Last 7 Days</option>
-                            <option value={30}>Last 30 Days</option>
-                        </select>
+                    <div className="flex items-center gap-6">
+                        <div className="flex items-center bg-muted border border-border rounded-2xl px-2 py-1">
+                            {[
+                                { label: '24H', value: 1 },
+                                { label: '7D', value: 7 },
+                                { label: '30D', value: 30 },
+                            ].map((opt) => (
+                                <button
+                                    key={opt.value}
+                                    onClick={() => setDays(opt.value)}
+                                    className={cn(
+                                        "px-4 py-1.5 rounded-xl text-[10px] font-bold transition-all",
+                                        days === opt.value
+                                            ? "bg-background text-primary shadow-sm"
+                                            : "text-muted-foreground hover:text-foreground"
+                                    )}
+                                >
+                                    {opt.label}
+                                </button>
+                            ))}
+                        </div>
+
                         <button
                             onClick={fetchAnalytics}
-                            className="p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-all"
-                            title="Refresh Data"
+                            disabled={loading}
+                            className="flex items-center gap-2 px-4 py-2 bg-primary/10 hover:bg-primary/20 text-primary rounded-2xl transition-all disabled:opacity-50 group"
                         >
-                            <RefreshCw size={14} />
+                            <RefreshCw size={14} className={cn(loading && "animate-spin")} />
+                            <span className="text-[10px] font-bold uppercase tracking-widest">Refresh Telemetry</span>
                         </button>
-                        <div className="h-8 w-px bg-white/10 mx-2" />
-                        <Link
-                            href="/"
-                            className="text-xs font-semibold text-muted-foreground hover:text-white transition-colors flex items-center gap-1.5"
-                        >
-                            <ArrowLeft size={14} /> Back to Live
-                        </Link>
                     </div>
                 </div>
             </header>
 
-            <main className="max-w-7xl mx-auto px-6 py-10">
-                {/* Core Stats */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-10">
-                    <StatBox
-                        icon={<ThumbsUp size={18} />}
-                        label="User Satisfaction"
-                        value={data.feedback.satisfactionRate ? `${data.feedback.satisfactionRate}%` : "—"}
-                        trend={`${data.feedback.total} samples`}
+            <main className="max-w-[1600px] mx-auto px-8 pt-48 pb-20 relative z-10">
+                {/* Status HUD (Top Cards) */}
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 mb-12">
+                    <AuditCard
+                        icon={<ThumbsUp size={24} />}
+                        label="User Sentiment"
+                        value={data.feedback.satisfactionRate ? `${data.feedback.satisfactionRate}%` : "0%"}
+                        subtext={`${data.feedback.total} Active Signals`}
                         color="emerald"
                     />
-                    <StatBox
-                        icon={<Clock size={18} />}
-                        label="Average Latency"
-                        value={data.performance.avgLatencyMs ? `${data.performance.avgLatencyMs}ms` : "—"}
-                        trend="Processing Speed"
+                    <AuditCard
+                        icon={<Activity size={24} />}
+                        label="Total Requests"
+                        value={data.engineering.totalLogs.toLocaleString()}
+                        subtext="Cumulative Interactions"
                         color="indigo"
                     />
-                    <StatBox
-                        icon={<AlertCircle size={18} />}
-                        label="Negative Signals"
-                        value={data.feedback.negative.toString()}
-                        trend="Critical Feedback"
-                        color="rose"
-                    />
-                    <StatBox
-                        icon={<RefreshCw size={18} />}
-                        label="Correction Accuracy"
-                        value={`${Math.round(data.queryAnalytics.correctionRate * 100)}%`}
-                        trend="Typo Recovery"
+                    <AuditCard
+                        icon={<Zap size={24} />}
+                        label="Operational Cost"
+                        value={`$${data.engineering.totalCostUsd}`}
+                        subtext={`${data.engineering.totalTokens.toLocaleString()} Total Tokens`}
                         color="amber"
+                    />
+                    <AuditCard
+                        icon={<Database size={24} />}
+                        label="Token Efficiency"
+                        value={data.engineering.totalLogs > 0 ? Math.round(data.engineering.totalTokens / data.engineering.totalLogs).toString() : "0"}
+                        subtext="Avg Tokens / Request"
+                        color="emerald" // Reusing emerald or maybe blue
+                    />
+                    <AuditCard
+                        icon={<Clock size={24} />}
+                        label="System Latency"
+                        value={data.engineering.avgLatencyMs ? `${data.engineering.avgLatencyMs}ms` : "0ms"}
+                        subtext="Mean Response Velocity"
+                        color="indigo"
+                    />
+                    <AuditCard
+                        icon={<AlertCircle size={24} />}
+                        label="Critical Faults"
+                        value={data.feedback.negative.toString()}
+                        subtext="Negative Feedback Loops"
+                        color="rose"
                     />
                 </div>
 
-                {/* Main Content Sections */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+                    {/* Primary Audit Pane */}
+                    <div className="lg:col-span-8 space-y-10">
 
-                    {/* Left: Quality Analysis */}
-                    <div className="lg:col-span-8 space-y-8">
+                        {/* Intent Success Matrix */}
+                        <section className="bg-card border border-border rounded-[40px] p-8 relative overflow-hidden">
+                            <div className="flex items-center justify-between mb-8">
+                                <div>
+                                    <h3 className="text-2xl font-serif font-bold text-foreground flex items-center gap-3">
+                                        <Microscope size={24} className="text-primary" />
+                                        Cognitive Integrity
+                                    </h3>
+                                    <p className="text-[10px] text-muted-foreground uppercase tracking-[0.2em] font-bold mt-1">Intent Recognition Precision Heatmap</p>
+                                </div>
+                            </div>
 
-                        {/* Intent Accuracy Table */}
-                        <div className="bg-zinc-900/40 border border-white/5 rounded-3xl p-8">
-                            <h3 className="text-base font-bold text-white mb-6 flex items-center gap-2">
-                                <Target size={18} className="text-primary" />
-                                Intent Precision Analytics
-                            </h3>
-
-                            <div className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {data.intents.map((intent) => (
-                                    <div key={intent.intent} className="bg-black/20 rounded-2xl p-4 border border-white/[0.02]">
-                                        <div className="flex items-center justify-between mb-3">
+                                    <div key={intent.intent} className="p-5 rounded-3xl bg-muted/30 border border-border hover:bg-muted/50 transition-all group">
+                                        <div className="flex items-center justify-between mb-4">
                                             <div className="flex items-center gap-3">
-                                                <div className={`p-1.5 rounded-lg ${intent.successRate > 80 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
-                                                    <ShieldAlert size={14} />
-                                                </div>
-                                                <span className="text-sm font-bold text-zinc-100 uppercase tracking-tighter">{intent.intent}</span>
+                                                <div className={cn(
+                                                    "w-2 h-2 rounded-full",
+                                                    intent.successRate > 80 ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" : "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]"
+                                                )} />
+                                                <span className="text-xs font-bold uppercase tracking-tight text-foreground group-hover:text-primary transition-colors">{intent.intent === 'UNKNOWN' ? 'UNCLASSIFIED' : intent.intent}</span>
                                             </div>
-                                            <span className="text-xs font-mono text-zinc-500">
-                                                {intent.total} interactions
-                                            </span>
+                                            <span className="text-[10px] font-mono text-muted-foreground">{intent.total} hits</span>
                                         </div>
-                                        <div className="flex items-center gap-4">
-                                            <div className="flex-1 h-3 bg-zinc-800 rounded-full overflow-hidden border border-white/5">
-                                                <motion.div
-                                                    initial={{ width: 0 }}
-                                                    animate={{ width: `${intent.successRate}%` }}
-                                                    className={`h-full rounded-full ${intent.successRate > 80 ? 'bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.3)]' : 'bg-rose-500 shadow-[0_0_12px_rgba(244,63,94,0.3)]'}`}
-                                                />
-                                            </div>
-                                            <span className={`text-sm font-bold font-mono w-10 text-right ${intent.successRate > 80 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                                {intent.successRate}%
-                                            </span>
+                                        <div className="relative h-2 bg-muted rounded-full overflow-hidden border border-border">
+                                            <motion.div
+                                                initial={{ width: 0 }}
+                                                animate={{ width: `${intent.successRate}%` }}
+                                                className={cn(
+                                                    "h-full rounded-full transition-all duration-1000",
+                                                    intent.successRate > 80 ? "bg-emerald-500" : "bg-rose-500"
+                                                )}
+                                            />
+                                        </div>
+                                        <div className="flex justify-between mt-2">
+                                            <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">{intent.successRate}% Accuracy</span>
+                                            <span className="text-[9px] font-mono text-muted-foreground">FLAWLESS {intent.positive} / {intent.total}</span>
                                         </div>
                                     </div>
                                 ))}
                             </div>
-                        </div>
+                        </section>
 
-                        {/* Recent Failure Logs */}
-                        <div className="bg-zinc-900/40 border border-white/5 rounded-3xl p-8">
-                            <h3 className="text-base font-bold text-white mb-6 flex items-center gap-2">
-                                <ShieldAlert size={18} className="text-rose-500" />
-                                Model Failure Patterns (Recent Negative Feedback)
-                            </h3>
-
-                            {data.feedback.recentNegative.length === 0 ? (
-                                <div className="py-12 text-center bg-black/20 rounded-2xl border border-dashed border-white/10">
-                                    <p className="text-xs text-muted-foreground uppercase tracking-widest">No negative signals recorded</p>
+                        {/* Audit Terminal (Recent Failures) */}
+                        <section className="bg-card border border-border rounded-[40px] p-0 overflow-hidden">
+                            <div className="p-8 border-b border-border flex items-center justify-between bg-muted/10">
+                                <div>
+                                    <h3 className="text-2xl font-serif font-bold text-foreground flex items-center gap-3">
+                                        <Terminal size={24} className="text-primary" />
+                                        Failure Audit Console
+                                    </h3>
+                                    <p className="text-[10px] text-muted-foreground uppercase tracking-[0.2em] font-bold mt-1">Raw Stream: Recent Negative Signal Decryption</p>
                                 </div>
-                            ) : (
-                                <div className="space-y-4">
-                                    {data.feedback.recentNegative.map((item, i) => (
-                                        <div key={i} className="p-5 rounded-2xl bg-black/30 border border-white/5 transition-all hover:bg-black/40">
+                                <div className="px-4 py-1.5 rounded-full border border-rose-500/20 bg-rose-500/5 text-rose-500 text-[10px] font-bold uppercase tracking-widest animate-pulse">
+                                    LIVE MONITORING
+                                </div>
+                            </div>
+
+                            <div className="divide-y divide-border">
+                                {data.feedback.recentNegative.length === 0 ? (
+                                    <div className="p-20 text-center">
+                                        <div className="w-16 h-16 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto mb-6 border border-emerald-500/20">
+                                            <ThumbsUp size={24} className="text-emerald-500" />
+                                        </div>
+                                        <h4 className="text-foreground font-serif text-xl mb-2">Zero Critical Deviations</h4>
+                                        <p className="text-muted-foreground text-xs font-light italic">Model response integrity is operating at 100% within the current bio-window.</p>
+                                    </div>
+                                ) : (
+                                    data.feedback.recentNegative.map((item, i) => (
+                                        <div
+                                            key={i}
+                                            className={cn(
+                                                "p-6 transition-all cursor-pointer group hover:bg-muted/20",
+                                                activeFailure === i ? "bg-muted/30" : ""
+                                            )}
+                                            onClick={() => setActiveFailure(activeFailure === i ? null : i)}
+                                        >
                                             <div className="flex items-center justify-between mb-4">
-                                                <div className="flex items-center gap-3">
-                                                    <span className="px-2 py-0.5 bg-rose-500/10 text-rose-400 rounded-md text-[10px] font-bold uppercase tracking-tight border border-rose-500/20">
-                                                        Negative
-                                                    </span>
-                                                    <span className="text-xs font-mono font-bold text-zinc-300">
-                                                        {item.intent}
-                                                    </span>
-                                                </div>
-                                                <span className="text-[10px] text-zinc-600 font-mono">
-                                                    {new Date(item.date).toLocaleTimeString()}
-                                                </span>
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-4 mb-4">
-                                                <div className="space-y-1">
-                                                    <p className="text-[10px] uppercase text-zinc-600 font-bold tracking-widest">User Query</p>
-                                                    <p className="text-xs text-zinc-400 italic">"{item.user_message || "N/A"}"</p>
-                                                </div>
-                                                <div className="space-y-1 text-right">
-                                                    <p className="text-[10px] uppercase text-zinc-600 font-bold tracking-widest">Tools Triggered</p>
-                                                    <div className="flex flex-wrap gap-1 justify-end">
-                                                        {item.tools?.length > 0 ? item.tools.map(t => (
-                                                            <code key={t} className="text-[9px] bg-zinc-800 text-primary px-1.5 py-0.5 rounded border border-white/5">{t}</code>
-                                                        )) : <span className="text-[10px] text-zinc-700">None</span>}
+                                                <div className="flex items-center gap-4">
+                                                    <div className="w-8 h-8 rounded-lg bg-rose-500/10 border border-rose-500/20 flex items-center justify-center">
+                                                        <ThumbsDown size={14} className="text-rose-500" />
+                                                    </div>
+                                                    <div>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-xs font-bold text-foreground uppercase tracking-tighter">{item.intent}</span>
+                                                            <span className="text-[10px] text-muted-foreground font-mono bg-muted px-2 py-0.5 rounded uppercase tracking-widest">{item.latency}MS</span>
+                                                        </div>
+                                                        <p className="text-[9px] text-muted-foreground font-mono mt-0.5 uppercase opacity-40">{new Date(item.date).toLocaleString()} • ID: AUDIT-{i + 1000}</p>
                                                     </div>
                                                 </div>
+                                                <ChevronRight size={16} className={cn("text-muted-foreground transition-transform duration-300", activeFailure === i ? "rotate-90 text-primary" : "")} />
                                             </div>
-                                            <div className="pt-4 border-t border-white/5">
-                                                <p className="text-[10px] uppercase text-zinc-600 font-bold tracking-widest mb-1">AI Response</p>
-                                                <p className="text-xs text-zinc-500 line-clamp-2">{item.ai_response || "N/A"}</p>
-                                            </div>
+
+                                            <AnimatePresence>
+                                                {activeFailure === i && (
+                                                    <motion.div
+                                                        initial={{ height: 0, opacity: 0 }}
+                                                        animate={{ height: "auto", opacity: 1 }}
+                                                        exit={{ height: 0, opacity: 0 }}
+                                                        className="overflow-hidden"
+                                                    >
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6 pt-6 border-t border-border">
+                                                            <div className="space-y-4">
+                                                                <div className="space-y-2">
+                                                                    <p className="text-[9px] uppercase font-bold text-primary tracking-widest flex items-center gap-2">
+                                                                        <Search size={10} /> User Payload
+                                                                    </p>
+                                                                    <div className="p-4 rounded-2xl bg-muted border border-border font-mono text-[11px] text-muted-foreground italic">
+                                                                        "{item.user_message}"
+                                                                    </div>
+                                                                </div>
+                                                                <div className="space-y-2">
+                                                                    <p className="text-[9px] uppercase font-bold text-primary tracking-widest flex items-center gap-2">
+                                                                        <Cpu size={10} /> Active Tools
+                                                                    </p>
+                                                                    <div className="flex flex-wrap gap-2">
+                                                                        {item.tools && item.tools.length > 0 ? item.tools.map(t => (
+                                                                            <span key={t} className="px-2 py-1 rounded bg-muted border border-border text-[10px] font-mono text-primary/80">{t}()</span>
+                                                                        )) : <span className="text-[10px] text-muted-foreground font-mono italic">No tactical logic deployed</span>}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <div className="space-y-2">
+                                                                <p className="text-[9px] uppercase font-bold text-primary tracking-widest flex items-center gap-2">
+                                                                    <Activity size={10} /> Neural Response Output
+                                                                </p>
+                                                                <div className="p-4 rounded-2xl bg-muted border border-border font-mono text-[11px] text-muted-foreground leading-relaxed overflow-y-auto max-h-40">
+                                                                    {item.ai_response}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </motion.div>
+                                                )}
+                                            </AnimatePresence>
                                         </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </section>
                     </div>
 
-                    {/* Right Column: Optimization Data */}
-                    <div className="lg:col-span-4 space-y-8">
+                    {/* Secondary Intelligence Column */}
+                    <div className="lg:col-span-4 space-y-10">
 
-                        {/* Tool Frequency */}
-                        <div className="bg-zinc-900/40 border border-white/5 rounded-3xl p-6">
-                            <h3 className="text-sm font-bold text-white mb-6 uppercase tracking-widest">Core Function Usage</h3>
+                        {/* Model Distribution */}
+                        <section className="bg-card border border-border rounded-[40px] p-8">
+                            <h3 className="text-lg font-serif font-bold text-foreground mb-8 border-b border-border pb-4 flex items-center gap-2">
+                                <Cpu size={18} className="text-primary" />
+                                Model Fleet Status
+                            </h3>
                             <div className="space-y-4">
-                                {data.tools.map((tool) => (
-                                    <div key={tool.tool} className="flex items-center justify-between">
-                                        <code className="text-[10px] text-primary bg-primary/5 px-2 py-1 rounded border border-primary/10">
-                                            {tool.tool}
-                                        </code>
-                                        <span className="text-xs font-mono text-zinc-400">{tool.count} calls</span>
+                                {Object.keys(data.engineering.modelDistribution).length === 0 ? (
+                                    <div className="py-8 text-center border border-dashed border-border rounded-3xl">
+                                        <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">No Telemetry Data</p>
                                     </div>
-                                ))}
+                                ) : (
+                                    Object.entries(data.engineering.modelDistribution).map(([model, count]) => (
+                                        <div key={model} className="flex items-center justify-between group">
+                                            <span className="text-[11px] font-mono text-muted-foreground group-hover:text-foreground transition-colors">{model}</span>
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-32 h-1 bg-muted rounded-full overflow-hidden">
+                                                    <div
+                                                        className="h-full bg-primary"
+                                                        style={{ width: `${(count / data.engineering.totalLogs) * 100}%` }}
+                                                    />
+                                                </div>
+                                                <span className="text-[10px] font-mono font-bold text-primary">{Math.round((count / data.engineering.totalLogs) * 100)}%</span>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
                             </div>
-                        </div>
+                        </section>
 
-                        {/* Exercise Trends */}
-                        <div className="bg-zinc-900/40 border border-white/5 rounded-3xl p-6">
-                            <h3 className="text-sm font-bold text-white mb-6 uppercase tracking-widest">Query Density</h3>
-                            <div className="space-y-4">
-                                {data.queryAnalytics.topExercises.map((ex, i) => (
-                                    <div key={ex.name} className="flex items-center justify-between group">
-                                        <div className="flex items-center gap-3">
-                                            <span className="text-[10px] text-zinc-700 font-mono">0{i + 1}</span>
-                                            <span className="text-xs font-bold text-zinc-400 group-hover:text-white transition-colors">{ex.name}</span>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-xs font-mono text-zinc-500">{ex.count}</span>
-                                            <div className="w-1.5 h-1.5 rounded-full bg-primary/40" />
-                                        </div>
+                        {/* Power Users */}
+                        <section className="bg-card border border-border rounded-[40px] p-8">
+                            <h3 className="text-lg font-serif font-bold text-foreground mb-8 border-b border-border pb-4 flex items-center gap-2">
+                                <Activity size={18} className="text-primary" />
+                                Power Users
+                            </h3>
+                            <div className="space-y-4 font-mono">
+                                {data.engineering.topUsers?.length === 0 ? (
+                                    <div className="py-8 text-center border border-dashed border-border rounded-3xl">
+                                        <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">No Active Users</p>
                                     </div>
-                                ))}
+                                ) : (
+                                    data.engineering.topUsers?.map((user, i) => (
+                                        <div key={user.userId} className="flex items-center justify-between group">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-6 h-6 rounded-lg bg-primary/5 flex items-center justify-center border border-primary/10 text-[10px] font-bold text-primary">
+                                                    {i + 1}
+                                                </div>
+                                                <span className="text-[10px] text-muted-foreground group-hover:text-foreground transition-colors" title={user.userId}>
+                                                    {user.userId.substring(0, 8)}...
+                                                </span>
+                                            </div>
+                                            <div className="text-right">
+                                                <span className="block text-[10px] font-bold text-primary">{user.requests} reqs</span>
+                                                <span className="block text-[9px] text-muted-foreground">{user.totalTokens.toLocaleString()} toks</span>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
                             </div>
-                        </div>
+                        </section>
 
-                        {/* Database Sync Recovery */}
-                        <div className="bg-zinc-900/40 border border-white/5 rounded-3xl p-6 overflow-hidden relative">
-                            <h3 className="text-sm font-bold text-white mb-6 uppercase tracking-widest">Normalization Matrix</h3>
+                        {/* Tool Usage Stack */}
+                        <section className="bg-card border border-border rounded-[40px] p-8">
+                            <h3 className="text-lg font-serif font-bold text-foreground mb-8 border-b border-border pb-4">Tactical Tool Load</h3>
+                            <div className="space-y-4 font-mono">
+                                {data.tools.length === 0 ? (
+                                    <div className="py-8 text-center border border-dashed border-border rounded-3xl">
+                                        <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">No Tools Deployed</p>
+                                    </div>
+                                ) : (
+                                    data.tools.map((tool) => (
+                                        <div key={tool.tool} className="flex items-center justify-between group">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 rounded-lg bg-primary/5 flex items-center justify-center border border-primary/10">
+                                                    <Target size={14} className="text-primary" />
+                                                </div>
+                                                <span className="text-[11px] text-muted-foreground group-hover:text-foreground transition-colors">{tool.tool}</span>
+                                            </div>
+                                            <span className="text-xs font-bold text-primary">{tool.count}</span>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </section>
+
+                        {/* Typo Recovery Matrix */}
+                        <section className="bg-card border border-border rounded-[40px] p-8 relative overflow-hidden">
+                            <h3 className="text-lg font-serif font-bold text-foreground mb-8 border-b border-border pb-4">Normalization Engine</h3>
                             <div className="space-y-4 relative z-10">
-                                {data.queryAnalytics.typoPatterns.slice(0, 8).map((pattern, i) => (
-                                    <div key={i} className="flex items-center justify-between text-[11px]">
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-zinc-500 italic line-through opacity-50">{pattern.typo}</span>
-                                            <span className="text-primary/50">→</span>
-                                            <span className="text-zinc-200 font-bold">{pattern.corrected}</span>
-                                        </div>
-                                        <span className="text-[9px] font-mono text-zinc-600">{pattern.frequency}x</span>
+                                {data.queryAnalytics.typoPatterns.length === 0 ? (
+                                    <div className="py-8 text-center border border-dashed border-border rounded-3xl">
+                                        <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Stream Idle</p>
                                     </div>
-                                ))}
+                                ) : (
+                                    data.queryAnalytics.typoPatterns.map((pattern, i) => (
+                                        <div key={i} className="flex items-center justify-between text-[11px] group">
+                                            <div className="flex items-center gap-3">
+                                                <span className="text-muted-foreground font-mono italic opacity-60">"{pattern.typo}"</span>
+                                                <ChevronRight size={10} className="text-primary/40" />
+                                                <span className="text-primary font-bold uppercase tracking-widest">{pattern.corrected}</span>
+                                            </div>
+                                            <span className="text-[9px] font-mono text-muted-foreground">{pattern.frequency}x</span>
+                                        </div>
+                                    ))
+                                )}
                             </div>
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 blur-3xl -z-0" />
-                        </div>
+                        </section>
+
+                        {/* Database Health Card */}
+                        <section className="p-8 rounded-[40px] bg-primary/5 border border-primary/20">
+                            <div className="flex items-center gap-4 mb-4">
+                                <Database size={24} className="text-primary" />
+                                <div>
+                                    <h4 className="text-sm font-serif font-bold text-foreground">Audit Synchronization</h4>
+                                    <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-[0.2em]">Last Linked: {new Date().toLocaleTimeString()}</p>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="bg-card p-3 rounded-2xl border border-border">
+                                    <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest mb-1">Telemetry</p>
+                                    <p className="text-xl font-mono text-foreground">{data.engineering.totalLogs}</p>
+                                </div>
+                                <div className="bg-card p-3 rounded-2xl border border-border">
+                                    <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest mb-1">Status</p>
+                                    <p className="text-xl font-mono text-primary">NOMINAL</p>
+                                </div>
+                            </div>
+                        </section>
 
                     </div>
                 </div>
             </main>
+
+            <style jsx global>{`
+                @keyframes scan-line-anim {
+                    0% { transform: translateY(-100vh); }
+                    100% { transform: translateY(100vh); }
+                }
+                .scan-line-admin {
+                    animation: scan-line-anim 8s linear infinite;
+                }
+            `}</style>
         </div>
     );
 }
 
-function StatBox({ icon, label, value, trend, color }: {
+function AuditCard({ icon, label, value, subtext, color }: {
     icon: React.ReactNode,
     label: string,
     value: string,
-    trend: string,
+    subtext: string,
     color: 'emerald' | 'indigo' | 'rose' | 'amber'
 }) {
     const colors = {
-        emerald: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-        indigo: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
-        rose: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
-        amber: 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+        emerald: { bg: 'bg-emerald-500/10', text: 'text-emerald-500', border: 'border-emerald-500/20', glow: 'shadow-emerald-500/10' },
+        indigo: { bg: 'bg-indigo-500/10', text: 'text-indigo-400', border: 'border-indigo-500/20', glow: 'shadow-indigo-500/10' },
+        rose: { bg: 'bg-rose-500/10', text: 'text-rose-500', border: 'border-rose-500/20', glow: 'shadow-rose-500/10' },
+        amber: { bg: 'bg-amber-500/10', text: 'text-amber-500', border: 'border-amber-500/20', glow: 'shadow-amber-500/10' }
     };
 
+    const c = colors[color];
+
     return (
-        <motion.div
-            whileHover={{ y: -4 }}
-            className="p-6 rounded-3xl bg-zinc-900/40 border border-white/5 backdrop-blur-sm"
+        <TiltCard
+            glowColor={c.glow}
+            className="group rounded-[40px] p-8 border border-border overflow-hidden bg-card"
         >
-            <div className={`w-10 h-10 rounded-2xl flex items-center justify-center border ${colors[color]} mb-4`}>
-                {icon}
+            <div className={`absolute -right-6 -bottom-6 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity duration-300 pointer-events-none ${c.text}`}>
+                <div className="scale-[4]">
+                    {icon}
+                </div>
             </div>
-            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-[0.15em] mb-1">{label}</p>
-            <div className="flex items-end gap-2">
-                <p className="text-2xl font-bold text-white tracking-tighter">{value}</p>
-                <p className="text-[10px] text-zinc-600 font-mono mb-1">{trend}</p>
+
+            <div className="flex justify-between items-start mb-10 relative z-10">
+                <div className={cn("w-14 h-14 rounded-[22px] flex items-center justify-center border transition-all duration-300 group-hover:scale-110", c.bg, c.border, c.text)}>
+                    {icon}
+                </div>
+                <div className="text-right">
+                    <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-[0.3em] opacity-40">{label}</p>
+                    <div className="w-6 h-[1px] bg-border ml-auto mt-2" />
+                </div>
             </div>
-        </motion.div>
+
+            <div className="relative z-10">
+                <h3 className="text-5xl font-serif text-foreground tracking-tighter mb-1">
+                    {value}
+                </h3>
+                <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-[0.2em]">{subtext}</p>
+            </div>
+
+            <div className="mt-8 h-[2px] w-8 bg-muted group-hover:w-16 group-hover:bg-primary transition-all duration-500" />
+        </TiltCard>
     );
 }

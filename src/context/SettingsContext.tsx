@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 interface SettingsState {
     units: UnitSystem;
     theme: string;
+    isAdmin: boolean;
 }
 
 interface SettingsContextType extends SettingsState {
@@ -17,18 +18,25 @@ interface SettingsContextType extends SettingsState {
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
-
 export function SettingsProvider({
     children,
     initialSettings
 }: {
     children: React.ReactNode;
-    initialSettings: { units: string | null; theme: string | null }
+    initialSettings: { units: string | null; theme: string | null; isAdmin: boolean }
 }) {
     const router = useRouter();
     const [units, setUnitsState] = useState<UnitSystem>(normalizeUnit(initialSettings.units));
     const [theme, setThemeState] = useState<string>(initialSettings.theme || 'Pulse Light');
+    const [isAdmin, setIsAdmin] = useState<boolean>(initialSettings.isAdmin);
     const [isLoading, setIsLoading] = useState(false);
+
+    // Sync state with props when they change (e.g. after login/logout or server-side refresh)
+    useEffect(() => {
+        setUnitsState(normalizeUnit(initialSettings.units));
+        setThemeState(initialSettings.theme || 'Pulse Light');
+        setIsAdmin(initialSettings.isAdmin);
+    }, [initialSettings.units, initialSettings.theme, initialSettings.isAdmin]);
 
     // Apply theme to document element
     useEffect(() => {
@@ -68,7 +76,7 @@ export function SettingsProvider({
     };
 
     return (
-        <SettingsContext.Provider value={{ units, theme, setUnits, setTheme, isLoading }}>
+        <SettingsContext.Provider value={{ units, theme, isAdmin, setUnits, setTheme, isLoading }}>
             {children}
         </SettingsContext.Provider>
     );

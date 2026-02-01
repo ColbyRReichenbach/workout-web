@@ -10,7 +10,7 @@ import {
     summarizeBiometrics,
     logTokenUsage,
 } from './tokenUtils';
-import { normalizeExercise, getFilterPattern, getUnrecognizedMessage } from './exerciseNormalization';
+import { normalizeExercise, getFilterPattern, getUnrecognizedMessage, EXERCISE_KEYWORDS } from './exerciseNormalization';
 import { logToolCall } from './queryAnalytics';
 import { DEMO_USER_ID } from '@/lib/constants';
 
@@ -289,6 +289,21 @@ export const findLastLog = tool({
                 normalizedFilter = normResult.normalized;
                 wasCorrected = normResult.wasCorrected;
 
+                // HANDLE GENERIC "WORKOUT" QUERIES
+                // If user asks "when was my last workout?", normalized might be "workout" (unrecognized) or similar
+                // We typically want to show ANY recent log in this case
+                const genericKeywords = ['workout', 'session', 'training', 'exercise', 'lift', 'gym'];
+                if (genericKeywords.includes(normalizedFilter) || genericKeywords.includes(filter.toLowerCase())) {
+                    console.log(`[AI Tool] Generic query detected ("${filter}"), returning most recent logs without filtering.`);
+                    return JSON.stringify({
+                        count: logs.length,
+                        logs: logs.map(log => ({
+                            ...sanitizeLogForAI(log),
+                            days_ago: Math.floor((new Date().getTime() - new Date(log.date).setHours(0, 0, 0, 0)) / (1000 * 60 * 60 * 24))
+                        })).slice(0, limit)
+                    }, null, 2);
+                }
+
                 // Handle unrecognized exercise
                 if (normResult.confidence === 0) {
                     return getUnrecognizedMessage(filter);
@@ -299,12 +314,19 @@ export const findLastLog = tool({
                     console.log(`[AI Tool] Corrected "${filter}" -> "${normalizedFilter}" (confidence: ${normResult.confidence})`);
                 }
 
-                // Filter with normalized term
-                const term = normalizedFilter.replace(/_/g, ' ');
-                filteredLogs = logs.filter(log =>
-                    log.segment_name?.toLowerCase().includes(term) ||
-                    log.segment_type?.toLowerCase().includes(term)
-                ).slice(0, limit);
+                // Filter using ALL aliases for the canonical exercise
+                // This ensures "Overhead Press" (normalized to 'overhead_press') matches logs named "OHP", "Strict Press", etc.
+                const aliases = EXERCISE_KEYWORDS[normalizedFilter] || [normalizedFilter.replace(/_/g, ' ')];
+
+                filteredLogs = logs.filter(log => {
+                    const logName = log.segment_name?.toLowerCase() || '';
+                    const logType = log.segment_type?.toLowerCase() || '';
+
+                    // Check if any alias appears in the log name or type
+                    return aliases.some((alias: string) =>
+                        logName.includes(alias) || logType.includes(alias)
+                    );
+                }).slice(0, limit);
 
                 if (filteredLogs.length === 0) {
                     const displayFilter = wasCorrected ? `${filter}" (interpreted as "${normalizedFilter}` : filter;
@@ -443,6 +465,80 @@ export const getExercisePR = tool({
                 return getUnrecognizedMessage(exercise);
             }
 
+            const displayExercise = normalized.replace(/_/g, ' ');
+
+            // 1. PRIMARY SEARCH: Check pr_history table (most accurate source)
+            try {
+                // Get all aliases to search against
+                const aliases = EXERCISE_KEYWORDS[normalized] || [normalized.replace(/_/g, ' ')];
+
+                // Construct a filter string for .or()
+                // format: exercise_name.ilike.%alias1%,exercise_name.ilike.%alias2%...
+                const filterString = aliases.map(a => `exercise_name.ilike.%${a}%`).join(',');
+
+                const { data: prHistory, error: prHistoryError } = await supabase
+                    .from('pr_history')
+                    .select('date, value, exercise_name')
+                    .eq('user_id', userId)
+                    .or(filterString)
+                    .order('value', { ascending: false }) // Highest value first (true PR)
+                    .order('date', { ascending: false })  // Most recent if ties
+                    .limit(1);
+
+                if (!prHistoryError && prHistory && prHistory.length > 0) {
+                    const record = prHistory[0];
+                    const prValue = Number(record.value);
+                    const prDate = record.date;
+                    const prActivity = record.exercise_name;
+
+                    if (prValue > 0 && prDate) {
+                        // Calculate days ago
+                        const logDate = new Date(prDate);
+                        const today = new Date();
+                        logDate.setHours(0, 0, 0, 0);
+                        today.setHours(0, 0, 0, 0);
+                        const daysAgo = Math.floor((today.getTime() - logDate.getTime()) / (1000 * 60 * 60 * 24));
+
+                        // Infer type if possible, default to weight if unknown
+                        let type: 'weight' | 'time' | 'power' = 'weight';
+                        if (prActivity.toLowerCase().includes('run') || prActivity.toLowerCase().includes('row') || prActivity.toLowerCase().includes('ski') || prActivity.toLowerCase().includes('mile') || prActivity.toLowerCase().includes('5k')) {
+                            type = 'time';
+                        } else if (prActivity.toLowerCase().includes('bike') || prActivity.toLowerCase().includes('watts')) {
+                            type = 'power';
+                        }
+
+                        // Use existing helper to guess valid unit or type if needed, but pr_history usually stores 'lbs' for weight
+                        // If we needed unit, we could select it. Assuming lbs for now or from tool logic types.
+                        const { unit } = getPRType(type === 'weight' ? 'squat_max' : type === 'time' ? 'mile_time_sec' : 'bike_max_watts'); // Dummy field to get unit
+
+                        // Log analytics
+                        logToolCall({
+                            toolName: 'getExercisePR',
+                            exerciseName: exercise,
+                            normalizedName: normalized,
+                            wasCorrected: normResult.wasCorrected,
+                            userId,
+                        });
+
+                        return JSON.stringify({
+                            exercise: displayExercise,
+                            originalQuery: normResult.wasCorrected ? exercise : undefined,
+                            pr: prValue,
+                            formatted: type === 'time' ? formatTime(prValue) : `${prValue} ${unit}`, // Simple formatting, can be improved if unit known
+                            type: type,
+                            date: prDate,
+                            days_ago: daysAgo,
+                            activity_name: prActivity,
+                            source: 'pr_history'
+                        }, null, 2);
+                    }
+                }
+            } catch (err) {
+                console.warn('[AI Tool] Error searching pr_history, falling back to profile:', err);
+                // Continue to fallback
+            }
+
+            // 2. FALLBACK SEARCH: Profile + Logs (Legacy/Backup)
             // Map to PR field
             const prField = EXERCISE_TO_PR_FIELD[normalized];
             if (!prField) {
@@ -472,9 +568,74 @@ export const getExercisePR = tool({
                 return `No PR recorded for ${exercise}${correction}. You can set your PRs in Profile Settings or complete a checkpoint test.`;
             }
 
+            // FETCH DATE OF PR (New Logic)
+            let prDate: string | null = null;
+            let prDaysAgo: number | null = null;
+            let prActivity: string | null = null;
+
+            if (prValue && prValue > 0) {
+                // Find the log that matches this PR value
+                // We search for logs with matching exercise name AND matching performance value
+                const aliases = EXERCISE_KEYWORDS[normalized] || [normalized.replace(/_/g, ' ')];
+
+                // Build a flexible query to find logs that MIGHT contain this PR
+                // We can't easily query JSONB for exact value efficiently in one go without specific structure knowledge,
+                // so we fetch candidate logs for the exercise and filter in memory (efficient enough for single user history)
+                const { data: candidateLogs } = await supabase
+                    .from('logs')
+                    .select('date, segment_name, segment_type, performance_data')
+                    .eq('user_id', userId)
+                    .order('date', { ascending: false }); // Newest first
+
+                if (candidateLogs && candidateLogs.length > 0) {
+                    // Filter for logs that match the exercise AND the PR value
+                    const matchingLog = candidateLogs.find(log => {
+                        const logName = log.segment_name?.toLowerCase() || '';
+                        const logType = log.segment_type?.toLowerCase() || '';
+                        const isExerciseMatch = aliases.some(alias => logName.includes(alias) || logType.includes(alias));
+                        if (!isExerciseMatch) return false;
+
+                        // Check performance data
+                        const perf = log.performance_data as any;
+                        if (!perf) return false;
+
+                        if (type === 'weight') {
+                            // Check max weight in sets or single weight field
+                            // Handle simple { weight: 100 } format
+                            if (perf.weight === prValue) return true;
+
+                            // Handle { sets: [{weight: 100}, ...] } format
+                            if (Array.isArray(perf.sets)) {
+                                return perf.sets.some((s: any) => s.weight === prValue);
+                            }
+                        } else if (type === 'time') {
+                            // Check duration or specific time fields
+                            // This is trickier as time might be stored in different fields (time_seconds, etc)
+                            // For now, check common fields
+                            if (perf.time_seconds === prValue) return true;
+                            if (perf.duration_sec === prValue) return true;
+                            // For some cardio, it might be in specific field like mile_time_sec which isn't in logs standardly
+                            // But usually logs store 'time_seconds' or 'duration'
+                        } else if (type === 'power') {
+                            if (perf.watts === prValue || perf.avg_watts === prValue || perf.max_watts === prValue) return true;
+                        }
+                        return false;
+                    });
+
+                    if (matchingLog && matchingLog.date) {
+                        prDate = matchingLog.date;
+                        prActivity = matchingLog.segment_name;
+                        const logDate = new Date(matchingLog.date);
+                        const today = new Date();
+                        logDate.setHours(0, 0, 0, 0);
+                        today.setHours(0, 0, 0, 0);
+                        prDaysAgo = Math.floor((today.getTime() - logDate.getTime()) / (1000 * 60 * 60 * 24));
+                    }
+                }
+            }
+
             // Format the result
-            const formattedValue = type === 'time' ? formatTime(prValue) : prValue;
-            const displayExercise = normalized.replace(/_/g, ' ');
+            const formattedValue = (type === 'time' && prValue) ? formatTime(prValue) : prValue;
 
             // Log analytics
             logToolCall({
@@ -491,6 +652,10 @@ export const getExercisePR = tool({
                 pr: prValue,
                 formatted: `${formattedValue} ${unit}`,
                 type: type,
+                date: prDate, // ISO Date string
+                days_ago: prDaysAgo,
+                activity_name: prActivity, // exact log name found
+                source: 'profile_fallback'
             }, null, 2);
         } catch (error) {
             console.error('[AI Tool Error] getExercisePR:', error);

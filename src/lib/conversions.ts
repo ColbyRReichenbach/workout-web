@@ -137,3 +137,39 @@ export const mapExerciseToBaseline = (name: string): string => {
 
     return "Other";
 };
+
+/**
+ * Auto-formats a numeric string into M:SS or MM:SS format.
+ * Handles backspacing and prevents invalid inputs.
+ * 
+ * @param input - The raw string from the input field
+ * @param previousValue - The previous state of the input (to handle deletions)
+ */
+export const formatTimeInput = (input: string, previousValue: string = ""): string => {
+    // 1. Remove non-numeric characters
+    const numbers = input.replace(/\D/g, '');
+
+    // 2. Limit to 4 digits (MM:SS)
+    const truncated = numbers.slice(0, 4);
+
+    // 3. Handle deletions: If the user just deleted the colon, don't immediately re-add it
+    const isDeleting = input.length < previousValue.length;
+    const hadColon = previousValue.includes(':');
+    const hasColon = input.includes(':');
+
+    if (isDeleting && hadColon && !hasColon && numbers.length > 0) {
+        // Just return the numbers without the colon to allow backspacing through it
+        return numbers;
+    }
+
+    // 4. Format based on length
+    if (truncated.length <= 2) {
+        return truncated;
+    } else if (truncated.length === 3) {
+        // M:SS
+        return `${truncated[0]}:${truncated.slice(1)}`;
+    } else {
+        // MM:SS
+        return `${truncated.slice(0, 2)}:${truncated.slice(2)}`;
+    }
+};

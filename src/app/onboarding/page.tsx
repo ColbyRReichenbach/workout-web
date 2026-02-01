@@ -12,6 +12,7 @@ import { GUEST_MODE_COOKIE } from "@/lib/constants";
 import { estimateMissingMaxes } from "@/lib/calculations/percentages";
 import { UserProfile } from "@/lib/types";
 import { NanoParticles } from "@/components/NanoParticles";
+import { formatTimeInput } from "@/lib/conversions";
 
 /**
  * Parse a specific cookie value from document.cookie string
@@ -120,6 +121,20 @@ export default function OnboardingPage() {
             const guestCookie = getCookieValue(GUEST_MODE_COOKIE.name);
             const isGuestMode = !user || guestCookie === GUEST_MODE_COOKIE.value;
 
+            if (!isGuestMode && user) {
+                // If the user already has a completed profile, send them to dashboard
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('height, weight_lbs')
+                    .eq('id', user.id)
+                    .single();
+
+                if (profile?.height && profile?.weight_lbs) {
+                    router.push('/');
+                    return;
+                }
+            }
+
             setIsGuest(isGuestMode);
 
             if (isGuestMode) {
@@ -151,6 +166,8 @@ export default function OnboardingPage() {
                 snatch_max: parseInt(formState.snatch_max) || 0,
                 ohp_max: parseInt(formState.ohp_max) || 0,
                 bike_max_watts: parseInt(formState.bike_max_watts) || 0,
+                mile_time_sec: parseTime(formState.mile_time),
+                row_2k_sec: parseTime(formState.row_2k),
             };
             const estimates = estimateMissingMaxes(tempProfile);
             setEstimatedProfile(estimates);
@@ -181,10 +198,51 @@ export default function OnboardingPage() {
         if (!isGuest) {
             const formData = new FormData();
             Object.entries(formState).forEach(([key, val]) => {
-                if (key === 'mile_time') formData.append('mile_time_sec', parseTime(val).toString());
-                else if (key === 'row_2k') formData.append('row_2k_sec', parseTime(val).toString());
-                else formData.append(key, val);
+                let finalValue = val;
+
+                // If value is missing, use AI estimate if available
+                if (!val && estimatedProfile) {
+                    if (key === 'squat_max') finalValue = (estimatedProfile.squat_max || 0).toString();
+                    else if (key === 'bench_max') finalValue = (estimatedProfile.bench_max || 0).toString();
+                    else if (key === 'deadlift_max') finalValue = (estimatedProfile.deadlift_max || 0).toString();
+                    else if (key === 'front_squat_max') finalValue = (estimatedProfile.front_squat_max || 0).toString();
+                    else if (key === 'clean_jerk_max') finalValue = (estimatedProfile.clean_jerk_max || 0).toString();
+                    else if (key === 'snatch_max') finalValue = (estimatedProfile.snatch_max || 0).toString();
+                    else if (key === 'ohp_max') finalValue = (estimatedProfile.ohp_max || 0).toString();
+                    else if (key === 'bike_max_watts') finalValue = (estimatedProfile.bike_max_watts || 0).toString();
+                    // Additional estimated fields
+                    else if (key === 'k5_time_sec') finalValue = (estimatedProfile.k5_time_sec || 0).toString();
+                    else if (key === 'sprint_400m_sec') finalValue = (estimatedProfile.sprint_400m_sec || 0).toString();
+                    else if (key === 'row_500m_sec') finalValue = (estimatedProfile.row_500m_sec || 0).toString();
+                    else if (key === 'ski_1k_sec') finalValue = (estimatedProfile.ski_1k_sec || 0).toString();
+                }
+
+                if (key === 'mile_time') {
+                    const secs = val ? parseTime(val) : (estimatedProfile?.mile_time_sec || 0);
+                    formData.append('mile_time_sec', secs.toString());
+                } else if (key === 'row_2k') {
+                    const secs = val ? parseTime(val) : (estimatedProfile?.row_2k_sec || 0);
+                    formData.append('row_2k_sec', secs.toString());
+                } else {
+                    formData.append(key, finalValue);
+                }
             });
+
+            // Append additional AI estimated fields that aren't in formState directly
+            if (estimatedProfile) {
+                if (!formState.front_squat_max) formData.append('front_squat_max', (estimatedProfile.front_squat_max || 0).toString());
+                if (!formState.clean_jerk_max) formData.append('clean_jerk_max', (estimatedProfile.clean_jerk_max || 0).toString());
+                if (!formState.snatch_max) formData.append('snatch_max', (estimatedProfile.snatch_max || 0).toString());
+                if (!formState.ohp_max) formData.append('ohp_max', (estimatedProfile.ohp_max || 0).toString());
+                if (!formState.bike_max_watts) formData.append('bike_max_watts', (estimatedProfile.bike_max_watts || 0).toString());
+
+                // Cardio correlates
+                formData.append('k5_time_sec', (estimatedProfile.k5_time_sec || 0).toString());
+                formData.append('sprint_400m_sec', (estimatedProfile.sprint_400m_sec || 0).toString());
+                formData.append('row_500m_sec', (estimatedProfile.row_500m_sec || 0).toString());
+                formData.append('ski_1k_sec', (estimatedProfile.ski_1k_sec || 0).toString());
+            }
+
             formData.append('units', units);
             await updateOnboardingData(formData);
         }
@@ -493,8 +551,18 @@ export default function OnboardingPage() {
 
                                         {selectedCategories.includes('cardio') && (
                                             <div className="grid grid-cols-2 gap-4">
-                                                <FloatingInput label="1 Mile (m:s)" type="text" value={formState.mile_time} onChange={e => updateField('mile_time', e.target.value)} />
-                                                <FloatingInput label="2k Row (m:s)" type="text" value={formState.row_2k} onChange={e => updateField('row_2k', e.target.value)} />
+                                                <FloatingInput
+                                                    label="1 Mile (m:s)"
+                                                    type="text"
+                                                    value={formState.mile_time}
+                                                    onChange={e => updateField('mile_time', formatTimeInput(e.target.value, formState.mile_time))}
+                                                />
+                                                <FloatingInput
+                                                    label="2k Row (m:s)"
+                                                    type="text"
+                                                    value={formState.row_2k}
+                                                    onChange={e => updateField('row_2k', formatTimeInput(e.target.value, formState.row_2k))}
+                                                />
                                             </div>
                                         )}
                                     </div>
@@ -518,8 +586,8 @@ export default function OnboardingPage() {
                                             <Zap size={12} fill="currentColor" /> Neural Mapping Complete
                                         </div>
                                         <h2 className="text-4xl font-serif text-zinc-900 italic">Rhythm Synced</h2>
-                                        <p className="text-zinc-500 text-sm max-w-xs mx-auto italic font-serif">
-                                            Secondary performance markers calibrated via anchor interpolation.
+                                        <p className="text-zinc-500 text-[11px] leading-relaxed max-w-[320px] mx-auto italic font-serif">
+                                            Based on your data, Pulse has estimated your baseline across secondary modalities. We recommend verifying these markers for optimal precision, but they will serve as your initial training anchors until updated in your profile.
                                         </p>
                                     </div>
 
@@ -533,7 +601,11 @@ export default function OnboardingPage() {
                                                 { label: 'OHP', val: estimatedProfile?.ohp_max, isEst: !formState.ohp_max, unit: 'lbs' },
                                                 { label: 'Bike Power', val: estimatedProfile?.bike_max_watts, isEst: !formState.bike_max_watts, unit: 'w' },
                                                 { label: '1 Mile', val: estimatedProfile?.mile_time_sec ? formatTime(estimatedProfile.mile_time_sec) : null, isEst: !formState.mile_time, unit: '' },
+                                                { label: '5k Run', val: estimatedProfile?.k5_time_sec ? formatTime(estimatedProfile.k5_time_sec) : null, isEst: true, unit: '' },
+                                                { label: '400m Sprint', val: estimatedProfile?.sprint_400m_sec ? formatTime(estimatedProfile.sprint_400m_sec) : null, isEst: true, unit: '' },
                                                 { label: '2k Row', val: estimatedProfile?.row_2k_sec ? formatTime(estimatedProfile.row_2k_sec) : null, isEst: !formState.row_2k, unit: '' },
+                                                { label: '500m Split', val: estimatedProfile?.row_500m_sec ? formatTime(estimatedProfile.row_500m_sec) : null, isEst: true, unit: '' },
+                                                { label: '1k Ski', val: estimatedProfile?.ski_1k_sec ? formatTime(estimatedProfile.ski_1k_sec) : null, isEst: true, unit: '' },
                                             ].filter(item => item.val !== null && item.val !== undefined && item.val !== 0).map((item, i) => (
                                                 <motion.div
                                                     key={item.label}

@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { createClient } from "@/utils/supabase/client";
-import { toDisplayWeight, toStorageWeight, getUnitLabel } from "@/lib/conversions";
+import { toDisplayWeight, toStorageWeight, getUnitLabel, inchesToFormValues, formValuesToInches, formatTimeInput } from "@/lib/conversions";
 import { useEffect, useState } from "react";
 import { Check, Scale, Activity, Zap, User, Target, TrendingUp, HeartPulse } from "lucide-react";
 import { TiltCard } from "@/components/TiltCard";
@@ -48,6 +48,10 @@ interface ProfileFormState {
     // Training State
     current_week: number;
     current_phase: number;
+    // Height Fields (UI only)
+    height_ft: string;
+    height_in: string;
+    height_cm: string;
 }
 
 export default function ProfilePage() {
@@ -72,6 +76,9 @@ export default function ProfilePage() {
         bike_max_watts: "",
         current_week: 1,
         current_phase: 1,
+        height_ft: "",
+        height_in: "",
+        height_cm: "",
     });
 
     const supabase = createClient();
@@ -148,6 +155,9 @@ export default function ProfilePage() {
                 bike_max_watts: profile.bike_max_watts?.toString() || "",
                 current_week: profile.current_week || 1,
                 current_phase: profile.current_phase || 1,
+                height_ft: inchesToFormValues(profile.height, units).feet,
+                height_in: inchesToFormValues(profile.height, units).inches,
+                height_cm: inchesToFormValues(profile.height, units).cm,
             }));
         }
     }, [profile, units]);
@@ -179,6 +189,11 @@ export default function ProfilePage() {
             bike_max_watts: form.bike_max_watts ? parseFloat(form.bike_max_watts) : null,
             current_week: form.current_week,
             current_phase: form.current_phase,
+            height: formValuesToInches(units, {
+                feet: form.height_ft,
+                inches: form.height_in,
+                cm: form.height_cm
+            }),
         };
 
         const { error } = await supabase
@@ -273,9 +288,45 @@ export default function ProfilePage() {
                                 {getUnitLabel(units, 'weight')}
                             </span>
                         </div>
-                        <div className="p-6 rounded-xl bg-muted/30 border border-border flex items-center justify-between">
-                            <span className="text-muted-foreground text-[10px] font-bold uppercase tracking-widest">Height Spectrum</span>
-                            <span className="text-foreground font-serif text-2xl italic">{profile?.height || "6'1\""}</span>
+                        <div className="space-y-4">
+                            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-2">Height Spectrum</label>
+                            <div className="grid grid-cols-2 gap-4">
+                                {units === 'imperial' ? (
+                                    <>
+                                        <div className="relative group/field">
+                                            <input
+                                                type="number"
+                                                value={form.height_ft}
+                                                onChange={(e) => setForm({ ...form, height_ft: e.target.value })}
+                                                className={inputClasses}
+                                                placeholder="0"
+                                            />
+                                            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground/30 font-serif text-sm italic">ft</span>
+                                        </div>
+                                        <div className="relative group/field">
+                                            <input
+                                                type="number"
+                                                value={form.height_in}
+                                                onChange={(e) => setForm({ ...form, height_in: e.target.value })}
+                                                className={inputClasses}
+                                                placeholder="0"
+                                            />
+                                            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground/30 font-serif text-sm italic">in</span>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="col-span-2 relative group/field">
+                                        <input
+                                            type="number"
+                                            value={form.height_cm}
+                                            onChange={(e) => setForm({ ...form, height_cm: e.target.value })}
+                                            className={inputClasses}
+                                            placeholder="0"
+                                        />
+                                        <span className="absolute right-6 top-1/2 -translate-y-1/2 text-muted-foreground/30 font-serif text-lg italic">cm</span>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </TiltCard>
@@ -412,7 +463,12 @@ export default function ProfilePage() {
                                     type={field.key === "bike_max_watts" ? "number" : "text"}
                                     placeholder={field.placeholder}
                                     value={form[field.key as keyof ProfileFormState]}
-                                    onChange={(e) => setForm({ ...form, [field.key]: e.target.value })}
+                                    onChange={(e) => {
+                                        const val = field.key === "bike_max_watts"
+                                            ? e.target.value
+                                            : formatTimeInput(e.target.value, form[field.key as keyof ProfileFormState] as string);
+                                        setForm({ ...form, [field.key]: val });
+                                    }}
                                     className={inputClasses}
                                 />
                             </div>
@@ -424,7 +480,7 @@ export default function ProfilePage() {
 
             {/* Footer Inspiration */}
             <p className="text-center text-muted-foreground text-xs font-light mt-12 mb-8 lowercase tracking-[0.2em]">
-                Pulse Architecture v2.0 &bull; Private Athlete Terminal
+                Pulse Architecture v2.0 & bull; Private Athlete Terminal
             </p>
         </div>
     );
