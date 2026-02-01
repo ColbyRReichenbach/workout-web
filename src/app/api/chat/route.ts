@@ -8,6 +8,7 @@ import { detectIntent, buildDynamicContext } from '@/lib/ai/contextRouter';
 import { DEMO_USER_ID, RATE_LIMITS } from '@/lib/constants';
 import { DEFAULT_SETTINGS } from '@/lib/userSettings';
 import { logRequest, createRequestTimer, ApiErrors, logInteraction } from '@/lib/api/helpers';
+import { calculateCost } from '@/lib/ai/cost';
 import * as Sentry from '@sentry/nextjs';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -1439,7 +1440,7 @@ BEHAVIOR: Acknowledge effort. Use "We" statements. Push for consistency.
                         fs.appendFileSync('/tmp/ai_chat_debug.log', logData);
                     } catch (e) { }
                 },
-                onFinish: ({ text, toolCalls, toolResults, finishReason }: any) => {
+                onFinish: ({ text, toolCalls, toolResults, finishReason, usage }: any) => {
                     // Debug Logging to file
                     try {
                         const logData = `\n--- [${new Date().toISOString()}] ---\nFinishReason: ${finishReason}\nHasText: ${!!text}\nTextLength: ${text?.length || 0}\nToolCalls: ${toolCalls?.length || 0}\nToolResults: ${toolResults?.length || 0}\nText: ${text || 'EMPTY'}\n-------------------\n`;
@@ -1512,13 +1513,49 @@ BEHAVIOR: Acknowledge effort. Use "We" statements. Push for consistency.
                         }
                     }
 
-                    // AUDIT LOG
+                    // AUDIT LOG (Enhanced for Engineering)
+                    const modelId = 'gpt-4o-mini';
+                    const promptTokens = usage?.promptTokens || 0;
+                    const completionTokens = usage?.completionTokens || 0;
+                    const totalTokens = usage?.totalTokens || 0;
+                    const cost = calculateCost(modelId, promptTokens, completionTokens);
+
+                    // Fire and forget database log
+                    supabase.from('ai_logs').insert({
+                        user_id: userId,
+                        message_id: messageId || `msg_${Date.now()}`,
+                        model_id: modelId,
+                        prompt_tokens: promptTokens,
+                        completion_tokens: completionTokens,
+                        total_tokens: totalTokens,
+                        estimated_cost_usd: cost,
+                        latency_ms: timer.getDuration(),
+                        intent: intent || 'UNKNOWN',
+                        tools_used: toolCalls?.map((tc: any) => tc.toolName) || [],
+                        user_message: latestUserContent.substring(0, 1000), // Truncate for log
+                        ai_response: text?.substring(0, 1000),
+                        status: flagged ? 'refusal' : 'success',
+                        metadata: {
+                            toolResults: toolResults?.map((tr: any) => ({
+                                tool: tr.toolName,
+                                success: !tr.isError,
+                                length: JSON.stringify(tr.result).length
+                            }))
+                        }
+                    }).then(({ error }) => {
+                        if (error) console.error('[AI Audit] Failed to save log:', error);
+                    });
+
                     logInteraction({
                         userId,
                         intent: intent || 'UNKNOWN',
                         userMessage: extractMessageContent(userMessages[userMessages.length - 1] || {}),
                         aiResponse: text,
                         toolCalls: toolCalls?.length || 0,
+                        tokens: {
+                            prompt: promptTokens,
+                            completion: completionTokens
+                        },
                         durationMs: timer.getDuration(),
                         status: flagged ? 'refusal' : 'success',
                         refusalReason,

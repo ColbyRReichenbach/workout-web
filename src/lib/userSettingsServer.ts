@@ -11,6 +11,7 @@ export interface UserSettings {
     notifications_enabled: boolean;
     data_privacy: string;
     is_demo_account: boolean;
+    is_admin: boolean;
 }
 
 const DEFAULT_SETTINGS: Omit<UserSettings, 'id'> = {
@@ -22,6 +23,7 @@ const DEFAULT_SETTINGS: Omit<UserSettings, 'id'> = {
     notifications_enabled: true,
     data_privacy: 'Analysis',
     is_demo_account: false,
+    is_admin: false,
 };
 
 // Re-export DEMO_USER_ID for backwards compatibility
@@ -37,7 +39,7 @@ export async function getUserSettingsServer(): Promise<UserSettings> {
 
     const { data, error } = await supabase
         .from('profiles')
-        .select('id, full_name, ai_name, ai_personality, units, theme, notifications_enabled, data_privacy, is_demo_account')
+        .select('id, full_name, ai_name, ai_personality, units, theme, notifications_enabled, data_privacy, is_demo_account, is_admin')
         .eq('id', userId)
         .single();
 
@@ -56,5 +58,6 @@ export async function getUserSettingsServer(): Promise<UserSettings> {
         notifications_enabled: data.notifications_enabled ?? DEFAULT_SETTINGS.notifications_enabled,
         data_privacy: (userId === DEMO_USER_ID) ? DEFAULT_SETTINGS.data_privacy : (data.data_privacy || DEFAULT_SETTINGS.data_privacy),
         is_demo_account: data.is_demo_account || false,
+        is_admin: data.is_admin || false,
     };
 }

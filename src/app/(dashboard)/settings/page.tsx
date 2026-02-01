@@ -365,10 +365,16 @@ export default function SettingsPage() {
                                                     id: 'agent_review',
                                                     label: 'Agent Data Review',
                                                     desc: 'Allow Pulse AI to analyze your session logs to improve coaching algorithms.',
-                                                    locked: false
+                                                    locked: false,
+                                                    active: preferences.dataPrivacy === 'Analysis',
+                                                    onToggle: () => handleSelect('dataPrivacy', preferences.dataPrivacy === 'Analysis' ? 'Private' : 'Analysis')
                                                 }
                                             ].map(item => (
-                                                <div key={item.id} className={`flex justify-between items-center p-6 ${item.locked ? "bg-muted/10 opacity-60 cursor-not-allowed" : "bg-muted/20 hover:bg-muted/40 cursor-pointer"} rounded-xl transition-all group`}>
+                                                <div
+                                                    key={item.id}
+                                                    onClick={() => !item.locked && item.onToggle && item.onToggle()}
+                                                    className={`flex justify-between items-center p-6 ${item.locked ? "bg-muted/10 opacity-60 cursor-not-allowed" : "bg-muted/20 hover:bg-muted/40 cursor-pointer"} rounded-xl transition-all group`}
+                                                >
                                                     <div>
                                                         <div className="flex items-center gap-3">
                                                             <span className="text-foreground font-serif text-xl">{item.label}</span>
@@ -384,8 +390,13 @@ export default function SettingsPage() {
                                                             <div className="w-5 h-5 bg-muted-foreground/20 rounded-full absolute top-1 left-1" />
                                                         </div>
                                                     ) : (
-                                                        <div className="w-12 h-7 bg-muted rounded-full relative transition-colors group-hover:bg-muted-foreground/30">
-                                                            <div className="w-5 h-5 bg-background rounded-full absolute top-1 left-1 shadow-sm" />
+                                                        <div className={`w-12 h-7 rounded-full relative transition-all duration-300 ${item.active ? "bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.3)]" : "bg-muted-foreground/20"}`}>
+                                                            <motion.div
+                                                                initial={false}
+                                                                animate={{ x: item.active ? 20 : 0 }}
+                                                                transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                                                                className="w-5 h-5 bg-white rounded-full absolute top-1 left-1 shadow-sm"
+                                                            />
                                                         </div>
                                                     )}
                                                 </div>

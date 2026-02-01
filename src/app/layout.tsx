@@ -36,7 +36,7 @@ export default async function RootLayout({
   return (
     <html lang="en" className={isDark ? 'dark' : ''} suppressHydrationWarning={true}>
       <body className={`${inter.className} ${playfair.variable} bg-background text-foreground antialiased selection:bg-primary/20 selection:text-primary-foreground`}>
-        <SettingsProvider initialSettings={{ units: settings.units, theme: settings.theme }}>
+        <SettingsProvider initialSettings={{ units: settings.units, theme: settings.theme, isAdmin: settings.is_admin }}>
           <div className="min-h-screen flex flex-col relative overflow-hidden">
             {/* Subtle Texture/Grain Overlay (Global) */}
             <div

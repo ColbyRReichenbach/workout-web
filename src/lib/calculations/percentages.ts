@@ -107,7 +107,7 @@ export function estimateMissingMaxes(profile: UserProfile): UserProfile {
     const estimated = { ...profile };
 
     // --- 0. Baseline Fallback ---
-    // If both anchors are missing, use baseline to ensure we can prescribe something
+    // If both strength anchors are missing, use baseline to ensure we can prescribe something
     if (!estimated.squat_max && !estimated.bench_max) {
         estimated.bench_max = estimated.bench_max || BASELINE.bench_max;
         estimated.squat_max = estimated.squat_max || BASELINE.squat_max;
@@ -116,9 +116,6 @@ export function estimateMissingMaxes(profile: UserProfile): UserProfile {
         estimated.front_squat_max = estimated.front_squat_max || BASELINE.front_squat_max;
         estimated.clean_jerk_max = estimated.clean_jerk_max || BASELINE.clean_jerk_max;
         estimated.snatch_max = estimated.snatch_max || BASELINE.snatch_max;
-        estimated.mile_time_sec = estimated.mile_time_sec || BASELINE.mile_time_sec;
-        estimated.row_2k_sec = estimated.row_2k_sec || BASELINE.row_2k_sec;
-        estimated.bike_max_watts = estimated.bike_max_watts || BASELINE.bike_max_watts;
     }
 
     // --- 1. Secondary Anchor Estimation (Cross-Chain) ---
@@ -161,13 +158,41 @@ export function estimateMissingMaxes(profile: UserProfile): UserProfile {
         estimated.bike_max_watts = Math.round(estimated.squat_max * 3.0);
     }
 
-    // Cardio Estimates (Very rough benchmarks based on general fitness)
+    // --- 6. Distance & Rowing (Correlates from pr_logic.md) ---
+    // Running Anchor
     if (!estimated.mile_time_sec) {
-        // If they have a bench of 225+, assume a decent baseline
-        estimated.mile_time_sec = 480; // 8:00
+        estimated.mile_time_sec = BASELINE.mile_time_sec; // Default to 8:00 baseline
     }
+
+    if (estimated.mile_time_sec) {
+        if (!estimated.k5_time_sec) {
+            // 5k = Mile * 3.1 * 1.15
+            estimated.k5_time_sec = Math.round(estimated.mile_time_sec * 3.1 * 1.15);
+        }
+        if (!estimated.sprint_400m_sec) {
+            // 400m = (Mile / 4) - 5 seconds
+            estimated.sprint_400m_sec = Math.round((estimated.mile_time_sec / 4) - 5);
+        }
+    }
+
+    // Rowing Anchor
     if (!estimated.row_2k_sec) {
-        estimated.row_2k_sec = 480; // 8:00
+        estimated.row_2k_sec = BASELINE.row_2k_sec; // Default to 8:00 baseline
+    }
+
+    if (estimated.row_2k_sec) {
+        // 500m Row = (2k / 4) - 5 seconds (expressed as split per 500m)
+        const row500mSplit = Math.round((estimated.row_2k_sec / 4) - 5);
+
+        if (!estimated.row_500m_sec) {
+            estimated.row_500m_sec = row500mSplit;
+        }
+
+        if (!estimated.ski_1k_sec) {
+            // 1k Ski = 1k Row Split + 10 seconds
+            // 1k Row Split is split*2
+            estimated.ski_1k_sec = (row500mSplit * 2) + 10;
+        }
     }
 
     return estimated;

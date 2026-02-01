@@ -10,11 +10,13 @@ import {
     BarChart2,
     Menu,
     X,
-    HeartPulse
+    HeartPulse,
+    Terminal
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useSettings } from "@/context/SettingsContext";
 
 const navigation = [
     { name: "Feed", href: "/", icon: Home },
@@ -27,8 +29,14 @@ const MotionLink = motion(Link);
 
 export function Navbar() {
     const pathname = usePathname();
+    const { isAdmin } = useSettings();
     const [scrolled, setScrolled] = useState(false);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+    const mergedNavigation = [
+        ...navigation,
+        ...(isAdmin ? [{ name: "Audit", href: "/admin/ai-coach", icon: Terminal }] : [])
+    ];
 
     useEffect(() => {
         const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -71,7 +79,7 @@ export function Navbar() {
 
                 {/* Desktop Nav */}
                 <nav className="hidden md:flex items-center gap-2 relative z-20">
-                    {navigation.map((item) => {
+                    {mergedNavigation.map((item) => {
                         const isActive = pathname === item.href;
                         return (
                             <MotionLink
@@ -132,7 +140,7 @@ export function Navbar() {
                         className="md:hidden mt-4 bg-background/90 backdrop-blur-2xl border border-border rounded-[48px] p-4 shadow-2xl overflow-hidden"
                     >
                         <div className="grid grid-cols-2 gap-2">
-                            {navigation.map((item) => {
+                            {mergedNavigation.map((item) => {
                                 const isActive = pathname === item.href;
                                 return (
                                     <Link
