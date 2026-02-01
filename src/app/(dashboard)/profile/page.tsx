@@ -385,10 +385,10 @@ export default function ProfilePage() {
                             </div>
                         </div>
                     </div>
-                </TiltCard >
+                </TiltCard>
 
                 {/* 3. Strength Matrix (Large) */}
-                < TiltCard className="lg:col-span-4 rounded-[48px] p-10 flex flex-col group overflow-hidden bg-card border-border" glowColor="shadow-primary/10" >
+                <TiltCard className="lg:col-span-4 rounded-[48px] p-10 flex flex-col group overflow-hidden bg-card border-border" glowColor="shadow-primary/10">
                     <div className="absolute -right-12 -bottom-12 opacity-[0.02] group-hover:opacity-[0.05] transition-opacity pointer-events-none text-primary">
                         <HeartPulse size={400} strokeWidth={1} />
                     </div>
@@ -429,10 +429,10 @@ export default function ProfilePage() {
                             ))}
                         </div>
                     </div>
-                </TiltCard >
+                </TiltCard>
 
                 {/* 4. Endurance Benchmarks (Extra Wide) */}
-                < TiltCard className="lg:col-span-12 rounded-[48px] p-10 flex flex-col md:flex-row md:items-center justify-between group overflow-hidden bg-card border-border" glowColor="shadow-primary/5" >
+                <TiltCard className="lg:col-span-12 rounded-[48px] p-10 flex flex-col md:flex-row md:items-center justify-between group overflow-hidden bg-card border-border" glowColor="shadow-primary/5">
                     <div className="absolute right-1/4 -top-20 opacity-[0.02] group-hover:opacity-[0.05] transition-opacity pointer-events-none text-primary">
                         <Activity size={300} strokeWidth={1} />
                     </div>
@@ -474,14 +474,14 @@ export default function ProfilePage() {
                             </div>
                         ))}
                     </div>
-                </TiltCard >
+                </TiltCard>
 
-            </div >
+            </div>
 
             {/* Footer Inspiration */}
-            < p className="text-center text-muted-foreground text-xs font-light mt-12 mb-8 lowercase tracking-[0.2em]" >
+            <p className="text-center text-muted-foreground text-xs font-light mt-12 mb-8 lowercase tracking-[0.2em]">
                 Pulse Architecture v2.0 & bull; Private Athlete Terminal
-            </p >
-        </div >
+            </p>
+        </div>
     );
 }
