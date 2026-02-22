@@ -16,7 +16,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useState, useMemo } from "react";
 import { createClient } from "@/utils/supabase/client";
-import { WorkoutDay, ProtocolDay, WorkoutLog, UserProfile } from "@/lib/types";
+import { WorkoutDay, ProtocolDay, WorkoutLog, UserProfile, WorkoutPhase } from "@/lib/types";
 import { useSettings } from "@/context/SettingsContext";
 import { getUnitLabel } from "@/lib/conversions";
 import { calculateAbsoluteWeek } from "@/lib/dateUtils";
@@ -233,7 +233,7 @@ export default function Home() {
         // Calculate total weeks and options for dropdown
         let total = 0;
         const options: { week: number; phase: number }[] = [];
-        phases.forEach((p, pIdx) => {
+        (phases as WorkoutPhase[]).forEach((p: WorkoutPhase, pIdx: number) => {
           const pWeeks = p.weeks?.length || 4;
           for (let w = 1; w <= pWeeks; w++) {
             total++;
