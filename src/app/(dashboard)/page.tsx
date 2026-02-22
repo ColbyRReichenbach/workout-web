@@ -4,7 +4,8 @@ import { motion } from "framer-motion";
 import dynamic from "next/dynamic";
 import {
   Activity, Calendar, Flame, CalendarDays,
-  ArrowRight, Scale
+  ArrowRight, Scale, ChevronLeft, ChevronRight,
+  ChevronDown
 } from "lucide-react";
 import { DayCard, DayDetailModal } from "@/components/WeeklySchedule";
 import { TiltCard } from "@/components/TiltCard";
@@ -15,7 +16,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useState, useMemo } from "react";
 import { createClient } from "@/utils/supabase/client";
-import { WorkoutDay, ProtocolDay, WorkoutLog, UserProfile } from "@/lib/types";
+import { WorkoutDay, ProtocolDay, WorkoutLog, UserProfile, WorkoutPhase } from "@/lib/types";
 import { useSettings } from "@/context/SettingsContext";
 import { getUnitLabel } from "@/lib/conversions";
 import { calculateAbsoluteWeek } from "@/lib/dateUtils";
@@ -73,6 +74,8 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const { units } = useSettings();
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [totalWeeks, setTotalWeeks] = useState(1);
+  const [allProgramWeeks, setAllProgramWeeks] = useState<{ week: number; phase: number }[]>([]);
 
   // Modal State
   const [selectedDay, setSelectedDay] = useState<ProtocolDay | null>(null);
@@ -225,7 +228,26 @@ export default function Home() {
             };
           });
           setProtocol(dynamicProtocol);
+        } else {
+          // Fallback if week data is missing (e.g. out of bounds)
+          setProtocol(weeklyTemplate.map(d => ({
+            ...d,
+            isFuture: viewedWeek > absoluteCurrentWeek
+          })));
         }
+
+        // Calculate total weeks and options for dropdown
+        let total = 0;
+        const options: { week: number; phase: number }[] = [];
+        (phases as WorkoutPhase[]).forEach((p: WorkoutPhase, pIdx: number) => {
+          const pWeeks = p.weeks?.length || 4;
+          for (let w = 1; w <= pWeeks; w++) {
+            total++;
+            options.push({ week: total, phase: pIdx + 1 });
+          }
+        });
+        setTotalWeeks(total);
+        setAllProgramWeeks(options);
       }
 
       // Filter logs for the VIEWED week
@@ -333,6 +355,22 @@ export default function Home() {
   };
 
 
+
+  const handlePrevWeek = () => {
+    if (currentWeek > 1) {
+      router.push(`/?week=${currentWeek - 1}`);
+    }
+  };
+
+  const handleNextWeek = () => {
+    if (currentWeek < totalWeeks) {
+      router.push(`/?week=${currentWeek + 1}`);
+    }
+  };
+
+  const handleWeekChange = (w: number) => {
+    router.push(`/?week=${w}`);
+  };
 
   if (loading) {
     return (
@@ -452,9 +490,51 @@ export default function Home() {
               <h3 className="font-serif text-4xl text-foreground tracking-tight">Weekly Protocol</h3>
               <p className="text-muted-foreground text-sm mt-1">Adaptive training schedule based on biometric data.</p>
             </div>
-            <div className="flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground bg-muted/50 px-4 py-2 rounded-full border border-border">
-              <CalendarDays size={14} className="text-primary" />
-              <span>Phase {currentPhase} • Pulse 0{currentWeek}</span>
+
+            <div className="flex items-center gap-2">
+              <div className="flex items-center bg-muted/50 rounded-full border border-border p-1">
+                <button
+                  onClick={handlePrevWeek}
+                  disabled={currentWeek <= 1}
+                  className="p-2 hover:bg-muted rounded-full disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+
+                <div className="relative group px-2">
+                  <select
+                    value={currentWeek}
+                    onChange={(e) => handleWeekChange(Number(e.target.value))}
+                    className="appearance-none bg-transparent pl-3 pr-8 py-1.5 text-[10px] font-bold uppercase tracking-[0.3em] font-sans focus:outline-none cursor-pointer"
+                  >
+                    {allProgramWeeks.map((w) => (
+                      <option key={w.week} value={w.week} className="text-black bg-white">
+                        Phase {w.phase} • Pulse {w.week < 10 ? `0${w.week}` : w.week}
+                      </option>
+                    ))}
+                    {/* If viewedWeek is beyond program data, add it as an option */}
+                    {currentWeek > totalWeeks && (
+                      <option value={currentWeek} className="text-black bg-white">
+                        Phase ? • Pulse {currentWeek}
+                      </option>
+                    )}
+                  </select>
+                  <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none opacity-50" />
+                </div>
+
+                <button
+                  onClick={handleNextWeek}
+                  disabled={currentWeek >= totalWeeks}
+                  className="p-2 hover:bg-muted rounded-full disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+
+              <div className="hidden md:flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground bg-muted/50 px-4 py-2.5 rounded-full border border-border">
+                <CalendarDays size={14} className="text-primary" />
+                <span>Rhythm Cycle</span>
+              </div>
             </div>
           </div>
 
