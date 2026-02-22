@@ -199,6 +199,7 @@ docs/pre-deployment.md
 
 # SQL seed data (large files, local development only)
 scripts/
+!src/scripts/
 supabase/migrations/
 
 # Exception: Keep migration files if using supabase CLI

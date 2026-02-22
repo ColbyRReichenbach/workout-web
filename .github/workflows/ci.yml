@@ -121,6 +121,20 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Start Next.js dev server
+        run: npm run dev &
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+      - name: Wait for server to be ready
+        run: |
+          echo "Waiting for Next.js dev server on :3000..."
+          for i in {1..30}; do
+            curl -sf http://localhost:3000 > /dev/null 2>&1 && echo "Server is ready." && break
+            echo "  attempt $i/30 — retrying in 3s..."
+            sleep 3
+          done
+
       - name: Run AI evaluations
         run: npm run test:ai
         env:
