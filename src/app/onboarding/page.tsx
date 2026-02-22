@@ -456,9 +456,9 @@ export default function OnboardingPage() {
                                             {units === 'imperial' ? (
                                                 <div className="flex gap-2">
                                                     <input type="number" placeholder="6" value={formState.height_ft} onChange={e => updateField('height_ft', e.target.value)} className="w-12 text-3xl font-serif text-right outline-none bg-transparent text-zinc-900 placeholder-zinc-300" />
-                                                    <span className="text-red-500 text-3xl font-serif">'</span>
+                                                    <span className="text-red-500 text-3xl font-serif">{"'"}</span>
                                                     <input type="number" placeholder="2" value={formState.height_in} onChange={e => updateField('height_in', e.target.value)} className="w-12 text-3xl font-serif text-right outline-none bg-transparent text-zinc-900 placeholder-zinc-300" />
-                                                    <span className="text-red-500 text-3xl font-serif">"</span>
+                                                    <span className="text-red-500 text-3xl font-serif">{'"'}</span>
                                                 </div>
                                             ) : (
                                                 <input type="number" placeholder="185" value={formState.height_cm} onChange={e => updateField('height_cm', e.target.value)} className="w-24 text-3xl font-serif text-right outline-none bg-transparent text-zinc-900 placeholder-zinc-300" />

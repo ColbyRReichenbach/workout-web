@@ -132,7 +132,7 @@ export function formatSegmentsForAI(segments: WorkoutSegment[], profile: UserPro
     return segments.map((s, idx) => {
         let text = `${idx + 1}. ${s.name} (${s.type})`;
         if (s.target) {
-            let targetStrs = [];
+            const targetStrs = [];
             if (s.target.sets && s.target.reps) targetStrs.push(`${s.target.sets}x${s.target.reps}`);
             else if (s.target.duration_min) targetStrs.push(`${s.target.duration_min} min`);
             else if (s.target.distance_miles) targetStrs.push(`${s.target.distance_miles} miles`);

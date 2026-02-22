@@ -344,7 +344,7 @@ export default function AdminAnalyticsPage() {
                                                                         <Search size={10} /> User Payload
                                                                     </p>
                                                                     <div className="p-4 rounded-2xl bg-muted border border-border font-mono text-[11px] text-muted-foreground italic">
-                                                                        "{item.user_message}"
+                                                                        &quot;{item.user_message}&quot;
                                                                     </div>
                                                                 </div>
                                                                 <div className="space-y-2">
@@ -478,7 +478,7 @@ export default function AdminAnalyticsPage() {
                                     data.queryAnalytics.typoPatterns.map((pattern, i) => (
                                         <div key={i} className="flex items-center justify-between text-[11px] group">
                                             <div className="flex items-center gap-3">
-                                                <span className="text-muted-foreground font-mono italic opacity-60">"{pattern.typo}"</span>
+                                                <span className="text-muted-foreground font-mono italic opacity-60">&quot;{pattern.typo}&quot;</span>
                                                 <ChevronRight size={10} className="text-primary/40" />
                                                 <span className="text-primary font-bold uppercase tracking-widest">{pattern.corrected}</span>
                                             </div>
