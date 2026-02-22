@@ -18,7 +18,11 @@ test.describe('Workout Page', () => {
         const guestButton = page.getByRole('button', { name: /demo|guest|try/i })
         await guestButton.click()
 
-        await page.waitForURL(/\/$|\/dashboard|\/workout/, { timeout: 10000 })
+        // loginDemoUser() redirects to /onboarding; navigate to main app afterward
+        await page.waitForURL(/\/$|\/dashboard|\/workout|\/onboarding/, { timeout: 10000 })
+        if (page.url().includes('/onboarding')) {
+            await page.goto('/')
+        }
 
         // Navigate to workout page if not already there
         const workoutLink = page.locator('a[href*="workout"], button:has-text("Workout")')
@@ -74,7 +78,10 @@ test.describe('Workout Logging Interaction', () => {
         await page.goto('/login')
         const guestButton = page.getByRole('button', { name: /demo|guest|try/i })
         await guestButton.click()
-        await page.waitForURL(/\/$|\/dashboard|\/workout/, { timeout: 10000 })
+        await page.waitForURL(/\/$|\/dashboard|\/workout|\/onboarding/, { timeout: 10000 })
+        if (page.url().includes('/onboarding')) {
+            await page.goto('/')
+        }
 
         const workoutLink = page.locator('a[href*="workout"], button:has-text("Workout")')
         if ((await workoutLink.count()) > 0) {
@@ -134,7 +141,10 @@ test.describe('Workout Data Display', () => {
         await page.goto('/login')
         const guestButton = page.getByRole('button', { name: /demo|guest|try/i })
         await guestButton.click()
-        await page.waitForURL(/\/$|\/dashboard|\/workout/, { timeout: 10000 })
+        await page.waitForURL(/\/$|\/dashboard|\/workout|\/onboarding/, { timeout: 10000 })
+        if (page.url().includes('/onboarding')) {
+            await page.goto('/')
+        }
 
         const workoutLink = page.locator('a[href*="workout"], button:has-text("Workout")')
         if ((await workoutLink.count()) > 0) {
@@ -183,7 +193,10 @@ test.describe('Workout Navigation', () => {
         await page.goto('/login')
         const guestButton = page.getByRole('button', { name: /demo|guest|try/i })
         await guestButton.click()
-        await page.waitForURL(/\/$|\/dashboard|\/workout/, { timeout: 10000 })
+        await page.waitForURL(/\/$|\/dashboard|\/workout|\/onboarding/, { timeout: 10000 })
+        if (page.url().includes('/onboarding')) {
+            await page.goto('/')
+        }
     })
 
     test('should navigate between workout days', async ({ page }) => {
