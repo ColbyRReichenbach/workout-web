@@ -18,7 +18,11 @@ test.describe('AI Coach Chat', () => {
         const guestButton = page.getByRole('button', { name: /demo|guest|try/i })
         await guestButton.click()
 
-        await page.waitForURL(/\/$|\/dashboard|\/workout/, { timeout: 10000 })
+        // loginDemoUser() redirects to /onboarding; navigate to main app afterward
+        await page.waitForURL(/\/$|\/dashboard|\/workout|\/onboarding/, { timeout: 10000 })
+        if (page.url().includes('/onboarding')) {
+            await page.goto('/')
+        }
     })
 
     test('should render the AI coach interface', async ({ page }) => {
@@ -98,7 +102,10 @@ test.describe('AI Chat Interaction', () => {
         await page.goto('/login')
         const guestButton = page.getByRole('button', { name: /demo|guest|try/i })
         await guestButton.click()
-        await page.waitForURL(/\/$|\/dashboard|\/workout/, { timeout: 10000 })
+        await page.waitForURL(/\/$|\/dashboard|\/workout|\/onboarding/, { timeout: 10000 })
+        if (page.url().includes('/onboarding')) {
+            await page.goto('/')
+        }
     })
 
     test('should send a message and show loading state', async ({ page }) => {
@@ -142,7 +149,10 @@ test.describe('AI Chat Error Handling', () => {
         await page.goto('/login')
         const guestButton = page.getByRole('button', { name: /demo|guest|try/i })
         await guestButton.click()
-        await page.waitForURL(/\/$|\/dashboard|\/workout/, { timeout: 10000 })
+        await page.waitForURL(/\/$|\/dashboard|\/workout|\/onboarding/, { timeout: 10000 })
+        if (page.url().includes('/onboarding')) {
+            await page.goto('/')
+        }
     })
 
     test('should handle network errors gracefully', async ({ page }) => {
