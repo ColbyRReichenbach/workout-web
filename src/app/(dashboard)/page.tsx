@@ -228,6 +228,12 @@ export default function Home() {
             };
           });
           setProtocol(dynamicProtocol);
+        } else {
+          // Fallback if week data is missing (e.g. out of bounds)
+          setProtocol(weeklyTemplate.map(d => ({
+            ...d,
+            isFuture: viewedWeek > absoluteCurrentWeek
+          })));
         }
 
         // Calculate total weeks and options for dropdown
@@ -357,7 +363,9 @@ export default function Home() {
   };
 
   const handleNextWeek = () => {
-    router.push(`/?week=${currentWeek + 1}`);
+    if (currentWeek < totalWeeks) {
+      router.push(`/?week=${currentWeek + 1}`);
+    }
   };
 
   const handleWeekChange = (w: number) => {
@@ -516,7 +524,8 @@ export default function Home() {
 
                 <button
                   onClick={handleNextWeek}
-                  className="p-2 hover:bg-muted rounded-full transition-colors"
+                  disabled={currentWeek >= totalWeeks}
+                  className="p-2 hover:bg-muted rounded-full disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                 >
                   <ChevronRight size={16} />
                 </button>
