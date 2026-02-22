@@ -215,8 +215,12 @@ export async function buildDynamicContext(
                         phaseSummaryStr = createPhaseSummary(phaseObj);
 
                         if (phaseObj.weeks && phaseObj.weeks.length > 0) {
-                            // Find relative week index. We assume the pattern repeats if currentWeek exceeds array bounds
-                            const relWeekIdx = (currentWeek - 1) % phaseObj.weeks.length;
+                            // Convert absolute program week to the selected phase's local week index.
+                            const phaseIdx = programData.phases.findIndex((p: any) => p.id === phaseObj.id);
+                            const priorPhaseWeeks = programData.phases
+                                .slice(0, Math.max(phaseIdx, 0))
+                                .reduce((sum: number, phase: any) => sum + (phase.weeks?.length || 0), 0);
+                            const relWeekIdx = Math.max(currentWeek - 1 - priorPhaseWeeks, 0) % phaseObj.weeks.length;
                             const weekObj = phaseObj.weeks[relWeekIdx] || phaseObj.weeks[0];
 
                             if (weekObj && weekObj.days) {
