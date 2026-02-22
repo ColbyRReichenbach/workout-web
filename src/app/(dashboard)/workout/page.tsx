@@ -89,35 +89,54 @@ export default function WorkoutPage() {
             const { data: profileData } = await supabase.from('profiles').select('*').eq('id', profileId).single();
             setProfile(profileData);
 
+            // --- DYNAMIC TRACKING LOGIC ---
+            const now = new Date();
+            now.setHours(0, 0, 0, 0);
+
+            const startDate = profileData?.program_start_date ? new Date(profileData.program_start_date) : new Date();
+            startDate.setHours(0, 0, 0, 0);
+
+            const msPerDay = 1000 * 60 * 60 * 24;
+            const diffTime = now.getTime() - startDate.getTime();
+            let daysSinceStart = Math.floor(diffTime / msPerDay);
+            if (daysSinceStart < 0) daysSinceStart = 0;
+
+            const absoluteCurrentWeek = Math.floor(daysSinceStart / 7) + 1;
+            const todayIndex = daysSinceStart % 7;
+
+            const startDayOfWeek = startDate.getDay();
+            const dynamicDaysOfTheWeek = Array.from({ length: 7 }, (_, i) => {
+                return dayNames[(startDayOfWeek + i) % 7];
+            });
+            // --- END LOGIC ---
+
+            let absWeek = absoluteCurrentWeek;
+            if (targetWeekParam) {
+                const parsed = parseInt(targetWeekParam);
+                if (!isNaN(parsed)) absWeek = parsed;
+            }
+            setCurrentWeek(absWeek);
+
             let workoutDayIndex;
             if (targetDay) {
-                workoutDayIndex = dayNames.indexOf(targetDay);
+                // If a day name is passed, find its index in our DYNAMIC week array
+                workoutDayIndex = dynamicDaysOfTheWeek.indexOf(targetDay);
                 if (workoutDayIndex === -1) workoutDayIndex = 0;
                 setActualDayName(targetDay);
             } else {
-                const jsDay = new Date().getDay();
-                const libraryDayIndex = jsDay === 0 ? 6 : jsDay - 1;
-                setActualDayName(dayNames[libraryDayIndex]);
-                workoutDayIndex = libraryDayIndex;
+                // If no day is passed, we default to "today" relative to the start date
+                setActualDayName(dynamicDaysOfTheWeek[todayIndex]);
+                workoutDayIndex = todayIndex;
             }
 
             const { data: library } = await supabase.from('workout_library').select('program_data').single();
 
             if (library && library.program_data?.phases) {
                 const phases = library.program_data.phases;
-                let absWeek = profileData?.current_week || 1;
-                if (targetWeekParam) {
-                    const parsed = parseInt(targetWeekParam);
-                    if (!isNaN(parsed)) absWeek = parsed;
-                }
-                setCurrentWeek(absWeek);
-
-                setCurrentWeek(absWeek);
 
                 let phaseIdx = 0;
                 let weekCount = 0;
 
-                // Always calculate phase and offset based on absolute week
                 for (let i = 0; i < phases.length; i++) {
                     const phaseLen = phases[i].weeks?.length || 4;
                     if (absWeek <= weekCount + phaseLen) {
@@ -129,12 +148,13 @@ export default function WorkoutPage() {
                 setCurrentPhase(phaseIdx + 1);
 
                 const phase = phases[phaseIdx] || phases[0];
-                // Correctly calculate relative index by subtracting potential previous weeks
-                // weekCount holds the sum of weeks from all PREVIOUS phases at this point
                 const relativeWeekIdx = (absWeek - 1) - weekCount;
                 const week = phase.weeks[relativeWeekIdx] || phase.weeks[0];
                 let todayData = week.days[workoutDayIndex] || week.days[0];
-                const todayDayName = targetDay || dayNames[workoutDayIndex];
+
+                // CRITICAL FIX: Ensure the template data uses our dynamic day name
+                const todayDayName = targetDay || dynamicDaysOfTheWeek[todayIndex];
+                todayData = { ...todayData, day: todayDayName };
 
                 if (todayDayName === "Saturday") {
                     const checkpointData = getCheckpointData(absWeek);

@@ -48,6 +48,7 @@ interface ProfileFormState {
     // Training State
     current_week: number;
     current_phase: number;
+    program_start_date?: string;
     // Height Fields (UI only)
     height_ft: string;
     height_in: string;
@@ -76,6 +77,7 @@ export default function ProfilePage() {
         bike_max_watts: "",
         current_week: 1,
         current_phase: 1,
+        program_start_date: "",
         height_ft: "",
         height_in: "",
         height_cm: "",
@@ -155,6 +157,7 @@ export default function ProfilePage() {
                 bike_max_watts: profile.bike_max_watts?.toString() || "",
                 current_week: profile.current_week || 1,
                 current_phase: profile.current_phase || 1,
+                program_start_date: profile.program_start_date ? profile.program_start_date.split('T')[0] : "",
                 height_ft: inchesToFormValues(profile.height, units).feet,
                 height_in: inchesToFormValues(profile.height, units).inches,
                 height_cm: inchesToFormValues(profile.height, units).cm,
@@ -189,6 +192,7 @@ export default function ProfilePage() {
             bike_max_watts: form.bike_max_watts ? parseFloat(form.bike_max_watts) : null,
             current_week: form.current_week,
             current_phase: form.current_phase,
+            program_start_date: form.program_start_date ? new Date(form.program_start_date).toISOString() : null,
             height: formValuesToInches(units, {
                 feet: form.height_ft,
                 inches: form.height_in,
@@ -342,48 +346,24 @@ export default function ProfilePage() {
                             <Target size={32} />
                         </div>
                         <h2 className="text-3xl font-serif text-foreground mb-2">Program Sync</h2>
-                        <p className="text-muted-foreground text-sm font-light">Align the interface with your master plan.</p>
+                        <p className="text-muted-foreground text-sm font-light">Set your origin point.</p>
                     </div>
 
                     <div className="mt-12 space-y-8 relative z-10">
-                        <div className="space-y-4">
-                            <label className="text-[10px] font-bold text-muted-foreground/70 uppercase tracking-widest px-2">
-                                {PHASE_RANGES[form.current_phase]?.label}
+                        <div className="relative group/field">
+                            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest absolute top-3 left-6 transition-colors group-hover/field:text-primary">
+                                Program Start Date
                             </label>
-                            <div className="grid grid-cols-5 gap-2">
-                                {[1, 2, 3, 4, 5].map((p) => (
-                                    <button
-                                        key={p}
-                                        onClick={() => handlePhaseChange(p)}
-                                        className={`py-3 rounded-xl border text-sm font-bold transition-all ${form.current_phase === p
-                                            ? "bg-primary border-primary text-primary-foreground shadow-xl shadow-primary/20"
-                                            : "bg-card border-border text-muted-foreground hover:border-foreground/20"
-                                            }`}
-                                    >
-                                        P{p}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div className="space-y-4">
-                            <div className="flex justify-between items-center px-2">
-                                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Active Week</label>
-                                <span className="text-foreground font-serif text-xl italic">Week {form.current_week}</span>
-                            </div>
                             <input
-                                type="range"
-                                min={PHASE_RANGES[form.current_phase]?.min || 1}
-                                max={PHASE_RANGES[form.current_phase]?.max || 52}
-                                value={form.current_week}
-                                onChange={(e) => setForm({ ...form, current_week: parseInt(e.target.value) })}
-                                className="w-full accent-primary h-2 bg-muted rounded-lg appearance-none cursor-pointer"
+                                type="date"
+                                value={form.program_start_date}
+                                onChange={(e) => setForm({ ...form, program_start_date: e.target.value })}
+                                className={inputClasses}
                             />
-                            <div className="flex justify-between px-2">
-                                <span className="text-[10px] font-bold text-muted-foreground/70 uppercase tracking-widest">Start: {PHASE_RANGES[form.current_phase]?.min}</span>
-                                <span className="text-[10px] font-bold text-muted-foreground/70 uppercase tracking-widest">End: {PHASE_RANGES[form.current_phase]?.max}</span>
-                            </div>
                         </div>
+                        <p className="text-xs text-muted-foreground italic px-2">
+                            Your training week begins on this date&apos;s weekday. For example, if you want Sunday to be your rest day (Day 7), please select a Monday.
+                        </p>
                     </div>
                 </TiltCard>
 

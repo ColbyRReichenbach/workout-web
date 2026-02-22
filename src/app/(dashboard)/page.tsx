@@ -15,7 +15,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useState, useMemo } from "react";
 import { createClient } from "@/utils/supabase/client";
-import { WorkoutDay, ProtocolDay, WorkoutLog } from "@/lib/types";
+import { WorkoutDay, ProtocolDay, WorkoutLog, UserProfile } from "@/lib/types";
 import { useSettings } from "@/context/SettingsContext";
 import { getUnitLabel } from "@/lib/conversions";
 import { DEMO_USER_ID } from "@/lib/constants";
@@ -71,6 +71,7 @@ export default function Home() {
   const [protocol, setProtocol] = useState<ProtocolDay[]>(weeklyTemplate);
   const [loading, setLoading] = useState(true);
   const { units } = useSettings();
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
   // Modal State
   const [selectedDay, setSelectedDay] = useState<ProtocolDay | null>(null);
@@ -101,7 +102,7 @@ export default function Home() {
       // Fetch profile using retrieved user
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
-        .select('current_week, current_phase, height, weight_lbs')
+        .select('current_week, current_phase, height, weight_lbs, program_start_date')
         .eq('id', user?.id || DEMO_USER_ID)
         .single();
 
@@ -117,12 +118,41 @@ export default function Home() {
         return;
       }
 
+      setUserProfile(profile as UserProfile);
+
+      // --- DYNAMIC TRACKING LOGIC ---
+      const now = new Date();
+      now.setHours(0, 0, 0, 0); // Normalize to local midnight
+
+      // Use program_start_date or fallback to today
+      const startDate = profile.program_start_date ? new Date(profile.program_start_date) : new Date();
+      startDate.setHours(0, 0, 0, 0); // Normalize start to midnight
+
+      const msPerDay = 1000 * 60 * 60 * 24;
+      // Calculate days since start (0 = Day 1, 6 = Day 7, etc.)
+      const diffTime = now.getTime() - startDate.getTime();
+      let daysSinceStart = Math.floor(diffTime / msPerDay);
+      if (daysSinceStart < 0) daysSinceStart = 0; // Prevent negative days if start date is in the future
+
+      // Calculate the true absolute week and today index
+      const absoluteCurrentWeek = Math.floor(daysSinceStart / 7) + 1;
+      const todayIndex = daysSinceStart % 7;
+
       // Determine Viewed Week
-      let viewedWeek = profile.current_week || 1;
+      let viewedWeek = absoluteCurrentWeek;
       if (targetWeekParam) {
         const parsed = parseInt(targetWeekParam);
         if (!isNaN(parsed)) viewedWeek = parsed;
       }
+
+      // Dynamic Weekday Array Generation
+      const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+      const startDayOfWeek = startDate.getDay(); // 0-6 (Sun-Sat)
+      const dynamicDaysOfTheWeek = Array.from({ length: 7 }, (_, i) => {
+        return dayNames[(startDayOfWeek + i) % 7];
+      });
+
+      // --- END DYNAMIC TRACKING LOGIC ---
 
       // Fetch ALL logs for this user to track streak across weeks
       const currentUserId = user?.id || DEMO_USER_ID;
@@ -136,7 +166,7 @@ export default function Home() {
 
       const recentLogs = (recentLogsData as WorkoutLog[]) || [];
 
-      // Fetch logs for the SPECIFIC viewed week (Ensure calendar is correct even for past phases)
+      // Fetch logs for the SPECIFIC viewed week
       const { data: weekLogsData } = await supabase
         .from('logs')
         .select('*')
@@ -160,7 +190,6 @@ export default function Home() {
         // Find Phase for Viewed Week
         let phaseIdx = 0;
         let weekCount = 0;
-        // Simple iteration to find which phase contains viewedWeek
         for (let i = 0; i < phases.length; i++) {
           const pWeeks = phases[i].weeks?.length || 4;
           if (viewedWeek <= weekCount + pWeeks) {
@@ -174,33 +203,21 @@ export default function Home() {
         setCurrentPhase(phaseIdx + 1);
 
         const phase = phases[phaseIdx] || phases[0];
-        // Correctly calculate relative index by subtracting potential previous weeks
-        // weekCount holds the sum of weeks from all PREVIOUS phases at this point
         const relativeWeekIdx = (viewedWeek - 1) - weekCount;
-
-        console.log(`[Dashboard] Phase Start Offset: ${weekCount}, Relative Index: ${relativeWeekIdx}`);
 
         const weekData = phase.weeks?.[relativeWeekIdx];
 
         if (weekData?.days) {
-          // Calculate today's index for future detection
-          const localJsDay = new Date().getDay();
-          const localTodayIndex = localJsDay === 0 ? 6 : localJsDay - 1;
-          const actualCurrentWeek = profile.current_week || 1;
-
           const dynamicProtocol = weekData.days.map((d: WorkoutDay, i: number) => {
             let isFuture = false;
-            // logic: If viewing a FUTURE week, all days are future.
-            // If viewing CURRENT week, only days after today are future.
-            // If viewing PAST week, no days are "future" (locked).
-            if (viewedWeek > actualCurrentWeek) {
+            if (viewedWeek > absoluteCurrentWeek) {
               isFuture = true;
-            } else if (viewedWeek === actualCurrentWeek) {
-              isFuture = i > localTodayIndex;
+            } else if (viewedWeek === absoluteCurrentWeek) {
+              isFuture = i > todayIndex;
             }
 
             return {
-              day: d.day,
+              day: dynamicDaysOfTheWeek[i], // Override generic "Day X" or hardcoded Monday-Sunday with their dynamic day
               title: d.title,
               type: d.segments?.[0]?.type || "Training",
               isFuture: isFuture
@@ -249,14 +266,29 @@ export default function Home() {
     const completion = Math.round((completedDays.size / 7) * 100);
 
     // Protocol-Based Streak (Chain Logic)
-    const dayNames = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+    // Map logs to an absolute integer based on their diff from the start date
     const loggedAbsIndices = new Set(allLogs.map(l => {
-      const dIdx = dayNames.indexOf(l.day_name);
-      return (l.week_number - 1) * 7 + (dIdx === -1 ? 0 : dIdx);
+      if (!l.date) return -1;
+      const logDate = new Date(l.date);
+      logDate.setHours(0, 0, 0, 0);
+
+      // Start date was calculated above, but we memoize this block so we recalculate
+      const pStartDate = userProfile?.program_start_date ? new Date(userProfile.program_start_date) : new Date();
+      pStartDate.setHours(0, 0, 0, 0);
+
+      const msPerDay = 1000 * 60 * 60 * 24;
+      const daysDiff = Math.floor((logDate.getTime() - pStartDate.getTime()) / msPerDay);
+      return daysDiff >= 0 ? daysDiff : -1;
     }));
 
-    const todayIndex = jsDay === 0 ? 6 : jsDay - 1;
-    const currentAbsIndex = (currentWeek - 1) * 7 + todayIndex;
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const msPerDay = 1000 * 60 * 60 * 24;
+
+    const pStartDate = userProfile?.program_start_date ? new Date(userProfile.program_start_date) : new Date();
+    pStartDate.setHours(0, 0, 0, 0);
+
+    const currentAbsIndex = Math.max(0, Math.floor((now.getTime() - pStartDate.getTime()) / msPerDay));
 
     let currentStreakCount = 0;
     let anchorIdx = -1;
@@ -283,7 +315,7 @@ export default function Home() {
       totalVolume: vol,
       totalCompletion: completion
     };
-  }, [allLogs, completedDays, currentWeek, jsDay]);
+  }, [allLogs, completedDays, userProfile]);
 
   const displayVolume = useMemo(() => {
     if (totalVolume === 0) return "0";

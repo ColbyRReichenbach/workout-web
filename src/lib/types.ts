@@ -97,6 +97,7 @@ export interface UserProfile {
     ai_name?: string;
     ai_personality?: string;
     units?: 'imperial' | 'metric';
+    program_start_date?: string;
 }
 
 export interface WorkoutLog {
