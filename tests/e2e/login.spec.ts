@@ -85,7 +85,7 @@ test.describe('Guest Mode', () => {
         await guestButton.click()
 
         // Should redirect to dashboard or home
-        await page.waitForURL(/\/$|\/dashboard|\/workout/, { timeout: 10000 })
+        await page.waitForURL(/\/$|\/dashboard|\/workout|\/onboarding/, { timeout: 10000 })
 
         // Should have guest mode cookie set
         const cookies = await page.context().cookies()
@@ -99,7 +99,7 @@ test.describe('Guest Mode', () => {
         const guestButton = page.getByRole('button', { name: /demo|guest|try/i })
         await guestButton.click()
 
-        await page.waitForURL(/\/$|\/dashboard|\/workout/, { timeout: 10000 })
+        await page.waitForURL(/\/$|\/dashboard|\/workout|\/onboarding/, { timeout: 10000 })
 
         // Page should load without errors
         await expect(page.locator('body')).not.toContainText(/error|failed/i)

@@ -1,11 +1,12 @@
-import { promises as fs } from 'fs';
-import path from 'path';
 import {
     MAX_CONTEXT_TOKENS,
     estimateTokens,
     truncateToTokenLimit,
     logTokenUsage,
 } from './tokenUtils';
+import { calculateWorkingSet } from '../calculations/percentages';
+import { parseWorkoutTemplate } from '../calculations/paceZones';
+import { UserProfile, WorkoutSegment } from '../types';
 
 export type IntentType = 'INJURY' | 'PROGRESS' | 'LOGISTICS' | 'GENERAL';
 
@@ -22,7 +23,6 @@ function extractMessageContent(message: Message | any): string {
     if (!message) return '';
     if (typeof message.content === 'string') return message.content;
 
-    // Handle SDK v6 parts array in content (from convertToModelMessages)
     if (Array.isArray(message.content)) {
         return message.content
             .map((p: any) => {
@@ -34,7 +34,6 @@ function extractMessageContent(message: Message | any): string {
             .join('\n');
     }
 
-    // Handle legacy parts array
     if (message.parts && Array.isArray(message.parts)) {
         return message.parts
             .map((p: any) => {
@@ -78,19 +77,12 @@ const KEYWORDS = {
     ]
 };
 
-/**
- * Heuristic keyword scoring for a single message.
- */
 function calculateIntent(content: any): IntentType {
     const text = (typeof content === 'string' ? content : extractMessageContent({ content })).toLowerCase();
     if (!text) return 'GENERAL';
 
-    // 1. Safety/Injury checks (Highest Priority)
-    if (KEYWORDS.INJURY.some(k => text.includes(k))) {
-        return 'INJURY';
-    }
+    if (KEYWORDS.INJURY.some(k => text.includes(k))) return 'INJURY';
 
-    // 2. Score other categories
     let progressScore = 0;
     let logisticsScore = 0;
 
@@ -103,13 +95,8 @@ function calculateIntent(content: any): IntentType {
     return 'GENERAL';
 }
 
-/**
- * Detects the user's intent based on the conversational history.
- * Handles "Conversational Continuations" by carrying over previous intent.
- */
 export function detectIntent(messages: Message[]): IntentType {
     if (!messages || messages.length === 0) return 'GENERAL';
-
     const userMessages = messages.filter(m => m.role === 'user');
     if (userMessages.length === 0) return 'GENERAL';
 
@@ -117,13 +104,11 @@ export function detectIntent(messages: Message[]): IntentType {
     const lastUserContent = extractMessageContent(lastUserMessage);
     const currentIntent = calculateIntent(lastUserContent);
 
-    // If current intent is GENERAL, check if it's a follow-up to a previous specific intent
     if (currentIntent === 'GENERAL') {
         const text = lastUserContent.toLowerCase();
         const isFollowUp = KEYWORDS.CONTINUATION.some(k => text.includes(k)) || text.length < 20;
 
         if (isFollowUp && userMessages.length > 1) {
-            // Traverse backwards through user messages to find the last specific intent
             for (let i = userMessages.length - 2; i >= 0; i--) {
                 const prevContent = extractMessageContent(userMessages[i]);
                 const prevIntent = calculateIntent(prevContent);
@@ -139,109 +124,126 @@ export function detectIntent(messages: Message[]): IntentType {
 }
 
 /**
- * Extracts a specific section from the Master Plan Markdown.
- * Improved to handle both #### DAY and * **DAY** formats.
+ * Compresses the full segment array into a high-density, token-efficient string
  */
-function extractSection(markdown: string, sectionHeader: string): string {
-    // Escape special characters for regex but allow for flexibility in prefixing
-    const escapedHeader = sectionHeader.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    // Match #### HEADER or * **HEADER** or ### HEADER
-    const regex = new RegExp(`(?:#{1,4}|\\*\\s\\*\\*)\\s*${escapedHeader}[\\s\\S]*?(?=(?:#{1,4}\\s|\\*\\s\\*\\*|\\Z))`, 'i');
-    const match = markdown.match(regex);
-    return match ? match[0].trim() : '';
+export function formatSegmentsForAI(segments: WorkoutSegment[], profile: UserProfile | undefined): string {
+    if (!segments || segments.length === 0) return "No exercises scheduled.";
+
+    return segments.map((s, idx) => {
+        let text = `${idx + 1}. ${s.name} (${s.type})`;
+        if (s.target) {
+            const targetStrs = [];
+            if (s.target.sets && s.target.reps) targetStrs.push(`${s.target.sets}x${s.target.reps}`);
+            else if (s.target.duration_min) targetStrs.push(`${s.target.duration_min} min`);
+            else if (s.target.distance_miles) targetStrs.push(`${s.target.distance_miles} miles`);
+
+            if (s.target.rpe) targetStrs.push(`RPE ${s.target.rpe}`);
+
+            if (s.target.percent_1rm) {
+                targetStrs.push(`@ ${Math.round(s.target.percent_1rm * 100)}% 1RM`);
+                // Only provide the physical weight calculation if we have the profile to process it
+                if (profile) {
+                    const calc = calculateWorkingSet(s.name, s.target.percent_1rm, profile);
+                    if (calc.weight > 0) {
+                        targetStrs.push(`-> ${calc.weight} lbs${calc.isEstimate ? ' (Est)' : ''}`);
+                    }
+                }
+            }
+            if (targetStrs.length > 0) text += ` [${targetStrs.join(', ')}]`;
+        }
+        if (s.details) text += ` - Details: ${parseWorkoutTemplate(s.details, profile)}`;
+        if (s.notes) text += ` - Note: ${parseWorkoutTemplate(s.notes, profile)}`;
+        return text;
+    }).join('\n');
 }
 
 /**
- * Extracts just the exercise list from a daily routine for compact representation
+ * Formats a compressed phase summary.
  */
-function extractExerciseList(dailyContent: string): string {
-    // Extract lines that look like exercises (start with - or *)
-    const lines = dailyContent.split('\n');
-    const exercises = lines.filter(line => {
-        const trimmed = line.trim();
-        return trimmed.startsWith('-') || trimmed.startsWith('*') || /^\d+\./.test(trimmed);
-    });
-
-    if (exercises.length > 0) {
-        return exercises.slice(0, 10).join('\n'); // Limit to first 10 exercises
+function createPhaseSummary(phaseObj: any): string {
+    if (!phaseObj) return "Unknown Phase";
+    const title = phaseObj.name ? `Phase: ${phaseObj.name}` : 'Current Phase';
+    let schedule = "Schedule: ";
+    if (phaseObj.weeks && phaseObj.weeks[0] && phaseObj.weeks[0].days) {
+        schedule += phaseObj.weeks[0].days.map((d: any) => d.day).join(', ');
+    } else {
+        schedule += "Unknown";
     }
-
-    // Fallback: just return first 500 chars
-    return dailyContent.substring(0, 500);
+    return `${title}\n${schedule}`;
 }
 
 /**
- * Creates a compact phase summary for general queries
- */
-function createPhaseSummary(phaseContent: string): string {
-    // Extract phase name/title
-    const titleMatch = phaseContent.match(/## PHASE \d+[^\n]*/i);
-    const title = titleMatch ? titleMatch[0] : 'Current Phase';
-
-    // Extract goals if present
-    const goalsMatch = phaseContent.match(/(?:goals?|objectives?|focus)[:\s]*([^\n]+)/i);
-    const goals = goalsMatch ? goalsMatch[1].trim() : '';
-
-    // Extract day headers for schedule overview
-    const dayHeaders = phaseContent.match(/#{3,4}\s*(MONDAY|TUESDAY|WEDNESDAY|THURSDAY|FRIDAY|SATURDAY|SUNDAY)[^\n]*/gi) || [];
-    const schedule = dayHeaders.slice(0, 7).map(h => h.replace(/^#+\s*/, '')).join(', ');
-
-    return [
-        title,
-        goals ? `Goals: ${goals}` : '',
-        schedule ? `Schedule: ${schedule}` : '',
-    ].filter(Boolean).join('\n');
-}
-
-/**
- * Builds the dynamic context based on Intent and User State
+ * Builds the dynamic context based on Intent and User State using the Supabase DB
  */
 export async function buildDynamicContext(
     intent: IntentType,
     currentPhase: number,
     currentWeek: number,
     messages: Message[],
-    providedUserDay?: string
+    providedUserDay?: string,
+    profile?: UserProfile,
+    supabase?: any
 ): Promise<ContextPayload> {
 
-    const planPath = path.join(process.cwd(), 'docs', 'routine_master_plan.md');
-    let masterPlan = '';
-    try {
-        masterPlan = await fs.readFile(planPath, 'utf-8');
-    } catch (e) {
-        console.error('[ContextRouter] Failed to load Master Plan', e);
-        return {
-            intent: 'GENERAL',
-            systemPromptAdditions: '',
-            suggestedTools: [],
-            tokenEstimate: 0
-        };
-    }
+    let programData: any = null;
+    let coreRoutineSnippet = `### STATUS (Week ${currentWeek}, Phase ${currentPhase})\nRest or recovery focused day.`;
+    let phaseSummaryStr = `Current Phase: ${currentPhase}`;
+    let dailyRoutineForLogistics = '';
 
-    // Get Current Day
-    const today = (providedUserDay || new Date().toLocaleDateString('en-US', { weekday: 'long' })).toUpperCase();
+    // If Supabase client is passed, query exactly what the UI sees for today
+    if (supabase) {
+        try {
+            const { data } = await supabase.from('workout_library').select('program_data').single();
+            if (data?.program_data) {
+                programData = data.program_data;
 
-    // Phase extraction logic
-    let targetPhase = currentPhase;
-    // Phase 5 Special Logic: Re-entry to Phase 1 for non-testing weeks
-    if (currentPhase === 5) {
-        const TESTING_WEEKS = [37, 44, 51];
-        if (!TESTING_WEEKS.includes(currentWeek)) {
-            targetPhase = 1;
-            console.log(`[ContextRouter] Phase 5 Re-entry detected for week ${currentWeek}. Redirecting to Phase 1 context.`);
+                const today = (providedUserDay || new Date().toLocaleDateString('en-US', { weekday: 'long' })).toUpperCase();
+
+                let targetPhase = currentPhase;
+                if (currentPhase === 5) {
+                    const TESTING_WEEKS = [37, 44, 51];
+                    if (!TESTING_WEEKS.includes(currentWeek)) {
+                        targetPhase = 1;
+                        console.log(`[ContextRouter] Phase 5 Re-entry detected for week ${currentWeek}. Redirecting to Phase 1 context.`);
+                    }
+                }
+
+                if (programData.phases) {
+                    // Extract exact Phase JSON
+                    const phaseObj = programData.phases.find((p: any) => p.id === targetPhase) || programData.phases[0];
+                    if (phaseObj) {
+                        phaseSummaryStr = createPhaseSummary(phaseObj);
+
+                        if (phaseObj.weeks && phaseObj.weeks.length > 0) {
+                            // Convert absolute program week to the selected phase's local week index.
+                            const phaseIdx = programData.phases.findIndex((p: any) => p.id === phaseObj.id);
+                            const priorPhaseWeeks = programData.phases
+                                .slice(0, Math.max(phaseIdx, 0))
+                                .reduce((sum: number, phase: any) => sum + (phase.weeks?.length || 0), 0);
+                            const relWeekIdx = Math.max(currentWeek - 1 - priorPhaseWeeks, 0) % phaseObj.weeks.length;
+                            const weekObj = phaseObj.weeks[relWeekIdx] || phaseObj.weeks[0];
+
+                            if (weekObj && weekObj.days) {
+                                // Find exact day matching "MONDAY" etc
+                                const dayObj = weekObj.days.find((d: any) => d.day?.toUpperCase() === today);
+
+                                if (dayObj) {
+                                    // Generate highly optimized string for AI (e.g. math done locally)
+                                    const formattedSegments = formatSegmentsForAI(dayObj.segments, profile);
+                                    dailyRoutineForLogistics = formattedSegments;
+                                    coreRoutineSnippet = `### CORE ROUTINE - ${dayObj.title} (${today}, Week ${currentWeek}, Phase ${currentPhase})\n${formattedSegments}`;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (e) {
+            console.error('[ContextRouter] Failed to process database workout_library:', e);
         }
+    } else {
+        console.warn(`[ContextRouter] No Supabase client provided, cannot fetch workout library!`);
     }
-
-    // Phase content extraction
-    const phaseRegex = new RegExp(`(## PHASE ${targetPhase}[\\s\\S]*?)(?=## PHASE \\d|$)`, 'i');
-    const phaseMatch = masterPlan.match(phaseRegex);
-    const fullPhaseContent = phaseMatch ? phaseMatch[1] : '';
-
-    // EXTRACT CORE ROUTINE (PERMANENT KNOWLEDGE)
-    const dailyRoutineRaw = extractSection(fullPhaseContent, today);
-    const coreRoutineSnippet = dailyRoutineRaw
-        ? `### CORE ROUTINE - ${today} (Week ${currentWeek}, Phase ${currentPhase})\n${truncateToTokenLimit(extractExerciseList(dailyRoutineRaw), 500)}`
-        : `### STATUS - ${today} (Week ${currentWeek}, Phase ${currentPhase})\nRest or recovery focused day.`;
 
     // EXTRACT RECENTLY DISCUSSED EXERCISES
     const lastAssistantMessages = messages
@@ -250,7 +252,6 @@ export async function buildDynamicContext(
         .map(m => extractMessageContent(m))
         .join('\n');
 
-    // Simple heuristic to extract exercise-like lines from recent history
     const recentExercises = lastAssistantMessages.split('\n')
         .filter(line => line.trim().startsWith('-') || line.trim().match(/^\d+\./))
         .slice(-5)
@@ -265,16 +266,15 @@ export async function buildDynamicContext(
 
     // Token budget per intent type (tokens)
     const TOKEN_BUDGETS = {
-        INJURY: 1500,      // Need more context for safety
-        LOGISTICS: 800,    // Just today's workout
-        PROGRESS: 1000,    // Analysis context
-        GENERAL: 600,      // Minimal context
+        INJURY: 1500,
+        LOGISTICS: 800,
+        PROGRESS: 1000,
+        GENERAL: 600,
     };
 
     switch (intent) {
         case 'INJURY':
-            // SAFETY MODE: More context allowed but still limited
-            const injuryContext = `
+            specificContext = `
 *** URGENT: USER REPORTED POTENTIAL INJURY OR MODIFICATION REQUEST ***
 
 Current Week: ${currentWeek}, Phase: ${currentPhase}
@@ -284,36 +284,27 @@ INSTRUCTION:
 - Suggest regressions or distinct alternatives.
 - Do not push through sharp pain.
 - Ask clarifying questions about the pain location and intensity.
-
-EXERCISES IN CURRENT PHASE:
-${truncateToTokenLimit(fullPhaseContent, TOKEN_BUDGETS.INJURY)}
 `;
-            specificContext = injuryContext;
             tools = ['getRecentLogs'];
             break;
 
         case 'LOGISTICS':
-            // MOST OPTIMIZED: Just today's routine
-            const dailyRoutine = extractSection(fullPhaseContent, today);
-
-            if (dailyRoutine) {
-                const exerciseList = extractExerciseList(dailyRoutine);
+            if (dailyRoutineForLogistics) {
                 specificContext = `
-*** TODAY'S WORKOUT (${today}) - Week ${currentWeek}, Phase ${currentPhase} ***
+*** TODAY'S WORKOUT - Week ${currentWeek}, Phase ${currentPhase} ***
 
-${truncateToTokenLimit(exerciseList, TOKEN_BUDGETS.LOGISTICS)}
+${truncateToTokenLimit(dailyRoutineForLogistics, TOKEN_BUDGETS.LOGISTICS)}
 
 INSTRUCTION:
-- Explain the workout details above.
+- Explain the workout details above. Be precise with the weights calculated for the user.
 - Provide warmup tips if asked.
 - Clarify RPE/percentages if asked.
 `;
             } else {
-                // Rest day or no specific routine
                 specificContext = `
-*** ${today} - Week ${currentWeek}, Phase ${currentPhase} ***
+*** Week ${currentWeek}, Phase ${currentPhase} ***
 
-No specific routine found for today. This may be a rest or recovery day.
+No specific routine found for today. This is likely a rest or recovery day.
 
 INSTRUCTION:
 - Confirm if today is a scheduled rest day.
@@ -323,16 +314,8 @@ INSTRUCTION:
             break;
 
         case 'PROGRESS':
-            // ANALYTIC MODE: Summary + progression logic + database schema hints
-            const progressionLogic = extractSection(fullPhaseContent, '### Phase [0-9]+ Progression');
-            const checkpointInfo = extractSection(fullPhaseContent, '### Week [0-9]+ Checkpoint');
-
             specificContext = `
 *** PROGRESS & ANALYTICS - Week ${currentWeek}, Phase ${currentPhase} ***
-
-${truncateToTokenLimit(progressionLogic || 'Focus on consistent improvement.', 400)}
-
-${truncateToTokenLimit(checkpointInfo || '', 300)}
 
 DATABASE SCHEMA (for smart query selection):
 Available Tools:
@@ -344,18 +327,10 @@ Available Tools:
 - getTrendAnalysis: For "Am I getting stronger?" or progress trend questions. Calculates direction + % change.
 - getBiometrics: For manual health entries (weight, hrv, rhr, sleep_hours).
 
-Data Available:
-- Strength PRs: squat_max, bench_max, deadlift_max, front_squat_max, ohp_max, clean_jerk_max, snatch_max
-- Cardio PRs: mile_time_sec, k5_time_sec, sprint_400m_sec, row_2k_sec, row_500m_sec, bike_max_watts
-- logs: segment_name, segment_type (Strength/Cardio/etc), performance_data (weight, reps, distance, time)
-- sleep_logs: asleep_minutes, hrv_ms, deep_sleep_minutes, sleep_efficiency_score
-- readiness_logs: readiness_score (1-10)
-
 INSTRUCTION:
 - Use the appropriate tool above to get actual data before answering.
 - Analyze trends in the user's logs.
 - Compare against prescribed targets.
-- Check compliance with the program.
 - Handle typos gracefully (e.g., "squirt" will be corrected to "squat").
 `;
             tools = ['getRecentLogs', 'getBiometrics', 'findLastLog', 'getExercisePR', 'getRecoveryMetrics', 'getComplianceReport', 'getTrendAnalysis'];
@@ -363,12 +338,10 @@ INSTRUCTION:
 
         case 'GENERAL':
         default:
-            // MINIMAL CONTEXT: Just phase summary
-            const phaseSummary = createPhaseSummary(fullPhaseContent);
             specificContext = `
 *** CURRENT PHASE OVERVIEW - Week ${currentWeek}, Phase ${currentPhase} ***
 
-${phaseSummary}
+${phaseSummaryStr}
 
 INSTRUCTION:
 - Answer general questions about the training program.

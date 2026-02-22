@@ -20,7 +20,8 @@
     "eval:history": "npm run eval && node eval/json-to-csv.js",
     "test:ai": "npx tsx src/scripts/set-demo-privacy.ts Analysis && promptfoo eval -c eval/promptfooconfig.js -o promptfoo-report-enabled.json --no-cache",
     "test:ai:privacy": "npx tsx src/scripts/set-demo-privacy.ts Private && promptfoo eval -c eval/promptfooconfig.privacy.js -o promptfoo-report-privacy.json --no-cache && npx tsx src/scripts/set-demo-privacy.ts Analysis",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test:ci": "npm run lint && npm run type-check && npm run test && npm run test:ai"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.12",
@@ -57,6 +58,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^5.1.2",
+    "@vitest/coverage-v8": "^4.0.18",
     "dotenv": "^17.2.3",
     "eslint": "^9",
     "eslint-config-next": "16.1.3",

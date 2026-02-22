@@ -129,30 +129,22 @@ export default function AnalyticsPage() {
             const TOTAL_WEEKS = 52;
             let ANCHOR_DATE = new Date();
 
-            // 1. Calculate the true ANCHOR_DATE (Monday of Week 1)
-            // We use the earliest log and its week_number to find where Week 1 Monday would be
-            if (raw.volumeData.length > 0) {
+            if (raw.profile.program_start_date) {
+                // Determine week 1 from the program start date
+                const start = new Date(raw.profile.program_start_date);
+                start.setHours(0, 0, 0, 0);
+                ANCHOR_DATE = start;
+                // If we also want it to display the whole past year since that start, we minus weeks:
+                // ANCHOR_DATE.setDate(ANCHOR_DATE.getDate() - (51 * 7));
+                // But typically for tracking progress we track *from* that date forward.
+            } else if (raw.volumeData.length > 0) {
+                // Fallback 1: Earliest log
                 const earliestLog = raw.volumeData[0];
-                const logDate = new Date(earliestLog.date);
-                const logWeek = earliestLog.week_number || 1;
-
-                // Align to Monday of the log's week
-                const day = logDate.getDay();
-                const diff = logDate.getDate() - (day === 0 ? 6 : day - 1);
-                const weekMonday = new Date(logDate);
-                weekMonday.setDate(diff);
-                weekMonday.setHours(0, 0, 0, 0);
-
-                // Subtract (week - 1) weeks to get to Week 1 Monday
-                ANCHOR_DATE = new Date(weekMonday);
-                ANCHOR_DATE.setDate(ANCHOR_DATE.getDate() - (logWeek - 1) * 7);
+                ANCHOR_DATE = new Date(earliestLog.date);
+                ANCHOR_DATE.setHours(0, 0, 0, 0);
             } else {
-                // Fallback: Monday of this week - 51 weeks
-                const now = new Date();
-                const day = now.getDay();
-                const diff = now.getDate() - (day === 0 ? 6 : day - 1);
-                ANCHOR_DATE = new Date(now);
-                ANCHOR_DATE.setDate(diff - (51 * 7));
+                // Fallback 2: Today
+                ANCHOR_DATE = new Date();
                 ANCHOR_DATE.setHours(0, 0, 0, 0);
             }
 

@@ -18,20 +18,17 @@ import { DEMO_USER_ID } from "@/lib/constants";
 import { calculateWorkingSet } from "@/lib/calculations/percentages";
 import { getCheckpointData } from "@/lib/checkpointTests";
 import { generateCheckpointWorkout } from "@/lib/checkpointWorkouts";
+import { parseWorkoutTemplate } from "@/lib/calculations/paceZones";
+import { calculateAbsoluteWeek } from "@/lib/dateUtils";
 
 // Helper to render dynamic details
 const renderSegmentDetails = (segment: WorkoutSegment, profile: UserProfile | null) => {
     if (!segment.details) return null;
 
-    const displayDetails = segment.details;
-    // Paces are used within formatPacePerUnit calls above via tokens
-
-    // ... (logic for tokens)
-
-    if (!profile) return <p className="text-muted-foreground text-sm leading-relaxed italic">&quot;{segment.details}&quot;</p>;
+    const displayDetails = parseWorkoutTemplate(segment.details, profile);
 
     return (
-        <div className="bg-muted/30 rounded-xl p-6 border border-border">
+        <div className="bg-muted/30 rounded-xl p-6 border border-border mt-3">
             <p className="text-muted-foreground text-sm leading-relaxed italic">&quot;{displayDetails}&quot;</p>
         </div>
     );
@@ -89,35 +86,55 @@ export default function WorkoutPage() {
             const { data: profileData } = await supabase.from('profiles').select('*').eq('id', profileId).single();
             setProfile(profileData);
 
+            // --- DYNAMIC TRACKING LOGIC ---
+            const now = new Date();
+            now.setHours(0, 0, 0, 0);
+
+            const startDate = profileData?.program_start_date ? new Date(profileData.program_start_date) : new Date();
+            startDate.setHours(0, 0, 0, 0);
+
+            const msPerDay = 1000 * 60 * 60 * 24;
+            const diffTime = now.getTime() - startDate.getTime();
+            let daysSinceStart = Math.floor(diffTime / msPerDay);
+            if (daysSinceStart < 0) daysSinceStart = 0;
+
+            const absoluteCurrentWeek = calculateAbsoluteWeek(startDate, now);
+            const todayIndex = daysSinceStart % 7;
+
+            // Date#getDay() is Sunday=0, but our dayNames array is Monday-first.
+            const startDayOfWeek = (startDate.getDay() + 6) % 7;
+            const dynamicDaysOfTheWeek = Array.from({ length: 7 }, (_, i) => {
+                return dayNames[(startDayOfWeek + i) % 7];
+            });
+            // --- END LOGIC ---
+
+            let absWeek = absoluteCurrentWeek;
+            if (targetWeekParam) {
+                const parsed = parseInt(targetWeekParam);
+                if (!isNaN(parsed)) absWeek = parsed;
+            }
+            setCurrentWeek(absWeek);
+
             let workoutDayIndex;
             if (targetDay) {
-                workoutDayIndex = dayNames.indexOf(targetDay);
+                // If a day name is passed, find its index in our DYNAMIC week array
+                workoutDayIndex = dynamicDaysOfTheWeek.indexOf(targetDay);
                 if (workoutDayIndex === -1) workoutDayIndex = 0;
                 setActualDayName(targetDay);
             } else {
-                const jsDay = new Date().getDay();
-                const libraryDayIndex = jsDay === 0 ? 6 : jsDay - 1;
-                setActualDayName(dayNames[libraryDayIndex]);
-                workoutDayIndex = libraryDayIndex;
+                // If no day is passed, we default to "today" relative to the start date
+                setActualDayName(dynamicDaysOfTheWeek[todayIndex]);
+                workoutDayIndex = todayIndex;
             }
 
             const { data: library } = await supabase.from('workout_library').select('program_data').single();
 
             if (library && library.program_data?.phases) {
                 const phases = library.program_data.phases;
-                let absWeek = profileData?.current_week || 1;
-                if (targetWeekParam) {
-                    const parsed = parseInt(targetWeekParam);
-                    if (!isNaN(parsed)) absWeek = parsed;
-                }
-                setCurrentWeek(absWeek);
-
-                setCurrentWeek(absWeek);
 
                 let phaseIdx = 0;
                 let weekCount = 0;
 
-                // Always calculate phase and offset based on absolute week
                 for (let i = 0; i < phases.length; i++) {
                     const phaseLen = phases[i].weeks?.length || 4;
                     if (absWeek <= weekCount + phaseLen) {
@@ -129,12 +146,13 @@ export default function WorkoutPage() {
                 setCurrentPhase(phaseIdx + 1);
 
                 const phase = phases[phaseIdx] || phases[0];
-                // Correctly calculate relative index by subtracting potential previous weeks
-                // weekCount holds the sum of weeks from all PREVIOUS phases at this point
                 const relativeWeekIdx = (absWeek - 1) - weekCount;
                 const week = phase.weeks[relativeWeekIdx] || phase.weeks[0];
                 let todayData = week.days[workoutDayIndex] || week.days[0];
-                const todayDayName = targetDay || dayNames[workoutDayIndex];
+
+                // CRITICAL FIX: Ensure the template data uses our dynamic day name
+                const todayDayName = targetDay || dynamicDaysOfTheWeek[todayIndex];
+                todayData = { ...todayData, day: todayDayName };
 
                 if (todayDayName === "Saturday") {
                     const checkpointData = getCheckpointData(absWeek);
@@ -343,7 +361,7 @@ export default function WorkoutPage() {
     const workoutStatus = segments.reduce((acc, s) => {
         if (!s.target?.percent_1rm) return acc;
         const res = calcWeight(s.name, s.target.percent_1rm);
-        if (res.needsCalibration) acc.needsCalibration = true;
+        if (res.needsCalibration && s.type === 'MAIN_LIFT') acc.needsCalibration = true;
         if (res.isEstimate) acc.hasEstimates = true;
         return acc;
     }, { needsCalibration: false, hasEstimates: false });

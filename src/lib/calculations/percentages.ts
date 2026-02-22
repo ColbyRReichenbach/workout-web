@@ -65,6 +65,20 @@ export function calculateWorkingSet(
         base = estimated.deadlift_max || 0;
         isEstimate = !profile.deadlift_max;
         source = isEstimate ? "Estimated from Squat" : "Personal Record";
+    } else {
+        // Accessory Mapping Fallback
+        isEstimate = true;
+        if (name.includes('lunge') || name.includes('split squat') || name.includes('leg press') || name.includes('calf') || name.includes('extension') || name.includes('curl')) {
+            base = estimated.squat_max || 0;
+            source = "Accessory (Mapped to Squat)";
+        } else if (name.includes('row') || name.includes('pull') || name.includes('push') || name.includes('fly') || name.includes('raise') || name.includes('press')) {
+            base = estimated.bench_max || 0;
+            source = "Accessory (Mapped to Bench)";
+        } else {
+            // General fallback
+            base = estimated.squat_max || estimated.bench_max || 0;
+            source = "Accessory (Mapped to Baseline)";
+        }
     }
 
     const calculated = Math.round(base * percentOf1RM);
@@ -213,5 +227,12 @@ export function getExerciseMax(exerciseName: string, profile: UserProfile): numb
     if (name.includes('bench')) return estimated.bench_max || 0;
     if (name.includes('deadlift')) return estimated.deadlift_max || 0;
 
-    return 0;
+    // Accessory mapping fallback
+    if (name.includes('lunge') || name.includes('split squat') || name.includes('leg press') || name.includes('calf') || name.includes('extension') || name.includes('curl')) {
+        return estimated.squat_max || 0;
+    } else if (name.includes('row') || name.includes('pull') || name.includes('push') || name.includes('fly') || name.includes('raise') || name.includes('press')) {
+        return estimated.bench_max || 0;
+    }
+
+    return estimated.squat_max || estimated.bench_max || 0;
 }

@@ -8,6 +8,7 @@ export interface WorkoutTarget {
     weight_fixed?: number;
     rpe?: number;
     duration_min?: number;
+    distance_miles?: number;
     zone?: string;
     hr_cap?: number;
 }
@@ -97,6 +98,7 @@ export interface UserProfile {
     ai_name?: string;
     ai_personality?: string;
     units?: 'imperial' | 'metric';
+    program_start_date?: string;
 }
 
 export interface WorkoutLog {
