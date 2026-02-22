@@ -8,6 +8,7 @@ export interface WorkoutTarget {
     weight_fixed?: number;
     rpe?: number;
     duration_min?: number;
+    distance_miles?: number;
     zone?: string;
     hr_cap?: number;
 }

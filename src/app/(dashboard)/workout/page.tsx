@@ -18,20 +18,16 @@ import { DEMO_USER_ID } from "@/lib/constants";
 import { calculateWorkingSet } from "@/lib/calculations/percentages";
 import { getCheckpointData } from "@/lib/checkpointTests";
 import { generateCheckpointWorkout } from "@/lib/checkpointWorkouts";
+import { parseWorkoutTemplate } from "@/lib/calculations/paceZones";
 
 // Helper to render dynamic details
 const renderSegmentDetails = (segment: WorkoutSegment, profile: UserProfile | null) => {
     if (!segment.details) return null;
 
-    const displayDetails = segment.details;
-    // Paces are used within formatPacePerUnit calls above via tokens
-
-    // ... (logic for tokens)
-
-    if (!profile) return <p className="text-muted-foreground text-sm leading-relaxed italic">&quot;{segment.details}&quot;</p>;
+    const displayDetails = parseWorkoutTemplate(segment.details, profile);
 
     return (
-        <div className="bg-muted/30 rounded-xl p-6 border border-border">
+        <div className="bg-muted/30 rounded-xl p-6 border border-border mt-3">
             <p className="text-muted-foreground text-sm leading-relaxed italic">&quot;{displayDetails}&quot;</p>
         </div>
     );
@@ -363,7 +359,7 @@ export default function WorkoutPage() {
     const workoutStatus = segments.reduce((acc, s) => {
         if (!s.target?.percent_1rm) return acc;
         const res = calcWeight(s.name, s.target.percent_1rm);
-        if (res.needsCalibration) acc.needsCalibration = true;
+        if (res.needsCalibration && s.type === 'MAIN_LIFT') acc.needsCalibration = true;
         if (res.isEstimate) acc.hasEstimates = true;
         return acc;
     }, { needsCalibration: false, hasEstimates: false });

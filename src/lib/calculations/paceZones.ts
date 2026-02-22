@@ -78,3 +78,56 @@ export function formatPace(seconds: number): string {
 export function formatPacePerUnit(seconds: number, unit: 'mile' | '500m' | '400m'): string {
     return `${formatPace(seconds)}/${unit}`;
 }
+
+import { UserProfile } from '../types';
+import { estimateMissingMaxes } from './percentages';
+
+/**
+ * Parses a workout text string to replace {{mustache}} variables 
+ * with dynamically calculated paces based on the user's profile.
+ */
+export function parseWorkoutTemplate(text: string, rawProfile?: UserProfile | null): string {
+    if (!text || !text.includes('{{')) return text;
+    if (!rawProfile) return text;
+
+    // Estimate missing so we have baseline data to work with
+    const profile = estimateMissingMaxes(rawProfile);
+
+    const row2kSec = profile.row_2k_sec || 465; // default 7:45
+    const k5TimeSec = profile.k5_time_sec || 1440; // default 24:00
+    const mileTimeSec = profile.mile_time_sec || 450; // default 7:30
+
+    const rowPaces = calculate2kRowDerivedPaces(row2kSec);
+    const runPaces = calculate5kDerivedPaces(k5TimeSec);
+    const run400mPace = calculate400mPaceFromMile(mileTimeSec);
+
+    // HR Zones based on generic % of Max HR if exact values aren't set
+    const maxHr = profile.max_hr || 196;
+
+    return text.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (match, variable) => {
+        switch (variable) {
+            case 'row_interval_pace_500m':
+                return formatPacePerUnit(rowPaces.aerobicInterval500m, '500m');
+            case 'row_tempo_pace_500m':
+                return formatPacePerUnit(rowPaces.aerobicInterval500m + 5, '500m');
+            case 'run_zone2_pace_mile':
+                return formatPacePerUnit(runPaces.zone2PacePerMile, 'mile');
+            case 'run_tempo_pace_mile':
+                return formatPacePerUnit(runPaces.tempoPacePerMile, 'mile');
+            case 'run_interval_pace_400m':
+                return formatPacePerUnit(run400mPace, '400m');
+            case 'zone_1_hr':
+                return `${Math.round(maxHr * 0.65)}-${Math.round(maxHr * 0.72)} bpm`;
+            case 'zone_2_hr':
+                return `${Math.round(maxHr * 0.73)}-${Math.round(maxHr * 0.82)} bpm`;
+            case 'zone_3_hr':
+                return `${Math.round(maxHr * 0.83)}-${Math.round(maxHr * 0.86)} bpm`;
+            case 'zone_4_hr':
+                return `${Math.round(maxHr * 0.87)}-${Math.round(maxHr * 0.94)} bpm`;
+            case 'zone_5_hr':
+                return `${Math.round(maxHr * 0.95)}+ bpm`;
+            default:
+                return match; // Leave unparsed if unrecognized
+        }
+    });
+}

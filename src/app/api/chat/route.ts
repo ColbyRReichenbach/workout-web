@@ -1287,7 +1287,7 @@ export async function POST(req: Request) {
         // 6. FETCH USER PROFILE & BUILD CONTEXT
         const { data: profile } = await supabase
             .from('profiles')
-            .select('ai_name, ai_personality, current_phase, current_week, data_privacy')
+            .select('*')
             .eq('id', userId)
             .single();
 
@@ -1318,7 +1318,9 @@ export async function POST(req: Request) {
             currentPhase,
             currentWeek,
             sanitizedMessages as any[],
-            userDay
+            userDay,
+            profile,
+            supabase
         );
 
         // --- CORE KNOWLEDGE & PERSONA ---
