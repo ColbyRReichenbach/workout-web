@@ -18,6 +18,7 @@ import { createClient } from "@/utils/supabase/client";
 import { WorkoutDay, ProtocolDay, WorkoutLog, UserProfile } from "@/lib/types";
 import { useSettings } from "@/context/SettingsContext";
 import { getUnitLabel } from "@/lib/conversions";
+import { calculateAbsoluteWeek } from "@/lib/dateUtils";
 import { DEMO_USER_ID } from "@/lib/constants";
 
 // Dynamic import for AiCoach with loading skeleton
@@ -135,7 +136,7 @@ export default function Home() {
       if (daysSinceStart < 0) daysSinceStart = 0; // Prevent negative days if start date is in the future
 
       // Calculate the true absolute week and today index
-      const absoluteCurrentWeek = Math.floor(daysSinceStart / 7) + 1;
+      const absoluteCurrentWeek = calculateAbsoluteWeek(startDate, now);
       const todayIndex = daysSinceStart % 7;
 
       // Determine Viewed Week

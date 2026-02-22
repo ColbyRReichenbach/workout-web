@@ -19,7 +19,7 @@ function stripTime(d: Date): Date {
 
 /** Whole days between two dates (a − b). */
 function daysBetween(a: Date, b: Date): number {
-    return Math.floor((stripTime(a).getTime() - stripTime(b).getTime()) / 86_400_000);
+    return Math.round((stripTime(a).getTime() - stripTime(b).getTime()) / 86_400_000);
 }
 
 /** Add `n` days to a date (returns new Date). */
@@ -124,6 +124,21 @@ export function formatDateShort(d: Date): string {
  */
 export function formatDateFull(d: Date): string {
     return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+/**
+ * Calculate the absolute week (1-indexed) based on a program start date
+ * and an optional reference date (defaults to now).
+ */
+export function calculateAbsoluteWeek(programStartDate: Date | string, referenceDate?: Date): number {
+    const start = typeof programStartDate === "string" ? new Date(programStartDate + "T00:00:00") : stripTime(programStartDate);
+    const now = stripTime(referenceDate ?? new Date());
+
+    const diff = daysBetween(now, start);
+    let daysSinceStart = diff;
+    if (daysSinceStart < 0) daysSinceStart = 0;
+
+    return Math.floor(daysSinceStart / 7) + 1;
 }
 
 /**

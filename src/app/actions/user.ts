@@ -76,7 +76,8 @@ export async function updateOnboardingData(formData: FormData) {
             ai_name: aiName,
             ai_personality: aiPersonality,
             current_week: 1,
-            current_phase: 1
+            current_phase: 1,
+            program_start_date: new Date().toISOString().split('T')[0] // Store as YYYY-MM-DD
         }, { onConflict: 'id' })
 
     if (error) {

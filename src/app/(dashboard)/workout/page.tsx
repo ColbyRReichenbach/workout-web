@@ -19,6 +19,7 @@ import { calculateWorkingSet } from "@/lib/calculations/percentages";
 import { getCheckpointData } from "@/lib/checkpointTests";
 import { generateCheckpointWorkout } from "@/lib/checkpointWorkouts";
 import { parseWorkoutTemplate } from "@/lib/calculations/paceZones";
+import { calculateAbsoluteWeek } from "@/lib/dateUtils";
 
 // Helper to render dynamic details
 const renderSegmentDetails = (segment: WorkoutSegment, profile: UserProfile | null) => {
@@ -97,7 +98,7 @@ export default function WorkoutPage() {
             let daysSinceStart = Math.floor(diffTime / msPerDay);
             if (daysSinceStart < 0) daysSinceStart = 0;
 
-            const absoluteCurrentWeek = Math.floor(daysSinceStart / 7) + 1;
+            const absoluteCurrentWeek = calculateAbsoluteWeek(startDate, now);
             const todayIndex = daysSinceStart % 7;
 
             const startDayOfWeek = startDate.getDay();
