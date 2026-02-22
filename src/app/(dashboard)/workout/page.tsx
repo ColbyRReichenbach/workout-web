@@ -101,7 +101,8 @@ export default function WorkoutPage() {
             const absoluteCurrentWeek = calculateAbsoluteWeek(startDate, now);
             const todayIndex = daysSinceStart % 7;
 
-            const startDayOfWeek = startDate.getDay();
+            // Date#getDay() is Sunday=0, but our dayNames array is Monday-first.
+            const startDayOfWeek = (startDate.getDay() + 6) % 7;
             const dynamicDaysOfTheWeek = Array.from({ length: 7 }, (_, i) => {
                 return dayNames[(startDayOfWeek + i) % 7];
             });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { detectIntent, Message, formatSegmentsForAI } from '../../src/lib/ai/contextRouter';
+import { buildDynamicContext, detectIntent, Message, formatSegmentsForAI } from '../../src/lib/ai/contextRouter';
 import { UserProfile, WorkoutSegment } from '../../src/lib/types';
 
 describe('detectIntent (Stateful)', () => {
@@ -52,6 +52,42 @@ describe('detectIntent (Stateful)', () => {
     });
 });
 
+
+
+describe('buildDynamicContext', () => {
+    it('uses phase-local week when currentWeek is absolute', async () => {
+        const supabase = {
+            from: () => ({
+                select: () => ({
+                    single: async () => ({
+                        data: {
+                            program_data: {
+                                phases: [
+                                    {
+                                        id: 1,
+                                        weeks: Array.from({ length: 8 }, () => ({ days: [{ day: 'Monday', title: 'P1', segments: [{ name: 'P1 Segment' }] }] })),
+                                    },
+                                    {
+                                        id: 2,
+                                        weeks: [
+                                            { days: [{ day: 'Monday', title: 'P2 Week 1', segments: [{ name: 'Phase2 Week1 Segment' }] }] },
+                                            { days: [{ day: 'Monday', title: 'P2 Week 2', segments: [{ name: 'Phase2 Week2 Segment' }] }] },
+                                        ],
+                                    },
+                                ],
+                            },
+                        },
+                    }),
+                }),
+            }),
+        };
+
+        const context = await buildDynamicContext('LOGISTICS', 2, 9, [{ role: 'user', content: 'What is my workout today?' }], 'Monday', undefined, supabase);
+
+        expect(context.systemPromptAdditions).toContain('P2 Week 1');
+        expect(context.systemPromptAdditions).toContain('Phase2 Week1 Segment');
+    });
+});
 describe('formatSegmentsForAI', () => {
     const mockProfile: UserProfile = {
         row_2k_sec: 480, // 8:00
