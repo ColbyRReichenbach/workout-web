@@ -20,7 +20,8 @@
     "eval:history": "npm run eval && node eval/json-to-csv.js",
     "test:ai": "npx tsx src/scripts/set-demo-privacy.ts Analysis && promptfoo eval -c eval/promptfooconfig.js -o promptfoo-report-enabled.json --no-cache",
     "test:ai:privacy": "npx tsx src/scripts/set-demo-privacy.ts Private && promptfoo eval -c eval/promptfooconfig.privacy.js -o promptfoo-report-privacy.json --no-cache && npx tsx src/scripts/set-demo-privacy.ts Analysis",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test:ci": "npm run lint && npm run type-check && npm run test && npm run test:ai"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.12",

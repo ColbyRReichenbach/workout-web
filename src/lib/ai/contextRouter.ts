@@ -126,7 +126,7 @@ export function detectIntent(messages: Message[]): IntentType {
 /**
  * Compresses the full segment array into a high-density, token-efficient string
  */
-function formatSegmentsForAI(segments: WorkoutSegment[], profile: UserProfile | undefined): string {
+export function formatSegmentsForAI(segments: WorkoutSegment[], profile: UserProfile | undefined): string {
     if (!segments || segments.length === 0) return "No exercises scheduled.";
 
     return segments.map((s, idx) => {

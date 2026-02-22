@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { detectIntent, Message } from '../../src/lib/ai/contextRouter';
+import { detectIntent, Message, formatSegmentsForAI } from '../../src/lib/ai/contextRouter';
+import { UserProfile, WorkoutSegment } from '../../src/lib/types';
 
 describe('detectIntent (Stateful)', () => {
     it('should detect INJURY intent from direct keywords', () => {
@@ -48,5 +49,62 @@ describe('detectIntent (Stateful)', () => {
             { role: 'user', content: 'Hello ECHO-P1!' }
         ];
         expect(detectIntent(messages)).toBe('GENERAL');
+    });
+});
+
+describe('formatSegmentsForAI', () => {
+    const mockProfile: UserProfile = {
+        row_2k_sec: 480, // 8:00
+        max_hr: 200,
+        bench_max: 200,
+    } as any;
+
+    it('should format strength segments with calculated weights', () => {
+        const segments: WorkoutSegment[] = [
+            {
+                name: 'Bench Press',
+                type: 'MAIN_LIFT',
+                tracking_mode: 'STRENGTH_SETS',
+                target: {
+                    sets: 3,
+                    reps: 5,
+                    percent_1rm: 0.80
+                }
+            }
+        ];
+        const formatted = formatSegmentsForAI(segments, mockProfile);
+        expect(formatted).toContain('1. Bench Press (MAIN_LIFT)');
+        expect(formatted).toContain('[3x5, @ 80% 1RM, -> 160 lbs]');
+    });
+
+    it('should parse cardio templates in details and notes', () => {
+        const segments: WorkoutSegment[] = [
+            {
+                name: 'Rowing Intervals',
+                type: 'CARDIO',
+                tracking_mode: 'CARDIO_BASIC',
+                details: '5 x 500m @ {{row_interval_pace_500m}}',
+                notes: 'Keep HR in {{zone_2_hr}}',
+                target: {
+                    duration_min: 25
+                }
+            }
+        ];
+        const formatted = formatSegmentsForAI(segments, mockProfile);
+        expect(formatted).toContain('Details: 5 x 500m @ 2:09/500m');
+        expect(formatted).toContain('Note: Keep HR in 146-164 bpm');
+    });
+
+    it('should handle missing profiles gracefully', () => {
+        const segments: WorkoutSegment[] = [
+            {
+                name: 'Row',
+                type: 'CARDIO',
+                tracking_mode: 'CARDIO_BASIC',
+                details: '{{row_interval_pace_500m}}'
+            }
+        ];
+        const formatted = formatSegmentsForAI(segments, undefined);
+        expect(formatted).toContain('Details: {{row_interval_pace_500m}}');
     });
 });
