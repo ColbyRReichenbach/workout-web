@@ -104,23 +104,13 @@ export default function Home() {
       const user = userResponse?.user;
 
       // Fetch profile using retrieved user
-      const { data: profile, error: profileError } = await supabase
+      const { data: profile } = await supabase
         .from('profiles')
         .select('current_week, current_phase, height, weight_lbs, program_start_date')
         .eq('id', user?.id || DEMO_USER_ID)
         .single();
 
-      // If no profile exists (new user from OAuth), redirect to onboarding
-      if (!profile || profileError) {
-        router.push('/onboarding');
-        return;
-      }
-
-      // If profile exists but is incomplete, also redirect to onboarding
-      if (!profile.height || !profile.weight_lbs) {
-        router.push('/onboarding');
-        return;
-      }
+      if (!profile) return; // Fallback for TypeScript, actual redirect handled by layout.tsx
 
       setUserProfile(profile as UserProfile);
 
