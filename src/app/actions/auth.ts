@@ -222,12 +222,16 @@ export async function resetPassword(email: string): Promise<{ error?: string; su
     })
 
     if (error) {
-        // Don't reveal if email exists for security
+        // Don't reveal if email exists for security, unless it's a rate limit
         console.error('[Auth] Password reset error:', error.message);
         Sentry.captureException(error);
+
+        if (error.status === 429) {
+            return { error: "Email rate limit exceeded (max 3 per hour). Please try again later or configure a custom SMTP server." }
+        }
     }
 
-    // Always return success to prevent email enumeration
+    // Always return success to prevent email enumeration if it's not a rate limit
     return { success: "If an account with that email exists, a password reset link has been sent." }
 }
 

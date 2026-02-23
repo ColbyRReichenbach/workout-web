@@ -5,8 +5,16 @@ import { cookies } from 'next/headers'
 export async function GET(request: Request) {
     const { searchParams, origin } = new URL(request.url)
     const code = searchParams.get('code')
+    // Check if there is an error passed from Supabase (e.g., rate limits, invalid token)
+    const authError = searchParams.get('error')
+    const authErrorDescription = searchParams.get('error_description')
+
     // if "next" is in param, use it as the redirect URL
     const next = searchParams.get('next') ?? '/'
+
+    if (authError) {
+        return NextResponse.redirect(`${origin}/auth/auth-code-error?error=${encodeURIComponent(authErrorDescription || authError)}`)
+    }
 
     if (code) {
         const supabase = await createClient()
@@ -18,9 +26,12 @@ export async function GET(request: Request) {
             cookieStore.delete('guest-mode')
 
             return NextResponse.redirect(`${origin}${next}`)
+        } else {
+            // exchange failed
+            return NextResponse.redirect(`${origin}/auth/auth-code-error?error=${encodeURIComponent(error.message)}`)
         }
     }
 
-    // return the user to an error page with instructions
-    return NextResponse.redirect(`${origin}/auth/auth-code-error`)
+    // return the user to an error page if there's no code and no error
+    return NextResponse.redirect(`${origin}/auth/auth-code-error?error=${encodeURIComponent("Invalid authentication link or missing authentication code.")}`)
 }
