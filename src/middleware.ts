@@ -36,14 +36,20 @@ export async function middleware(request: NextRequest) {
 
     let user = null
     try {
-        const { data } = await supabase.auth.getUser()
+        const { data, error } = await supabase.auth.getUser()
+        if (error) {
+            console.error('[Middleware] getUser error:', error)
+        }
         user = data.user
-    } catch {
+        console.log(`[Middleware] Path: ${request.nextUrl.pathname}, User ID:`, user?.id || 'null')
+    } catch (err) {
+        console.error('[Middleware] Unexpected getUser error:', err)
         // Supabase unreachable (e.g. CI with dummy URL); treat as unauthenticated
     }
 
     // check for guest mode cookie
     const isGuest = request.cookies.get('guest-mode')?.value === 'true'
+    console.log(`[Middleware] isGuest:`, isGuest)
 
     // CSP and SECURITY HEADERS
     const nonce = crypto.randomUUID()

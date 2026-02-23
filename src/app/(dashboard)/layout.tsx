@@ -1,8 +1,29 @@
-export default function DashboardLayout({
+import { createClient } from "@/utils/supabase/server";
+import { redirect } from "next/navigation";
+import { DEMO_USER_ID } from "@/lib/constants";
+
+export default async function DashboardLayout({
     children,
 }: {
     children: React.ReactNode;
 }) {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    // Check if the user has a completed profile (height/weight)
+    if (user && user.id !== DEMO_USER_ID) {
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('height, weight_lbs')
+            .eq('id', user.id)
+            .single();
+
+        if (!profile || !profile.height || !profile.weight_lbs) {
+            // Profile is incomplete, force onboarding before showing dashboard shell
+            redirect('/onboarding');
+        }
+    }
+
     return (
         <div className="flex-1 flex flex-col relative w-full">
             {/* Scanline Pulse Diagnostic Overlay - Background Layer */}
