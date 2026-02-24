@@ -104,17 +104,22 @@ export function parseWorkoutTemplate(text: string, rawProfile?: UserProfile | nu
     // HR Zones based on generic % of Max HR if exact values aren't set
     const maxHr = profile.max_hr || 196;
 
-    return text.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (match, variable) => {
+    return text.replace(/\{{1,2}\s*([a-zA-Z0-9_]+)\s*\}{1,2}/g, (match, variable) => {
         switch (variable) {
             case 'row_interval_pace_500m':
                 return formatPacePerUnit(rowPaces.aerobicInterval500m, '500m');
             case 'row_tempo_pace_500m':
                 return formatPacePerUnit(rowPaces.aerobicInterval500m + 5, '500m');
             case 'run_zone2_pace_mile':
+            case 'zone_2_pace_mile':
                 return formatPacePerUnit(runPaces.zone2PacePerMile, 'mile');
             case 'run_tempo_pace_mile':
+            case 'tempo_pace_mile':
+            case 'threshold_pace_mile':
+            case 'threshold_pace':
                 return formatPacePerUnit(runPaces.tempoPacePerMile, 'mile');
             case 'run_interval_pace_400m':
+            case 'track_repeat_pace_400m':
                 return formatPacePerUnit(run400mPace, '400m');
             case 'zone_1_hr':
                 return `${Math.round(maxHr * 0.65)}-${Math.round(maxHr * 0.72)} bpm`;
