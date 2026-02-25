@@ -21,10 +21,12 @@ Security is a primary concern for the Pulse Tracker platform. If you identify a 
 - **Error Obfuscation**: Production errors are captured by Sentry with PII masking; internal stack traces are NEVER leaked to the client.
 
 ### AI Governance & Safety
-- **Prompt Injection Detection**: Multi-pattern matching for jailbreak and injection attempts on every prompt.
-- **Privacy Layer**: Automated redaction of Personal Identifiable Information (PII) before transmission to AI providers.
-- **Immutable Auditing**: Cryptographically hashed audit logs for all AI interactions (Vortex standard).
-- **Tool Sandbox**: AI tools are limited to strict, pre-validated database functions with minimal data exposure.
+- **Prompt Injection Detection**: 16-pattern regex matching for jailbreak and injection attempts on every message.
+- **Topic Guardrails**: Priority-ordered keyword and pattern matching across 20+ categories, with fuzzy matching (Levenshtein distance) to catch deliberate typo-based bypasses.
+- **Semantic Safety Net**: OpenAI Moderation API and a GPT-4o-mini intent classifier run on every message lacking clear fitness context.
+- **Output Validation**: Post-generation response scanning for PII, credentials, and system prompt leakage before delivery to the client.
+- **Privacy Layer**: AI tools use explicit field selection and sanitization functions — user IDs, internal IDs, and session data are never included in LLM context.
+- **Interaction Auditing**: Every AI request is logged to `ai_logs` (intent, tools used, tokens, latency, status) for monitoring via the admin diagnostic terminal.
 
 ### Data Protection Standards
 - **Encryption**: Mandatory HTTPS (TLS 1.3) for all production traffic; data-at-rest encryption (AES-256) provided via Supabase/AWS.
@@ -66,4 +68,10 @@ npx promptfoo eval
 | Version | Date | Security Updates |
 | :--- | :--- | :--- |
 | 1.0.0 | 2026-01-18 | Initial security implementation |
-| 1.1.0 | 2026-01-28 | Production hardening: Redis rate limiting, Sentry, Privacy Layer, and Immutable Auditing |
+| 1.1.0 | 2026-01-28 | Production hardening: Redis rate limiting, Sentry integration, Privacy Layer, and Immutable Auditing |
+| 1.2.0 | 2026-02-25 | AI safety enhancements: 6-layer guardrail pipeline, semantic intent classifier, Levenshtein fuzzy matching for keyword bypass prevention, output validation with PII/credential detection |
+
+---
+
+For a detailed breakdown of the AI guardrail architecture, including all 6 safety layers, tool sandboxing, and PII scrubbing, see [TECHNICAL.md](./TECHNICAL.md).
+
