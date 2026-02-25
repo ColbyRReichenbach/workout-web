@@ -211,6 +211,8 @@ test.txt
 # Internal changelog and migration reference (dev-facing only)
 docs/RELEASE_1_0_CHANGELOG.md
 docs/SUPABASE_MIGRATION_GUIDE.md
+docs/BRANCH_PROTECTION.md
+docs/database-indexes.sql
 
 
 # ============================================================================

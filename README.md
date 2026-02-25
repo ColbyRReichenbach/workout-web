@@ -118,7 +118,6 @@ The current intent classifier uses a GPT-4o-mini call to determine whether a mes
 | :--- | :--- |
 | [TECHNICAL.md](./TECHNICAL.md) | Architecture, AI engineering, and security deep-dive |
 | [SECURITY.md](./SECURITY.md) | Security policy and vulnerability disclosure |
-| [docs/BRANCH_PROTECTION.md](./docs/BRANCH_PROTECTION.md) | Branch protection configuration |
 
 ---
 
