@@ -22,6 +22,13 @@ Built by **Colby Reichenbach**
 [![GitHub](https://img.shields.io/badge/GitHub-Follow-181717?style=flat-square&logo=github&logoColor=white)](https://github.com/ColbyRReichenbach)
 [![Live App](https://img.shields.io/badge/Pulse%20-%20Live%20App?style=for-the-badge&label=Pulse&color=ef4444)](https://pulse-workout.vercel.app/)
 
+[![Live App](https://img.shields.io/badge/Live%20App?style=flat&label=Pulse&color=ef4444)](https://pulse-workout.vercel.app/) flat
+[![Live App](https://img.shields.io/badge/Live%20App?style=flat-square&label=Pulse&color=ef4444)](https://pulse-workout.vercel.app/) flat square
+[![Live App](https://img.shields.io/badge/Pulse%20-%20Live%20App?style=for-the-badge&label=Pulse&color=ef4444)](https://pulse-workout.vercel.app/) for the badge
+[![Live App](https://img.shields.io/badge/Live%20App?style=plastic&label=Pulse&color=ef4444)](https://pulse-workout.vercel.app/) plastic
+[![Live App](https://img.shields.io/badge/Live%20App?style=social&label=Pulse&color=ef4444)](https://pulse-workout.vercel.app/) plastic
+
+
 </div>
 
 ---
