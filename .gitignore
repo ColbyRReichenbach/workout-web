@@ -208,6 +208,10 @@ pr_logic.md
 consolidated_pulse.txt
 test.txt
 
+# Internal changelog and migration reference (dev-facing only)
+docs/RELEASE_1_0_CHANGELOG.md
+docs/SUPABASE_MIGRATION_GUIDE.md
+
 
 # ============================================================================
 # 🗃️ DATABASE SEED & MIGRATION SCRIPTS (Local only)

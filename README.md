@@ -51,10 +51,10 @@ An always-on fitness coach powered by GPT-4o-mini. It knows your workout history
 ### Analytics Dashboard
 Centralized visualization of performance data across lifting and conditioning.
 
-- **Lift Progression Charts** — Volume and estimated 1RM trends over time
-- **Cardio Analytics** — Pace and distance history across modalities
-- **Adherence Ring** — Visual weekly workout completion tracking
-- **Benchmarks Panel** — Current PRs for all tracked exercises
+- **Lift Progression** — Area and bar charts tracking volume-load and estimated 1RM trends over time
+- **PR Proximity** — Visual indicator of how close current lifts are to personal records
+- **Recovery Index** — Charts tracking HRV, resting heart rate, and sleep quality trends
+- **PR History** — Full log of every personal record with date and performance context
 
 ### Multi-Tenant Architecture
 Built to handle multiple users with complete data isolation — your data is never accessible to anyone else.
@@ -102,14 +102,22 @@ The current intent classifier uses a GPT-4o-mini call to determine whether a mes
 
 ---
 
+## Changelog
+
+| Version | Date | What Changed |
+| :--- | :--- | :--- |
+| 1.0.0 | 2026-01-18 | Initial release — workout logging, dashboard, AI coach |
+| 1.1.0 | 2026-01-28 | Redis rate limiting, Sentry integration, privacy controls |
+| 1.2.0 | 2026-02-25 | Analytics dashboard, Google OAuth, auto-advancing program weeks |
+
+---
+
 ## Documentation
 
 | Document | Description |
 | :--- | :--- |
-| [TECHNICAL.md](./TECHNICAL.md) | Deep-dive into the system architecture and AI engineering |
+| [TECHNICAL.md](./TECHNICAL.md) | Architecture, AI engineering, and security deep-dive |
 | [SECURITY.md](./SECURITY.md) | Security policy and vulnerability disclosure |
-| [docs/RELEASE_1_0_CHANGELOG.md](./docs/RELEASE_1_0_CHANGELOG.md) | Release 1.0 changelog |
-| [docs/SUPABASE_MIGRATION_GUIDE.md](./docs/SUPABASE_MIGRATION_GUIDE.md) | DB migration workflow |
 | [docs/BRANCH_PROTECTION.md](./docs/BRANCH_PROTECTION.md) | Branch protection configuration |
 
 ---
