@@ -99,7 +99,10 @@ The long-term vision includes a CV layer for:
 - **Equipment Recognition** — Point your camera at a piece of gym equipment and get instructions on how to use it
 - **Movement Search** — Ask about an exercise and get a machine-appropriate video tutorial
 
-### 4. ML-Based Intent Pre-Classifier
+### 4. HealthKit and Wearable Device Sync
+Integration with Apple HealthKit, Garmin, Whoop, and other tracking devices to automatically import sleep data, workout metrics, and biometrics. Instead of manually logging sleep hours and resting heart rate, the system would pull this data directly from your watch or fitness tracker — enabling more accurate recovery scoring, automated HRV trends, and real-time readiness assessments without any manual entry.
+
+### 5. ML-Based Intent Pre-Classifier
 The current intent classifier uses a GPT-4o-mini call to determine whether a message is fitness-related. A future iteration would replace this with a fine-tuned, lightweight classification model (e.g., a distilled transformer or logistic regression over sentence embeddings) trained on the accumulated interaction data in `ai_logs`. This is the standard production pattern used by companies like Rasa and Aisera: a fast, cheap ML classifier runs first and assigns a confidence score — "this is 82% fitness-related" — which then gates whether the full LLM pipeline is invoked. For clearly in-scope queries, the classifier short-circuits the guardrail chain entirely, reducing latency and cost at scale. For borderline cases, the existing semantic classifier still runs as a fallback. The `ai_logs` table is already capturing the labeled interaction data needed to train this model.
 
 ---

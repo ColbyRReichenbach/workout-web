@@ -228,10 +228,11 @@ export default function LoginPage() {
                         ) : (
                             <form className="space-y-5 slide-in" onSubmit={handleSubmit}>
                                 <div className="space-y-2">
-                                    <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-[0.2em] ml-1">Email Address</label>
+                                    <label htmlFor="email" className="text-[11px] font-bold text-zinc-400 uppercase tracking-[0.2em] ml-1">Email Address</label>
                                     <div className="relative group">
                                         <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 group-focus-within:text-[#ef4444] transition-colors" />
                                         <input
+                                            id="email"
                                             type="email"
                                             value={email}
                                             required
@@ -248,10 +249,11 @@ export default function LoginPage() {
 
                                 {view !== 'reset' && (
                                     <div className="space-y-2">
-                                        <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-[0.2em] ml-1">Password</label>
+                                        <label htmlFor="password" className="text-[11px] font-bold text-zinc-400 uppercase tracking-[0.2em] ml-1">Password</label>
                                         <div className="relative group">
                                             <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 group-focus-within:text-[#ef4444] transition-colors" />
                                             <input
+                                                id="password"
                                                 type="password"
                                                 value={password}
                                                 required
@@ -270,11 +272,12 @@ export default function LoginPage() {
                                 <button
                                     type="submit"
                                     disabled={loading}
+                                    aria-label={view === 'reset' ? 'Send Recovery Link' : 'Sign In'}
                                     onMouseEnter={onEnter}
                                     onMouseLeave={onLeave}
                                     className="w-full bg-zinc-900 text-white font-bold py-4 rounded-2xl hover:bg-zinc-800 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg shadow-zinc-900/10 flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    {loading ? "Processing..." : view === 'reset' ? "Send Recovery Link" : "Continue"}
+                                    {loading ? "Processing..." : view === 'reset' ? "Send Recovery Link" : "Sign In"}
                                     {!loading && <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />}
                                 </button>
                             </form>

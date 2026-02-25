@@ -4,22 +4,49 @@ import { test, expect } from '@playwright/test'
  * Login Flow E2E Tests
  *
  * Tests for the complete login experience including:
- * - Page rendering
+ * - Page rendering (multi-view state machine)
  * - Form validation
  * - Guest mode
  * - OAuth buttons
  * - Error states
  */
 
-test.describe('Login Page', () => {
+test.describe('Login Page – Initial View', () => {
     test.beforeEach(async ({ page }) => {
         await page.goto('/login')
     })
 
-    test('should render the login page', async ({ page }) => {
-        // Check for main login elements
-        await expect(page.locator('h1, h2').first()).toBeVisible()
-        await expect(page.getByRole('button', { name: /sign in|log in/i })).toBeVisible()
+    test('should render the welcome heading', async ({ page }) => {
+        await expect(page.locator('h1')).toContainText('Welcome')
+    })
+
+    test('should have Google OAuth button', async ({ page }) => {
+        const googleButton = page.getByRole('button', { name: /google/i })
+        await expect(googleButton).toBeVisible()
+    })
+
+    test('should have email sign-in button', async ({ page }) => {
+        const emailButton = page.getByRole('button', { name: /sign in with email/i })
+        await expect(emailButton).toBeVisible()
+    })
+
+    test('should have a guest/demo mode option', async ({ page }) => {
+        const guestButton = page.getByRole('button', { name: /guest/i })
+        await expect(guestButton).toBeVisible()
+    })
+
+    test('should have a signup option', async ({ page }) => {
+        const signupButton = page.getByRole('button', { name: /create your pulse/i })
+        await expect(signupButton).toBeVisible()
+    })
+})
+
+test.describe('Login Page – Email Form', () => {
+    test.beforeEach(async ({ page }) => {
+        await page.goto('/login')
+        // Navigate to email login view
+        const emailButton = page.getByRole('button', { name: /sign in with email/i })
+        await emailButton.click()
     })
 
     test('should have email and password inputs', async ({ page }) => {
@@ -27,29 +54,15 @@ test.describe('Login Page', () => {
         await expect(page.getByLabel(/password/i)).toBeVisible()
     })
 
-    test('should have OAuth provider buttons', async ({ page }) => {
-        // Look for Google/Apple sign-in options
-        const googleButton = page.getByRole('button', { name: /google/i })
-        const appleButton = page.getByRole('button', { name: /apple/i })
-
-        // At least one OAuth option should be present
-        const hasOAuth = (await googleButton.count()) > 0 || (await appleButton.count()) > 0
-        expect(hasOAuth).toBeTruthy()
-    })
-
-    test('should have a guest/demo mode option', async ({ page }) => {
-        // Look for guest mode or demo button
-        const guestButton = page.getByRole('button', { name: /demo|guest|try/i })
-        await expect(guestButton).toBeVisible()
+    test('should have a sign-in submit button', async ({ page }) => {
+        await expect(page.getByRole('button', { name: /sign in/i })).toBeVisible()
     })
 
     test('should show validation errors for empty form', async ({ page }) => {
-        // Click submit without filling in fields
-        const submitButton = page.getByRole('button', { name: /sign in|log in/i })
+        const submitButton = page.getByRole('button', { name: /sign in/i })
         await submitButton.click()
 
-        // Should show validation message (either HTML5 or custom)
-        // Check that form wasn't submitted (still on login page)
+        // Should stay on login page due to HTML5 required validation
         await expect(page).toHaveURL(/login/)
     })
 
@@ -60,19 +73,20 @@ test.describe('Login Page', () => {
         await emailInput.fill('not-an-email')
         await passwordInput.fill('Password123!')
 
-        const submitButton = page.getByRole('button', { name: /sign in|log in/i })
+        const submitButton = page.getByRole('button', { name: /sign in/i })
         await submitButton.click()
 
         // Should stay on login page due to validation
         await expect(page).toHaveURL(/login/)
     })
 
-    test('should navigate to signup page', async ({ page }) => {
-        const signupLink = page.getByRole('link', { name: /sign up|register|create account/i })
-
-        if ((await signupLink.count()) > 0) {
-            await signupLink.click()
-            await expect(page).toHaveURL(/signup|register/)
+    test('should navigate back to initial view', async ({ page }) => {
+        // Click the back button (ChevronLeft)
+        const backButton = page.locator('button').filter({ has: page.locator('svg.lucide-chevron-left') })
+        if ((await backButton.count()) > 0) {
+            await backButton.click()
+            // Should be back on initial view with Google button visible
+            await expect(page.getByRole('button', { name: /google/i })).toBeVisible()
         }
     })
 })
@@ -81,10 +95,10 @@ test.describe('Guest Mode', () => {
     test('should allow entering guest/demo mode', async ({ page }) => {
         await page.goto('/login')
 
-        const guestButton = page.getByRole('button', { name: /demo|guest|try/i })
+        const guestButton = page.getByRole('button', { name: /guest/i })
         await guestButton.click()
 
-        // Should redirect to dashboard or home
+        // Should redirect to dashboard or onboarding
         await page.waitForURL(/\/$|\/dashboard|\/workout|\/onboarding/, { timeout: 10000 })
 
         // Should have guest mode cookie set
@@ -96,7 +110,7 @@ test.describe('Guest Mode', () => {
     test('should show demo data in guest mode', async ({ page }) => {
         await page.goto('/login')
 
-        const guestButton = page.getByRole('button', { name: /demo|guest|try/i })
+        const guestButton = page.getByRole('button', { name: /guest/i })
         await guestButton.click()
 
         await page.waitForURL(/\/$|\/dashboard|\/workout|\/onboarding/, { timeout: 10000 })
@@ -108,28 +122,20 @@ test.describe('Guest Mode', () => {
 
 test.describe('Protected Route Redirect', () => {
     test('should redirect unauthenticated users from dashboard to login', async ({ page }) => {
-        // Clear any existing cookies
         await page.context().clearCookies()
-
         await page.goto('/dashboard')
-
-        // Should be redirected to login
         await expect(page).toHaveURL(/login/)
     })
 
     test('should redirect unauthenticated users from workout to login', async ({ page }) => {
         await page.context().clearCookies()
-
         await page.goto('/workout')
-
         await expect(page).toHaveURL(/login/)
     })
 
     test('should redirect unauthenticated users from profile to login', async ({ page }) => {
         await page.context().clearCookies()
-
         await page.goto('/profile')
-
         await expect(page).toHaveURL(/login/)
     })
 })
