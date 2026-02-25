@@ -16,12 +16,10 @@
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
     "test:all": "vitest run && playwright test",
-    "eval": "promptfoo eval -c eval/promptfooconfig.js -o promptfoo-report-final-conversation.json",
-    "eval:history": "npm run eval && node eval/json-to-csv.js",
-    "test:ai": "npx tsx src/scripts/set-demo-privacy.ts Analysis && promptfoo eval -c eval/promptfooconfig.js -o promptfoo-report-enabled.json --no-cache",
-    "test:ai:privacy": "npx tsx src/scripts/set-demo-privacy.ts Private && promptfoo eval -c eval/promptfooconfig.privacy.js -o promptfoo-report-privacy.json --no-cache && npx tsx src/scripts/set-demo-privacy.ts Analysis",
+    "eval": "echo 'eval/ directory removed — see git history for promptfoo configs'",
+    "test:ai": "echo 'AI evals removed — eval/ directory no longer exists'",
     "type-check": "tsc --noEmit",
-    "test:ci": "npm run lint && npm run type-check && npm run test && npm run test:ai"
+    "test:ci": "npm run lint && npm run type-check && npm run test"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.12",

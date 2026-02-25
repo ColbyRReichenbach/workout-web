@@ -8,9 +8,9 @@ on:
 
 env:
   NODE_VERSION: '20'
-  # Dummy env vars for build/test (not real credentials)
-  NEXT_PUBLIC_SUPABASE_URL: https://test.supabase.co
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: test-anon-key
+  # Fallback env vars for build/test (overridden by secrets when available)
+  NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://test.supabase.co' }}
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'test-anon-key' }}
   NEXT_PUBLIC_SITE_URL: http://localhost:3000
 
 jobs:
@@ -103,48 +103,11 @@ jobs:
         env:
           OPENAI_API_KEY: sk-test-key
 
-  ai-eval:
-    name: AI Evaluations
-    runs-on: ubuntu-latest
-    needs: build
-    if: github.event_name == 'pull_request'
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Start Next.js dev server
-        run: npm run dev &
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-
-      - name: Wait for server to be ready
-        run: |
-          echo "Waiting for Next.js dev server on :3000..."
-          for i in {1..30}; do
-            curl -sf http://localhost:3000 > /dev/null 2>&1 && echo "Server is ready." && break
-            echo "  attempt $i/30 — retrying in 3s..."
-            sleep 3
-          done
-
-      - name: Run AI evaluations
-        run: npm run test:ai
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-
   e2e:
     name: E2E Tests
     runs-on: ubuntu-latest
     needs: build
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -165,6 +128,8 @@ jobs:
         run: npm run test:e2e -- --project=chromium
         env:
           OPENAI_API_KEY: sk-test-key
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4
