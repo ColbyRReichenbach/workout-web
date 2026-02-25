@@ -27,9 +27,10 @@
    - [Guardrail Pipeline (6 Layers)](#52-guardrail-pipeline--6-layers)
    - [Tool Sandboxing & PII Scrubbing](#53-tool-sandboxing--pii-scrubbing)
    - [Token Budget Management](#54-token-budget-management)
-6. [Backend API Security](#6-backend-api-security)
-7. [Infrastructure & Observability](#7-infrastructure--observability)
-8. [Testing Strategy](#8-testing-strategy)
+6. [Human-in-the-Loop Monitoring](#6-human-in-the-loop-monitoring)
+7. [Backend API Security](#7-backend-api-security)
+8. [Infrastructure & Observability](#8-infrastructure--observability)
+9. [Testing Strategy](#9-testing-strategy)
 
 ---
 
@@ -105,14 +106,7 @@ This means the same program data outputs different targets for every user based 
 
 ### Analytics Dashboard
 
-The analytics page (`src/app/(dashboard)/analytics/`) renders multiple data visualizations built with vanilla SVG and CSS:
-
-| Chart | Data Source | What It Shows |
-| :--- | :--- | :--- |
-| **Adherence Ring** | `logs` table | Weekly workout completion rate as an animated SVG ring |
-| **Lift Progression** | `logs` + `pr_history` | Volume-load trend over time with bezier curve smoothing |
-| **Benchmarks Panel** | `profiles` | Current PRs for all tracked exercises |
-| **Cardio Summary** | `logs` (cardio segments) | Distance and pace history |
+The analytics page (`src/app/(dashboard)/analytics/`) renders multiple data visualizations.
 
 All chart data is fetched via Server Actions in `actions.ts`, which enforce the authenticated user context before querying.
 
@@ -365,7 +359,77 @@ Context that exceeds the budget is truncated at token boundaries (not character 
 
 ---
 
-## 6. Backend API Security
+## 6. Human-in-the-Loop Monitoring
+
+### Admin Diagnostic Terminal
+
+A private admin dashboard at `/admin/ai-coach` provides real-time visibility into ECHO-P1's behavior. Access is gated at both the client and API level — non-admin users are immediately redirected.
+
+**Dashboard Panels:**
+
+| Panel | What It Shows |
+| :--- | :--- |
+| **User Sentiment** | Thumbs up/down satisfaction rate across all interactions |
+| **Failure Audit Console** | Expandable log of every negatively-rated response, showing the user message, AI response, detected intent, tools used, and latency |
+| **Cognitive Integrity Heatmap** | Per-intent success rate (INJURY / PROGRESS / LOGISTICS / GENERAL) with visual pass/fail bars |
+| **Cost & Token Tracking** | Total tokens consumed, estimated API cost in USD, and per-request averages |
+| **Tactical Tool Load** | Which tools are called most frequently |
+| **Normalization Engine** | Live log of exercise typo corrections (e.g., `"benchpress"` → `BENCH PRESS`) |
+| **Power Users** | Top users by request volume, shown as truncated UUIDs only |
+
+**Privacy design of the admin view:** Users are identified only by the first 8 characters of their UUID — no names, emails, or other identifiers are exposed in the dashboard. The user messages and AI responses shown in the Failure Audit Console are retrieved directly from the `ai_logs` table, which stores only truncated content (capped at 1,000 characters).
+
+### AI Interaction Telemetry (`ai_logs`)
+
+Every chat request — successful or blocked — is logged to a `ai_logs` Supabase table. The schema captures:
+
+```typescript
+{
+  user_id: string,            // Supabase auth UUID (RLS-protected)
+  message_id: string,         // Unique request identifier
+  model_id: string,           // e.g., 'gpt-4o-mini'
+  prompt_tokens: number,
+  completion_tokens: number,
+  total_tokens: number,
+  estimated_cost_usd: number, // Calculated from OpenAI pricing table
+  latency_ms: number,
+  intent: string,             // INJURY | PROGRESS | LOGISTICS | GENERAL | GUARDRAIL
+  tools_used: string[],       // Names of tools called
+  user_message: string,       // Truncated to 1,000 chars
+  ai_response: string,        // Truncated to 1,000 chars
+  status: 'success' | 'refusal',
+  metadata: object            // Tool result summaries
+}
+```
+
+This table is RLS-protected — users cannot query other users' logs, and the admin API route validates the `is_admin` flag from the user's profile before returning any aggregate data.
+
+### Sentry Integration
+
+Sentry is used for two distinct purposes in the AI pipeline:
+
+**1. Output filter alerts:** When the post-generation output validator detects a `critical` or `high` severity issue (credentials, PII, system prompt leakage), Sentry is immediately notified:
+
+```typescript
+Sentry.captureMessage(`[Output Filter] ${severity.toUpperCase()} severity issue detected`, {
+  level: severity === 'critical' ? 'error' : 'warning',
+  tags: { 'output_filter.severity': severity },
+  extra: {
+    issues: [...],      // Issue types only — no sensitive match content logged
+    userId,
+    responseLength,
+    responsePreview: text.substring(0, 100),  // First 100 chars only
+  },
+});
+```
+
+Notably, the actual sensitive match (e.g., the detected credential string) is **never sent to Sentry** — only the issue type, severity, and a safe preview. This prevents secrets from leaking into the error tracking system.
+
+**2. Exception capture:** All unhandled errors in the chat route are caught and forwarded to Sentry for debugging, with internal details withheld from API responses.
+
+---
+
+## 7. Backend API Security
 
 ### Middleware Layer
 
@@ -418,7 +482,7 @@ Production errors are captured by Sentry with automatic PII masking. Internal st
 
 ---
 
-## 7. Infrastructure & Observability
+## 8. Infrastructure & Observability
 
 | Concern | Solution |
 | :--- | :--- |
@@ -431,7 +495,7 @@ Production errors are captured by Sentry with automatic PII masking. Internal st
 
 ---
 
-## 8. Testing Strategy
+## 9. Testing Strategy
 
 ### Unit Tests (Vitest)
 
