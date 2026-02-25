@@ -13,7 +13,14 @@
 [![Vercel](https://img.shields.io/badge/Vercel-Deployed-black?logo=vercel&logoColor=white)](https://vercel.com/)
 [![License](https://img.shields.io/badge/License-Proprietary-red)](#license)
 
-**[Live App](https://pulse-workout.vercel.app/)** · **[Portfolio](https://colbyrreichenbach.github.io/)** · **[LinkedIn](https://www.linkedin.com/in/colby-reichenbach/)**
+## About
+
+Built by **Colby Reichenbach**
+
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-Connect-0077B5?style=flat-square&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/colby-reichenbach/)
+[![Portfolio](https://img.shields.io/badge/Portfolio-Visit-000000?style=flat-square&logo=githubpages&logoColor=white)](https://colbyrreichenbach.github.io/)
+[![GitHub](https://img.shields.io/badge/GitHub-Follow-181717?style=flat-square&logo=github&logoColor=white)](https://github.com/ColbyRReichenbach)
+[![Live App](https://img.shields.io/badge/Pulse%20-%20Live%20App?style=for-the-badge&label=Pulse&color=ef4444)](https://pulse-workout.vercel.app/)
 
 </div>
 
