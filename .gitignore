@@ -214,6 +214,20 @@ docs/SUPABASE_MIGRATION_GUIDE.md
 docs/BRANCH_PROTECTION.md
 docs/database-indexes.sql
 
+# Docker (app deploys to Vercel — Docker is unused)
+Dockerfile
+.dockerignore
+
+# Promptfoo eval runtime/config (internal AI eval infra)
+eval/promptfooconfig.js
+eval/promptfooconfig.privacy.js
+eval/promptfoo-chat-provider.js
+eval/promptfoo-transform.js
+eval/json-to-csv.js
+
+# Supabase CLI local state
+supabase/.branches/
+
 
 # ============================================================================
 # 🗃️ DATABASE SEED & MIGRATION SCRIPTS (Local only)

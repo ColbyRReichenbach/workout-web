@@ -106,9 +106,18 @@ This means the same program data outputs different targets for every user based 
 
 ### Analytics Dashboard
 
-The analytics page (`src/app/(dashboard)/analytics/`) renders multiple data visualizations.
+The analytics page (`src/app/(dashboard)/analytics/`) renders six data visualization components, all defined in `src/components/AnalyticsCharts.tsx`:
 
-All chart data is fetched via Server Actions in `actions.ts`, which enforce the authenticated user context before querying.
+| Component | What It Shows |
+| :--- | :--- |
+| `PremiumAreaChart` | Lift volume-load trends over time (one per major exercise) |
+| `ProgressionBarChart` | Set volume and intensity distribution by week |
+| `StructuralHeatmap` | Workout adherence grid with daily readiness overlay |
+| `PRProximityChart` | How close current working weights are to all-time PRs |
+| `RecoveryIndexChart` | HRV and resting heart rate trends |
+| `PRHistory` | Full chronological personal record log |
+
+All chart data is fetched via a single `getAnalyticsData()` Server Action, which enforces the authenticated user context before querying and assembles lift logs, cardio logs, biometrics, and PR history into a single typed response.
 
 ### UI Tech Stack
 - **Vanilla CSS** — custom CSS variables, responsive grid layouts, no framework overhead

@@ -51,9 +51,11 @@ An always-on fitness coach powered by GPT-4o-mini. It knows your workout history
 ### Analytics Dashboard
 Centralized visualization of performance data across lifting and conditioning.
 
-- **Lift Progression** — Area and bar charts tracking volume-load and estimated 1RM trends over time
-- **PR Proximity** — Visual indicator of how close current lifts are to personal records
-- **Recovery Index** — Charts tracking HRV, resting heart rate, and sleep quality trends
+- **Lift Trend Charts** — Area charts tracking volume-load week over week across major lifts
+- **Progression Bars** — Bar chart view of set volume and intensity distribution
+- **PR Proximity** — How close current working weights are to all-time personal records
+- **Adherence Heatmap** — Week-by-week workout completion grid with readiness overlay
+- **Recovery Index** — HRV and resting heart rate trends over time
 - **PR History** — Full log of every personal record with date and performance context
 
 ### Multi-Tenant Architecture
