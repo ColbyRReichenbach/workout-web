@@ -13,7 +13,7 @@
 [![Vercel](https://img.shields.io/badge/Vercel-Deployed-black?logo=vercel&logoColor=white)](https://vercel.com/)
 [![License](https://img.shields.io/badge/License-Proprietary-red)](#license)
 
-Built by **Colby Reichenbach**
+by **Colby Reichenbach**
 
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-Connect-0077B5?style=flat-square&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/colby-reichenbach/)
 [![Portfolio](https://img.shields.io/badge/Portfolio%20-%20Check%20Out%20My%20Work?style=flat-square&label=Check%20Out%20My%20Work&color=4B9CD3)](https://colbyrreichenbach.github.io/)
