@@ -42,10 +42,10 @@ Pulse tracks a 52-week periodized training program I designed — covering stren
 - **Auto-Advancing Weeks** — The dashboard automatically tracks which week of the program you're on based on your start date
 
 ### AI Coach — ECHO-P1
-An always-on fitness coach powered by GPT-4o-mini. It knows your workout history, understands your current training phase, and answers questions in context — without drifting outside its lane.
+An always-on fitness coach powered by GPT-4o-mini. When data access is granted in settings, it will know your workout history, understands your current training phase, and answers questions in context — without drifting outside its lane.
 
 - **Intent-Aware Responses** — Classifies questions as injury, logistics, progress, or general and loads the right context
-- **Full History Access** — Can look up PRs, recent logs, recovery metrics, and compliance trends on demand
+- **Full History Access (Data Access Required)** — Can look up PRs, recent logs, recovery metrics, and compliance trends on demand
 - **Hardened Safety Guardrails** — Built with 6 layers of protection. See [TECHNICAL.md](./TECHNICAL.md) for the full breakdown.
 
 ### Analytics Dashboard
