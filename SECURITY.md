@@ -66,4 +66,10 @@ npx promptfoo eval
 | Version | Date | Security Updates |
 | :--- | :--- | :--- |
 | 1.0.0 | 2026-01-18 | Initial security implementation |
-| 1.1.0 | 2026-01-28 | Production hardening: Redis rate limiting, Sentry, Privacy Layer, and Immutable Auditing |
+| 1.1.0 | 2026-01-28 | Production hardening: Redis rate limiting, Sentry integration, Privacy Layer, and Immutable Auditing |
+| 1.2.0 | 2026-02-25 | AI safety enhancements: 6-layer guardrail pipeline, semantic intent classifier, Levenshtein fuzzy matching for keyword bypass prevention, output validation with PII/credential detection |
+
+---
+
+For a detailed breakdown of the AI guardrail architecture, including all 6 safety layers, tool sandboxing, and PII scrubbing, see [TECHNICAL.md](./TECHNICAL.md).
+

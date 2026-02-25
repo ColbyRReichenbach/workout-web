@@ -175,10 +175,23 @@ temp/
 
 
 # ============================================================================
-# 📊 INTERNAL DOCUMENTATION (Keep routine_master_plan.md!)
+# 📊 INTERNAL DOCUMENTATION (Local Only — Do Not Commit)
 # ============================================================================
 
-# Development-only docs (not needed in production)
+# Internal data audit (contains real log UUIDs from database)
+docs/DATA_AUDIT_REPORT.md
+
+# Internal dev notes (describes historical gaps, now outdated)
+docs/PRODUCTION_READINESS_AUDIT.md
+
+# Internal architecture changelogs (dev-facing only)
+docs/PULSE_V2_CHANGELOG.md
+docs/pulse-v3.md
+
+# Personal training plan (contains personal fitness data)
+docs/routine_master_plan.md
+
+# Development-only docs (legacy, not needed publicly)
 docs/analytics_implementation.md
 docs/how_to.md
 docs/implementation_plan.md
@@ -190,7 +203,10 @@ docs/visual_technical_strategy.md
 docs/workflow_c_ai_coach.md
 docs/pre-deployment.md
 
-# DO NOT ignore routine_master_plan.md - it's needed for the AI coach!
+# Internal root-level dev scratch files
+pr_logic.md
+consolidated_pulse.txt
+test.txt
 
 
 # ============================================================================
@@ -259,8 +275,9 @@ local.properties
 # ============================================================================
 promptfoo-report.json
 promptfoo-report-final-conversation.json
+promptfoo-report-enabled.json
+promptfoo-report-privacy.json
 eval-history/
-# Removed root IMPLEMENTATION_PLAN.md (moved to docs/)
 
 # ============================================================================
 # END OF GITIGNORE
