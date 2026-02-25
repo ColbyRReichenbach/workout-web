@@ -13,7 +13,7 @@
 [![Vercel](https://img.shields.io/badge/Vercel-Deployed-black?logo=vercel&logoColor=white)](https://vercel.com/)
 [![License](https://img.shields.io/badge/License-Proprietary-red)](#license)
 
-**[Live App](#)** · **[Portfolio](#)** · **[LinkedIn](https://www.linkedin.com/in/colby-reichenbach/)**
+**[Live App](https://pulse-workout.vercel.app/)** · **[Portfolio](https://colbyrreichenbach.github.io/)** · **[LinkedIn](https://www.linkedin.com/in/colby-reichenbach/)**
 
 </div>
 
