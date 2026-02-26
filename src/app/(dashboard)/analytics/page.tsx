@@ -15,6 +15,7 @@ import { PRHistory } from "@/components/PRHistory";
 import { SleepAnalysisModal } from "@/components/SleepAnalysisModal";
 import { useSettings } from "@/context/SettingsContext";
 import { getUnitLabel, mapExerciseToBaseline } from "@/lib/conversions";
+import { calculateAbsoluteWeek, getPhaseForWeek } from "@/lib/dateUtils";
 
 
 // BASELINE MAXES (from Master Plan) - DEPRECATED (Using Profile now)
@@ -143,7 +144,13 @@ export default function AnalyticsPage() {
             const raw = await getAnalyticsData();
             if (!raw) return;
 
-            const profileWeek = raw.profile.currentWeek;
+            let profileWeek = raw.profile.currentWeek;
+            let profilePhase = raw.profile.currentPhase;
+
+            if (raw.profile.program_start_date) {
+                profileWeek = calculateAbsoluteWeek(raw.profile.program_start_date);
+                profilePhase = getPhaseForWeek(profileWeek);
+            }
 
             const TOTAL_WEEKS = 52;
             let ANCHOR_DATE = new Date();
@@ -630,7 +637,7 @@ export default function AnalyticsPage() {
                 systemStress,
                 cnsIntensity,
                 prs: prMap,
-                currentPhase: raw.profile.currentPhase,
+                currentPhase: profilePhase,
                 currentWeek: profileWeek,
                 readinessHistory: raw.readinessData.map(r => r.readiness_score || 0),
                 activityHeatmap: activeDays,
