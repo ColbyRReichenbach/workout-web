@@ -4,7 +4,7 @@
 
 ### A personal hybrid athlete training platform — built because I was tired of paywalls.
 
-[![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)](https://nextjs.org/)
+[![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js&logoColor=white)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-3FCF8E?logo=supabase&logoColor=white)](https://supabase.com/)
 [![OpenAI](https://img.shields.io/badge/OpenAI-GPT--4o--mini-412991?logo=openai&logoColor=white)](https://openai.com/)
@@ -54,13 +54,13 @@ An always-on fitness coach powered by GPT-4o-mini. When data access is granted i
 - **Hardened Safety Guardrails** — Built with 6 layers of protection. See [TECHNICAL.md](./TECHNICAL.md) for the full breakdown.
 
 ### Analytics Dashboard
-Centralized visualization of performance data across lifting and conditioning.
+Centralized visualization of performance data across all five training phases, driven by real logged data.
 
-- **Lift Trend Charts** — Area charts tracking volume-load week over week across major lifts
-- **Progression Bars** — Bar chart view of set volume and intensity distribution
-- **PR Proximity** — How close current working weights are to all-time personal records
-- **Adherence Heatmap** — Week-by-week workout completion grid with readiness overlay
-- **Recovery Index** — HRV and resting heart rate trends over time
+- **Phase-Adaptive Charts** — Primary chart changes per phase: Lift Load Progression (Phase 1), CNS Intensity (Phase 2), Power Density Index (Phase 3), Peak Singles (Phase 4), 52-Week Strength Arc (Phase 5)
+- **Cardiovascular Signal** — Zone 2/Zone 1/MetCon HR trend charts derived from actual cardio logs
+- **Structural Integrity Heatmap** — Workout adherence grid with daily readiness overlay
+- **1RM PR Scoreboard** — Phase 5 scoreboard shows tested 1RM results vs onboarding baselines with percentage improvement
+- **Intelligence Brief** — Phase-specific summary stats computed live from log history (tonnage, intensity %, peak singles, season totals)
 - **PR History** — Full log of every personal record with date and performance context
 
 ### Multi-Tenant Architecture
@@ -118,7 +118,8 @@ The current intent classifier uses a GPT-4o-mini call to determine whether a mes
 | :--- | :--- | :--- |
 | 1.0.0 | 2026-01-18 | Initial release — workout logging, dashboard, AI coach |
 | 1.1.0 | 2026-01-28 | Redis rate limiting, Sentry integration, privacy controls |
-| 1.2.0 | 2026-02-25 | Analytics dashboard, Google OAuth, auto-advancing program weeks |
+| 1.2.0 | 2026-02-25 | Analytics dashboard v1, Google OAuth, auto-advancing program weeks |
+| 1.3.0 | 2026-02-26 | Analytics rehaul — 5-phase real-data charts, distance stat card, midnight streak bug fix |
 
 ---
 

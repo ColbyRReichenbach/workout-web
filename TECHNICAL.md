@@ -106,18 +106,28 @@ This means the same program data outputs different targets for every user based 
 
 ### Analytics Dashboard
 
-The analytics page (`src/app/(dashboard)/analytics/`) renders six data visualization components, all defined in `src/components/AnalyticsCharts.tsx`:
+The analytics page (`src/app/(dashboard)/analytics/`) is phase-adaptive — every chart, stat tile, and secondary panel changes based on the user's current training phase. All data is computed from real logged entries in the `logs` table, never gap-filled.
 
-| Component | What It Shows |
+**Primary chart components (all in `src/components/AnalyticsCharts.tsx`):**
+
+| Component | Primary Use Case |
 | :--- | :--- |
-| `PremiumAreaChart` | Lift volume-load trends over time (one per major exercise) |
-| `ProgressionBarChart` | Set volume and intensity distribution by week |
-| `StructuralHeatmap` | Workout adherence grid with daily readiness overlay |
-| `PRProximityChart` | How close current working weights are to all-time PRs |
-| `RecoveryIndexChart` | HRV and resting heart rate trends |
-| `PRHistory` | Full chronological personal record log |
+| `PremiumAreaChart` | Phase-adaptive dual-line charts (lift progression, HR trends, strength arc) |
+| `StructuralHeatmap` | Activity and readiness heatmap grid (Phase 1 secondary panel) |
+| `PRProximityChart` | Working weight vs PR proximity (Phase 3 secondary panel) |
 
-All chart data is fetched via a single `getAnalyticsData()` Server Action, which enforces the authenticated user context before querying and assembles lift logs, cardio logs, biometrics, and PR history into a single typed response.
+**Phase-specific data arrays computed at fetch time** from `logs.performance_data`:
+
+| Phase | Primary Chart | Cardio Section | Secondary Panel |
+| :--- | :--- | :--- | :--- |
+| 1 — Foundation | Lift Load Progression (squat/bench avg) | Zone 2 HR + distance | Structural heatmap |
+| 2 — Intensity | CNS Intensity (%1RM) | MetCon HR trend | Threshold stability stats |
+| 3 — Peak Power | Power Density Index | Zone 2 HR | PR Proximity |
+| 4 — Taper | Peak Singles (squat/deadlift max) | Zone 1 HR monitor | Taper compliance stats |
+| 5 — Mastery | 52-Week Strength Arc | Aerobic Baseline (season) | 1RM Scoreboard vs baselines |
+
+All chart data is fetched via a single `getAnalyticsData()` Server Action (`src/app/(dashboard)/analytics/actions.ts`), which enforces the authenticated user context before querying and assembles lift logs, cardio logs, biometrics, and PR history into a single typed response.
+
 
 ### UI Tech Stack
 - **Vanilla CSS** — custom CSS variables, responsive grid layouts, no framework overhead
