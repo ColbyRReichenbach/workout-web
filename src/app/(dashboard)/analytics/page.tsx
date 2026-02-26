@@ -1070,29 +1070,7 @@ export default function AnalyticsPage() {
                                     />
                                 </div>
 
-                                <div className="space-y-8">
-                                    <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest border-b border-border pb-4">Baseline Maxes</h3>
-                                    <div className="space-y-6">
-                                        {Object.entries(data.runningMaxes).map(([name, val]) => (
-                                            <div key={name} className="group cursor-pointer hover:bg-muted/10 p-3 -mx-3 rounded-xl transition-colors">
-                                                <div className="flex justify-between items-baseline mb-1">
-                                                    <span className="font-serif text-lg text-foreground group-hover:text-primary transition-colors">{name}</span>
-                                                    <span className="text-xl font-bold font-sans">
-                                                        {name.toLowerCase().includes("pace") || name.toLowerCase().includes("time") || name.toLowerCase().includes("row")
-                                                            ? (typeof val === 'number' ? new Date(val * 1000).toISOString().substr(14, 5) : val)
-                                                            : val}
-                                                        <span className="text-[10px] text-muted-foreground ml-1 font-normal uppercase">
-                                                            {name.includes("Watts") ? 'w' : (name.includes("Pace") || name.includes("Time") ? '' : 'lbs')}
-                                                        </span>
-                                                    </span>
-                                                </div>
-                                                <div className="w-full bg-muted h-1 rounded-full overflow-hidden">
-                                                    <div className="h-full bg-primary/20 w-3/4 group-hover:bg-primary transition-colors" />
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
+
                             </div>
 
                             <aside className="lg:col-span-1 space-y-8 h-fit">

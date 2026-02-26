@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import dynamic from "next/dynamic";
 import {
   Activity, Calendar, Flame, CalendarDays,
-  ArrowRight, Scale, ChevronLeft, ChevronRight,
+  ArrowRight, Footprints, ChevronLeft, ChevronRight,
   ChevronDown
 } from "lucide-react";
 import { DayCard, DayDetailModal } from "@/components/WeeklySchedule";
@@ -267,7 +267,7 @@ export default function Home() {
   };
 
   // Calculate real stats
-  const { streak, totalVolume } = useMemo(() => {
+  const { streak, totalVolume, totalDistance } = useMemo(() => {
     const vol = allLogs.reduce((acc, log) => {
       const pd = log.performance_data || {};
       if (pd.sets && Array.isArray(pd.sets)) {
@@ -323,10 +323,21 @@ export default function Home() {
       }
     }
 
+    // Total cardio distance — sum distance from all CARDIO_BASIC and METCON logs
+    const distMiles = allLogs.reduce((acc, log) => {
+      const raw = log.performance_data?.distance;
+      if (!raw) return acc;
+      const num = parseFloat(String(raw));
+      if (isNaN(num)) return acc;
+      // If value looks like metres (>500), convert to miles; otherwise treat as miles
+      return acc + (num > 500 ? num / 1609.34 : num);
+    }, 0);
+
     return {
       streak: currentStreakCount,
       totalVolume: vol,
-      totalCompletion: completion
+      totalCompletion: completion,
+      totalDistance: distMiles
     };
   }, [allLogs, completedDays, userProfile]);
 
@@ -432,20 +443,23 @@ export default function Home() {
           },
           { icon: Flame, label: "Burn", value: totalVolume > 0 ? Math.round(totalVolume * 0.05) : "0", unit: "kcal", color: "text-amber-500", bg: "bg-amber-500/5", glow: "shadow-amber-500/10" },
           {
-            icon: Scale,
-            label: "Vitals",
-            value: "Sync",
-            unit: "Capture",
-            color: "text-primary",
-            bg: "bg-primary/5",
-            glow: "shadow-primary/10",
-            onClick: () => setBiometricsOpen(true)
+            icon: Footprints,
+            label: "Distance",
+            value: totalDistance > 0
+              ? (units === 'metric'
+                ? (totalDistance * 1.60934 > 100 ? `${(totalDistance * 1.60934).toFixed(0)}` : `${(totalDistance * 1.60934).toFixed(1)}`)
+                : (totalDistance > 100 ? `${totalDistance.toFixed(0)}` : `${totalDistance.toFixed(1)}`))
+              : "0",
+            unit: units === 'metric' ? "km" : "mi",
+            color: "text-sky-500",
+            bg: "bg-sky-500/5",
+            glow: "shadow-sky-500/10",
           },
         ].map((m, i) => (
           <TiltCard
             key={i}
             glowColor={m.glow}
-            onClick={m.onClick}
+            onClick={(m as { onClick?: () => void }).onClick}
             className="group rounded-[40px] p-8 cursor-pointer overflow-hidden"
           >
             {/* Background Icon Watermark */}
