@@ -460,7 +460,7 @@ export default function ProfilePage() {
 
             {/* Footer Inspiration */}
             <p className="text-center text-muted-foreground text-xs font-light mt-12 mb-8 lowercase tracking-[0.2em]">
-                Pulse Architecture v2.0 & bull; Private Athlete Terminal
+                Pulse Architecture & bull; Private Athlete Terminal
             </p>
         </div>
     );
