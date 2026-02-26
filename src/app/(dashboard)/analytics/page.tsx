@@ -198,7 +198,7 @@ export default function AnalyticsPage() {
             const DEADLIFT_SINGLE_NAMES = ['deadlift singles'];
             const ZONE1_NAMES = ['easy run', 'easy row', 'easy spin', 'zone 1 walk', 'zone 1 activity', 'continuous multi-modal'];
             const ZONE2_NAMES = ['zone 2 run', 'zone 2'];
-            const ONE_RM_NAMES = ['snatch 1rm', 'clean & jerk 1rm', 'deadlift 1rm', 'front squat 1rm', 'squat 1rm', 'bench 1rm', 'ohp 1rm'];
+            const ONE_RM_NAMES = ['snatch 1rm', 'clean & jerk 1rm', 'deadlift 1rm', 'front squat 1rm', 'back squat 1rm', 'bench press 1rm', 'ohp 1rm'];
 
 
             // 1. Seed historicalPRs with Profile Baselines (Weight)
