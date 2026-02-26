@@ -279,15 +279,20 @@ export default function Home() {
     const completion = Math.round((completedDays.size / 7) * 100);
 
     // Protocol-Based Streak (Chain Logic)
-    // Map logs to an absolute integer based on their diff from the start date
+    // Map logs to an absolute integer based on their diff from the start date.
+    // IMPORTANT: ISO date strings ("2026-02-25") parsed by new Date() are UTC midnight,
+    // which shifts to the previous local day in negative-offset timezones (e.g. EST -5).
+    // Parse as local dates by splitting the string to avoid streak resetting at midnight.
     const loggedAbsIndices = new Set(allLogs.map(l => {
       if (!l.date) return -1;
-      const logDate = new Date(l.date);
-      logDate.setHours(0, 0, 0, 0);
+      const [yr, mo, dy] = l.date.split('-').map(Number);
+      const logDate = new Date(yr, mo - 1, dy); // local midnight
 
       // Start date was calculated above, but we memoize this block so we recalculate
-      const pStartDate = userProfile?.program_start_date ? new Date(userProfile.program_start_date) : new Date();
-      pStartDate.setHours(0, 0, 0, 0);
+      const psRaw = userProfile?.program_start_date;
+      const pStartDate = psRaw
+        ? (() => { const [y, m, d] = psRaw.split('-').map(Number); return new Date(y, m - 1, d); })()
+        : new Date(new Date().setHours(0, 0, 0, 0));
 
       const msPerDay = 1000 * 60 * 60 * 24;
       const daysDiff = Math.floor((logDate.getTime() - pStartDate.getTime()) / msPerDay);
