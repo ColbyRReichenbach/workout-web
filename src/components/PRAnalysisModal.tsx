@@ -301,7 +301,7 @@ export function PRAnalysisModal({ isOpen, onClose, prs }: PRAnalysisModalProps) 
                         {/* Footer */}
                         <div className="p-8 border-t border-border bg-muted/10 text-center">
                             <p className="text-[10px] text-muted-foreground uppercase tracking-[0.5em] font-medium">
-                                Biological capacity verified via neural telemetry // Hall of Power v3.1
+                                Biological capacity verified via neural telemetry // Hall of Power
                             </p>
                         </div>
                     </motion.div>

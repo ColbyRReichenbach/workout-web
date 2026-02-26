@@ -120,6 +120,7 @@ The current intent classifier uses a GPT-4o-mini call to determine whether a mes
 | 1.1.0 | 2026-01-28 | Redis rate limiting, Sentry integration, privacy controls |
 | 1.2.0 | 2026-02-25 | Analytics dashboard v1, Google OAuth, auto-advancing program weeks |
 | 1.3.0 | 2026-02-26 | Analytics rehaul — 5-phase real-data charts, distance stat card, midnight streak bug fix |
+| 1.3.1 | 2026-02-26 | Hotfix — analytics charts now clip to user's current week instead of rendering all 52 weeks |
 
 ---
 

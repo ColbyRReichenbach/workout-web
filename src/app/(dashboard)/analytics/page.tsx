@@ -517,37 +517,40 @@ export default function AnalyticsPage() {
                 }
             });
 
-            // Format Arrays
-            const weeklyTonnage = Array.from({ length: TOTAL_WEEKS }, (_, i) => tonnageMap[i] || 0);
-            const efficiencyIndex = Array.from({ length: TOTAL_WEEKS }, (_, i) => efficiencyMap[i] || 0);
-            const systemStress = Array.from({ length: TOTAL_WEEKS }, (_, i) => stressMap[i] || 0);
-            const recoveryIndex = Array.from({ length: TOTAL_WEEKS }, (_, i) => {
+            // Chart week count: cap at user's current week so charts don't show empty future data
+            const CHART_WEEKS = Math.max(1, Math.min(profileWeek, TOTAL_WEEKS));
+
+            // Format Arrays (capped to CHART_WEEKS)
+            const weeklyTonnage = Array.from({ length: CHART_WEEKS }, (_, i) => tonnageMap[i] || 0);
+            const efficiencyIndex = Array.from({ length: CHART_WEEKS }, (_, i) => efficiencyMap[i] || 0);
+            const systemStress = Array.from({ length: CHART_WEEKS }, (_, i) => stressMap[i] || 0);
+            const recoveryIndex = Array.from({ length: CHART_WEEKS }, (_, i) => {
                 if (recMap[i] && recMap[i].count > 0) {
                     return Math.min(100, Math.max(0, recMap[i].sum / recMap[i].count));
                 }
                 return 0;
             });
-            const cnsIntensity = Array.from({ length: TOTAL_WEEKS }, (_, i) => {
+            const cnsIntensity = Array.from({ length: CHART_WEEKS }, (_, i) => {
                 if (intensityMap[i] && intensityMap[i].count > 0) {
                     return Math.min(100, intensityMap[i].sum / intensityMap[i].count);
                 }
                 return 0;
             });
 
-            // Gap filling and smoothing
-            for (let i = 1; i < TOTAL_WEEKS; i++) {
+            // Gap filling and smoothing (only up to CHART_WEEKS)
+            for (let i = 1; i < CHART_WEEKS; i++) {
                 if (efficiencyIndex[i] === 0) efficiencyIndex[i] = efficiencyIndex[i - 1] || 60;
                 if (cnsIntensity[i] === 0) cnsIntensity[i] = cnsIntensity[i - 1] || 75;
                 if (recoveryIndex[i] === 0) recoveryIndex[i] = recoveryIndex[i - 1] || 80;
             }
 
-            const powerDensity = Array.from({ length: TOTAL_WEEKS }, (_, i) =>
+            const powerDensity = Array.from({ length: CHART_WEEKS }, (_, i) =>
                 (powerMap[i] && powerMap[i].count > 0) ? (powerMap[i].sum / powerMap[i].count) : 0
             );
-            const readinessSurplus = Array.from({ length: TOTAL_WEEKS }, (_, i) =>
+            const readinessSurplus = Array.from({ length: CHART_WEEKS }, (_, i) =>
                 Math.max(-50, Math.min(50, (recoveryIndex[i] || 70) - (Math.min(100, systemStress[i] / 2) || 40)))
             );
-            const prMagnitude = Array.from({ length: TOTAL_WEEKS }, (_, i) => {
+            const prMagnitude = Array.from({ length: CHART_WEEKS }, (_, i) => {
                 const count = historicalPRs.filter(p => {
                     const d = new Date(p.created_at);
                     const diffTime = d.getTime() - ANCHOR_DATE.getTime();
@@ -557,37 +560,37 @@ export default function AnalyticsPage() {
                 return count * 10; // Scale for chart visibility
             });
 
-            for (let i = 1; i < TOTAL_WEEKS; i++) {
+            for (let i = 1; i < CHART_WEEKS; i++) {
                 if (powerDensity[i] === 0) powerDensity[i] = powerDensity[i - 1] || 25;
             }
 
-            // Derive final new arrays from new maps
-            const squatWeeklyAvg = Array.from({ length: TOTAL_WEEKS }, (_, i) =>
+            // Derive final new arrays from new maps (capped to CHART_WEEKS)
+            const squatWeeklyAvg = Array.from({ length: CHART_WEEKS }, (_, i) =>
                 squatMap[i]?.count > 0 ? squatMap[i].sum / squatMap[i].count : 0
             );
-            const benchWeeklyAvg = Array.from({ length: TOTAL_WEEKS }, (_, i) =>
+            const benchWeeklyAvg = Array.from({ length: CHART_WEEKS }, (_, i) =>
                 benchMap[i]?.count > 0 ? benchMap[i].sum / benchMap[i].count : 0
             );
-            const zone2HrWeekly = Array.from({ length: TOTAL_WEEKS }, (_, i) =>
+            const zone2HrWeekly = Array.from({ length: CHART_WEEKS }, (_, i) =>
                 zone2HrMap[i]?.count > 0 ? zone2HrMap[i].sum / zone2HrMap[i].count : 0
             );
-            const zone2DistWeekly = Array.from({ length: TOTAL_WEEKS }, (_, i) => zone2DistMap[i] || 0);
-            const metconHrWeekly = Array.from({ length: TOTAL_WEEKS }, (_, i) =>
+            const zone2DistWeekly = Array.from({ length: CHART_WEEKS }, (_, i) => zone2DistMap[i] || 0);
+            const metconHrWeekly = Array.from({ length: CHART_WEEKS }, (_, i) =>
                 metconHrMap[i]?.count > 0 ? metconHrMap[i].sum / metconHrMap[i].count : 0
             );
-            const singlesSquatPeak = Array.from({ length: TOTAL_WEEKS }, (_, i) => singlesSquatMap[i] || 0);
-            const singlesDeadliftPeak = Array.from({ length: TOTAL_WEEKS }, (_, i) => singlesDeadliftMap[i] || 0);
-            const zone1HrWeekly = Array.from({ length: TOTAL_WEEKS }, (_, i) =>
+            const singlesSquatPeak = Array.from({ length: CHART_WEEKS }, (_, i) => singlesSquatMap[i] || 0);
+            const singlesDeadliftPeak = Array.from({ length: CHART_WEEKS }, (_, i) => singlesDeadliftMap[i] || 0);
+            const zone1HrWeekly = Array.from({ length: CHART_WEEKS }, (_, i) =>
                 zone1HrMap[i]?.count > 0 ? zone1HrMap[i].sum / zone1HrMap[i].count : 0
             );
-            const weeklyCardioMin = Array.from({ length: TOTAL_WEEKS }, (_, i) => cardioMinMap[i] || 0);
-            const weeklySessionCount = Array.from({ length: TOTAL_WEEKS }, (_, i) => sessionCountMap[i] || 0);
-            const fullArcSquatPeak = Array.from({ length: TOTAL_WEEKS }, (_, i) => arcSquatMap[i] || 0);
-            const fullArcBenchPeak = Array.from({ length: TOTAL_WEEKS }, (_, i) => arcBenchMap[i] || 0);
+            const weeklyCardioMin = Array.from({ length: CHART_WEEKS }, (_, i) => cardioMinMap[i] || 0);
+            const weeklySessionCount = Array.from({ length: CHART_WEEKS }, (_, i) => sessionCountMap[i] || 0);
+            const fullArcSquatPeak = Array.from({ length: CHART_WEEKS }, (_, i) => arcSquatMap[i] || 0);
+            const fullArcBenchPeak = Array.from({ length: CHART_WEEKS }, (_, i) => arcBenchMap[i] || 0);
 
-            // Season totals
+            // Season totals (still use full distMap across all real data)
             const totalCardioDist = zone2DistWeekly.reduce((a, b) => a + b, 0) +
-                Array.from({ length: TOTAL_WEEKS }, (_, i) => distMap[i] || 0).reduce((a, b) => a + b, 0);
+                Array.from({ length: CHART_WEEKS }, (_, i) => distMap[i] || 0).reduce((a, b) => a + b, 0);
             const totalPRsSet = raw.prHistoryData?.length || 0;
 
             // 1RM scoreboard: logs where segment name contains '1RM'
@@ -632,8 +635,8 @@ export default function AnalyticsPage() {
                 readinessHistory: raw.readinessData.map(r => r.readiness_score || 0),
                 activityHeatmap: activeDays,
                 readinessHeatmap: readyDays,
-                weeklyCardioDist: Array.from({ length: TOTAL_WEEKS }, (_, i) => distMap[i] || 0),
-                aerobicVolume: Array.from({ length: TOTAL_WEEKS }, (_, i) => durationMap[i] || 0),
+                weeklyCardioDist: Array.from({ length: CHART_WEEKS }, (_, i) => distMap[i] || 0),
+                aerobicVolume: Array.from({ length: CHART_WEEKS }, (_, i) => durationMap[i] || 0),
                 powerDensity,
                 readinessSurplus,
                 prMagnitude,
