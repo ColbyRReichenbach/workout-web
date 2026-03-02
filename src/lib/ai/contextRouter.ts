@@ -200,7 +200,31 @@ export async function buildDynamicContext(
                 const today = (providedUserDay || new Date().toLocaleDateString('en-US', { weekday: 'long' })).toUpperCase();
 
                 let targetPhase = currentPhase;
-                if (currentPhase === 5) {
+
+                // --- DYNAMIC PHASE DERIVATION ---
+                // Override the static currentPhase passed from the database profile
+                // by manually calculating which phase holds the given absolute `currentWeek`
+                if (programData.phases) {
+                    let weekAccumulator = 0;
+                    let foundPhase = false;
+                    for (let i = 0; i < programData.phases.length; i++) {
+                        const phase = programData.phases[i];
+                        const weeksInPhase = phase.weeks?.length || 4; // fallback to 4
+                        if (currentWeek <= weekAccumulator + weeksInPhase) {
+                            targetPhase = phase.id || (i + 1);
+                            foundPhase = true;
+                            break;
+                        }
+                        weekAccumulator += weeksInPhase;
+                    }
+
+                    // If week is beyond all defined phases, clamp to the last phase
+                    if (!foundPhase && programData.phases.length > 0) {
+                        targetPhase = programData.phases[programData.phases.length - 1].id || programData.phases.length;
+                    }
+                }
+
+                if (targetPhase === 5) {
                     const TESTING_WEEKS = [37, 44, 51];
                     if (!TESTING_WEEKS.includes(currentWeek)) {
                         targetPhase = 1;

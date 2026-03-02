@@ -21,6 +21,7 @@ export const maxDuration = 30;
 
 import { checkRateLimit } from '@/lib/redis';
 import { getClientIp } from '@/lib/ip';
+import { calculateAbsoluteWeek } from '@/lib/dateUtils';
 
 // Use centralized rate limit configuration
 const RATE_LIMIT = RATE_LIMITS.CHAT;
@@ -1293,8 +1294,10 @@ export async function POST(req: Request) {
 
         const aiName = profile?.ai_name || 'ECHO-P1';
         const aiPersonality = profile?.ai_personality || 'Analytic';
+        const currentWeek = calculateAbsoluteWeek(profile?.program_start_date || new Date());
+
+        // current_phase will be recalculated correctly in ContextRouter based on exactly what currentWeek is
         const currentPhase = profile?.current_phase || 1;
-        const currentWeek = profile?.current_week || 1;
 
         // Detect Intent & Build Context
         let intent = detectIntent(sanitizedMessages as any[]);
