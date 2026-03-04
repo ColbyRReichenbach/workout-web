@@ -57,6 +57,8 @@ interface AnalyticsLog {
         time_min?: number;
     };
     segment_name: string;
+    segment_type?: string;
+    phase_id?: number;
 }
 
 interface ReadinessMetric {
@@ -493,7 +495,15 @@ export default function AnalyticsPage() {
                             }
 
                             // Weekly cardio minutes (Phase 4 taper compliance)
-                            if ((log.tracking_mode === 'CARDIO_BASIC' || log.tracking_mode === 'METCON') && dur > 0) {
+                            // Include ENDURANCE segment_type (e.g. long runs) even when
+                            // tracking_mode is null/legacy, since the actions query now
+                            // returns segment_type for every log.
+                            const isCardioLog =
+                                log.tracking_mode === 'CARDIO_BASIC' ||
+                                log.tracking_mode === 'METCON' ||
+                                log.segment_type === 'CARDIO' ||
+                                log.segment_type === 'ENDURANCE';
+                            if (isCardioLog && dur > 0) {
                                 cardioMinMap[weekIdx] = (cardioMinMap[weekIdx] || 0) + dur;
                             }
                         }

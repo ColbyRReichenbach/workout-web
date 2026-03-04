@@ -13,6 +13,7 @@ import { TiltCard } from "@/components/TiltCard";
 import { useSettings } from "@/context/SettingsContext";
 import { getUnitLabel, toDisplayWeight } from "@/lib/conversions";
 import { DEMO_USER_ID } from "@/lib/constants";
+import { updatePrMax } from "@/app/actions/user";
 
 
 import { calculateWorkingSet } from "@/lib/calculations/percentages";
@@ -298,8 +299,8 @@ export default function WorkoutPage() {
                 // Ideally we format time for celebration... but for now simple value
                 setPrCelebration({ show: true, value: displayVal, unit: unitLabel });
 
-                // 2. Update DB Profile
-                await supabase.from('profiles').update({ [type]: newValue }).eq('id', profile.id);
+                // 2. Update DB Profile (via server action — never direct client SDK)
+                await updatePrMax(type, newValue);
 
                 // 3. Update Local Profile State so calculation logic uses new max immediately
                 setProfile(prev => prev ? ({ ...prev, [type]: newValue }) : null);

@@ -236,10 +236,10 @@ supabase/.branches/
 # SQL seed data (large files, local development only)
 scripts/
 !src/scripts/
-supabase/migrations/
+supabase/migrations/*
 
-# Exception: Keep migration files if using supabase CLI
-# !supabase/migrations/*.sql
+# Track SQL migration files (Supabase CLI schema / RLS migrations)
+!supabase/migrations/*.sql
 
 
 # ============================================================================
