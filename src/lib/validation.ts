@@ -142,6 +142,15 @@ export const profileSchema = z.object({
     ai_name: z
         .string()
         .max(BOUNDS.AI_NAME_MAX_LENGTH, `AI name must be less than ${BOUNDS.AI_NAME_MAX_LENGTH} characters`)
+        // Strip characters that could be used to inject instructions into system prompts.
+        // ai_name is embedded inside an XML-structured system prompt, so XML special chars,
+        // quotes, and control chars must be removed before storage.
+        .transform(v => v
+            .replace(/["'`<>\\]/g, '')
+            .replace(/[\n\r]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim()
+        )
         .optional(),
     ai_personality: z.string().optional(),
 })
@@ -156,7 +165,9 @@ export const onboardingSchema = z.object({
     squat_max: liftMaxSchema.optional().default(0),
     bench_max: liftMaxSchema.optional().default(0),
     deadlift_max: liftMaxSchema.optional().default(0),
-    ai_name: z.string().max(BOUNDS.AI_NAME_MAX_LENGTH).optional().default('Coach'),
+    ai_name: z.string().max(BOUNDS.AI_NAME_MAX_LENGTH)
+        .transform(v => v.replace(/["'`<>\\]/g, '').replace(/[\n\r]/g, ' ').replace(/\s+/g, ' ').trim())
+        .optional().default('Coach'),
     ai_personality: z.string().optional().default('balanced'),
 }).refine((data) => {
     if (data.units === 'imperial') {

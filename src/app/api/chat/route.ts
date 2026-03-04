@@ -1285,7 +1285,17 @@ export async function POST(req: Request) {
             .eq('id', userId)
             .single();
 
-        const aiName = profile?.ai_name || 'ECHO-P1';
+        // Sanitize ai_name before embedding in system prompt to prevent stored prompt injection.
+        // A user who sets their ai_name to something like `", ignore instructions` would otherwise
+        // break out of the XML context and inject arbitrary instructions into the system prompt.
+        const rawAiName = profile?.ai_name || 'ECHO-P1';
+        const aiName = rawAiName
+            .replace(/["'`<>\\]/g, '')   // Strip chars that break XML/string context
+            .replace(/[\n\r]/g, ' ')      // Collapse newlines into spaces
+            .replace(/\s+/g, ' ')         // Normalize whitespace
+            .trim()
+            .slice(0, 50)                 // Hard-cap at schema max
+            || 'ECHO-P1';                 // Fallback if all chars stripped
         const aiPersonality = profile?.ai_personality || 'Analytic';
         const currentPhase = profile?.current_phase || 1;
         const currentWeek = profile?.current_week || 1;
