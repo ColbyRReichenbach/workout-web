@@ -476,13 +476,18 @@ export const getExercisePR = tool({
                 // format: exercise_name.ilike.%alias1%,exercise_name.ilike.%alias2%...
                 const filterString = aliases.map(a => `exercise_name.ilike.%${a}%`).join(',');
 
+                // Determine sort order: for time-based PRs lower is better; for all others higher is better.
+                // We detect time-based by checking if the exercise resolves to a time PR field.
+                const resolvedPrField = EXERCISE_TO_PR_FIELD[normalized];
+                const isTimeBased = resolvedPrField?.includes('sec') ?? false;
+
                 const { data: prHistory, error: prHistoryError } = await supabase
                     .from('pr_history')
-                    .select('date, value, exercise_name')
+                    .select('date, value, exercise_name, unit')
                     .eq('user_id', userId)
                     .or(filterString)
-                    .order('value', { ascending: false }) // Highest value first (true PR)
-                    .order('date', { ascending: false })  // Most recent if ties
+                    .order('value', { ascending: isTimeBased }) // Ascending = lowest (fastest) for time PRs; descending = heaviest for strength
+                    .order('date', { ascending: false })          // Most recent if values tie
                     .limit(1);
 
                 if (!prHistoryError && prHistory && prHistory.length > 0) {
@@ -507,9 +512,10 @@ export const getExercisePR = tool({
                             type = 'power';
                         }
 
-                        // Use existing helper to guess valid unit or type if needed, but pr_history usually stores 'lbs' for weight
-                        // If we needed unit, we could select it. Assuming lbs for now or from tool logic types.
-                        const { unit } = getPRType(type === 'weight' ? 'squat_max' : type === 'time' ? 'mile_time_sec' : 'bike_max_watts'); // Dummy field to get unit
+                        // Use the stored unit from pr_history if available; otherwise infer from type
+                        const storedUnit = record.unit as string | undefined;
+                        const { unit: inferredUnit } = getPRType(type === 'weight' ? 'squat_max' : type === 'time' ? 'mile_time_sec' : 'bike_max_watts');
+                        const unit = storedUnit || inferredUnit;
 
                         // Log analytics
                         logToolCall({
@@ -585,7 +591,8 @@ export const getExercisePR = tool({
                     .from('logs')
                     .select('date, segment_name, segment_type, performance_data')
                     .eq('user_id', userId)
-                    .order('date', { ascending: false }); // Newest first
+                    .order('date', { ascending: false }) // Newest first
+                    .limit(500);
 
                 if (candidateLogs && candidateLogs.length > 0) {
                     // Filter for logs that match the exercise AND the PR value
@@ -820,12 +827,12 @@ export const getCardioSummary = tool({
             date.setDate(date.getDate() - days);
             const dateStr = date.toISOString().split('T')[0];
 
-            // Fetch all CARDIO segment logs
+            // Fetch all CARDIO and ENDURANCE segment logs (long runs and rucks use ENDURANCE type)
             const { data: logs, error } = await supabase
                 .from('logs')
                 .select('date, segment_name, segment_type, performance_data')
                 .eq('user_id', userId)
-                .eq('segment_type', 'CARDIO')
+                .in('segment_type', ['CARDIO', 'ENDURANCE'])
                 .gte('date', dateStr)
                 .order('date', { ascending: false });
 

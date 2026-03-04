@@ -76,6 +76,15 @@ export default function Home() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [totalWeeks, setTotalWeeks] = useState(1);
   const [allProgramWeeks, setAllProgramWeeks] = useState<{ week: number; phase: number }[]>([]);
+  // The protocol-relative index (0–6) for today, based on days-since-start % 7.
+  // Stored in state so the render can use the same value computed inside useEffect
+  // instead of re-deriving it from JS day-of-week (which assumes Monday-start).
+  const [todayProtocolIndex, setTodayProtocolIndex] = useState<number>(() => {
+    const jsDay = new Date().getDay();
+    return jsDay === 0 ? 6 : jsDay - 1; // Monday-start fallback until useEffect runs
+  });
+  // The REAL current week (not the viewed week), so isToday can be correct even when browsing history
+  const [realCurrentWeek, setRealCurrentWeek] = useState(1);
 
   // Modal State
   const [selectedDay, setSelectedDay] = useState<ProtocolDay | null>(null);
@@ -131,6 +140,8 @@ export default function Home() {
       // Calculate the true absolute week and today index
       const absoluteCurrentWeek = calculateAbsoluteWeek(startDate, now);
       const todayIndex = daysSinceStart % 7;
+      setTodayProtocolIndex(todayIndex);
+      setRealCurrentWeek(absoluteCurrentWeek);
 
       // Determine Viewed Week
       let viewedWeek = absoluteCurrentWeek;
@@ -250,10 +261,8 @@ export default function Home() {
     fetchData();
   }, [router, targetWeekParam]);
 
-  // Determine today accurately
-  const jsDay = new Date().getDay();
-  const todayIndex = jsDay === 0 ? 6 : jsDay - 1;
-  const todayName = protocol[todayIndex]?.day || "Monday";
+  // Derive today's day name from the protocol-relative index (accounts for non-Monday starts)
+  const todayName = protocol[todayProtocolIndex]?.day || "Monday";
 
   const handleDayClick = (day: ProtocolDay) => {
     setSelectedDay(day);
@@ -303,8 +312,11 @@ export default function Home() {
     now.setHours(0, 0, 0, 0);
     const msPerDay = 1000 * 60 * 60 * 24;
 
-    const pStartDate = userProfile?.program_start_date ? new Date(userProfile.program_start_date) : new Date();
-    pStartDate.setHours(0, 0, 0, 0);
+    // Parse program_start_date as LOCAL midnight (same pattern as loggedAbsIndices above)
+    // to avoid the UTC-shift bug that causes off-by-one errors in negative-offset timezones.
+    const pStartDate = userProfile?.program_start_date
+      ? (() => { const [y, m, d] = userProfile.program_start_date.split('-').map(Number); return new Date(y, m - 1, d); })()
+      : new Date(now);
 
     const currentAbsIndex = Math.max(0, Math.floor((now.getTime() - pStartDate.getTime()) / msPerDay));
 
@@ -321,10 +333,20 @@ export default function Home() {
     if (anchorIdx !== -1) {
       currentStreakCount = 1;
       let check = anchorIdx - 1;
-      // Streak breaks if ANY day in the protocol is missing
-      while (check >= 0 && loggedAbsIndices.has(check)) {
-        currentStreakCount++;
-        check--;
+      // Walk back through days. Skip rest days (day 6 of each 7-day cycle = Sunday)
+      // so a user is never penalized for not logging an intentional rest day.
+      while (check >= 0) {
+        const isRestDay = check % 7 === 6; // Day 6 of every week cycle = Sunday/rest
+        if (isRestDay) {
+          check--;
+          continue;
+        }
+        if (loggedAbsIndices.has(check)) {
+          currentStreakCount++;
+          check--;
+        } else {
+          break;
+        }
       }
     }
 
@@ -552,11 +574,9 @@ export default function Home() {
               <DayCard
                 key={day.day}
                 day={day}
-                isToday={todayName === day.day && (!window.location.search.includes('week') || currentWeek === (allLogs.length > 0 ? getHighestWeek(allLogs) : 1))}
-                // Quick hack: If URL has week param, don't show today unless it matches? 
-                // Better: Store 'realCurrentWeek' in state.
+                isToday={todayName === day.day && currentWeek === realCurrentWeek}
                 isDone={completedDays.has(day.day)}
-                isPast={i < todayIndex && !completedDays.has(day.day)}
+                isPast={currentWeek === realCurrentWeek && i < todayProtocolIndex && !completedDays.has(day.day)}
                 phase={currentPhase}
                 currentWeek={currentWeek}
                 onClick={() => handleDayClick(day)}
