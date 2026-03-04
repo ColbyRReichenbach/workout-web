@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { getAnalyticsSummary, getTypoPatterns } from '@/lib/ai/queryAnalytics';
-import { DEMO_USER_ID } from '@/lib/constants';
 
 /**
  * GET /api/ai/analytics
@@ -11,15 +10,17 @@ export async function GET(request: NextRequest) {
     try {
         const supabase = await createClient();
 
-        // Check auth & admin status
+        // Check auth — unauthenticated requests are always rejected, no DEMO_USER_ID fallback
         const { data: { user } } = await supabase.auth.getUser();
-        const userId = user?.id || DEMO_USER_ID;
+        if (!user) {
+            return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
+        }
 
-        // Fetch is_admin status
+        // Fetch is_admin status for the authenticated user only
         const { data: profile } = await supabase
             .from('profiles')
             .select('is_admin')
-            .eq('id', userId)
+            .eq('id', user.id)
             .single();
 
         if (!profile?.is_admin) {

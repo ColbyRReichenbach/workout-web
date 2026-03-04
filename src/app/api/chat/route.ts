@@ -279,7 +279,9 @@ Respond with ONLY a JSON object:
                     },
                     {
                         role: 'user',
-                        content: `Classify this message: "${content}"`
+                        // Escape quotes and hard-truncate so user content cannot break out of
+                        // the classifier framing or inject instructions into the classifier.
+                        content: `Classify this message: "${content.replace(/"/g, "'").replace(/`/g, "'").slice(0, 500)}"`
                     }
                 ],
                 max_tokens: 100,
