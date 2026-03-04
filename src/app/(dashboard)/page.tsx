@@ -329,21 +329,20 @@ export default function Home() {
       currentStreakCount = 0;
 
       // Keep going backwards day by day as long as the date string exists in the set
-      let keepChecking = true;
-      let iterDate = new Date(checkDate);
+      let iterTime = checkDate.getTime();
 
-      while (keepChecking) {
-        const iterYr = iterDate.getFullYear();
-        const iterMo = String(iterDate.getMonth() + 1).padStart(2, '0');
-        const iterDy = String(iterDate.getDate()).padStart(2, '0');
+      while (true) {
+        const d = new Date(iterTime);
+        const iterYr = d.getFullYear();
+        const iterMo = String(d.getMonth() + 1).padStart(2, '0');
+        const iterDy = String(d.getDate()).padStart(2, '0');
         const iterString = `${iterYr}-${iterMo}-${iterDy}`;
 
         if (loggedDateStrings.has(iterString)) {
           currentStreakCount++;
-          // Move back one day
-          iterDate.setDate(iterDate.getDate() - 1);
+          iterTime -= 86_400_000; // Move back one day
         } else {
-          keepChecking = false;
+          break;
         }
       }
     }
