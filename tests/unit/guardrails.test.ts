@@ -44,7 +44,7 @@ function levenshteinDistance(a: string, b: string): number {
 
 function fuzzyMatch(word: string, keyword: string, maxDistance?: number): boolean {
     const distance = levenshteinDistance(word.toLowerCase(), keyword.toLowerCase());
-    const tolerance = maxDistance ?? (keyword.length >= 7 ? 2 : keyword.length >= 4 ? 1 : 0);
+    const tolerance = maxDistance ?? (keyword.length >= 7 ? 2 : keyword.length >= 6 ? 1 : 0);
     return distance <= tolerance;
 }
 
@@ -117,9 +117,12 @@ describe('Fuzzy Match', () => {
         expect(fuzzyMatch('steroids', 'steroids')).toBe(true);
     });
 
-    it('should match with one typo for short words', () => {
-        expect(fuzzyMatch('steriod', 'steroid')).toBe(true); // 1 typo, 7 chars
-        expect(fuzzyMatch('keto', 'keti')).toBe(true); // 1 typo, 4 chars
+    it('should match with two typos for 7-char words (transpositions)', () => {
+        expect(fuzzyMatch('steriod', 'steroid')).toBe(true); // transposition, 7 chars -> tolerance 2
+    });
+
+    it('should NOT fuzzy-match short keywords (<6 chars) to avoid false positives', () => {
+        expect(fuzzyMatch('keto', 'keti')).toBe(false); // 4 chars -> tolerance 0 (rigid)
     });
 
     it('should match with two typos for longer words', () => {

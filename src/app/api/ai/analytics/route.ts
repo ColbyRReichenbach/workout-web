@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
         }
 
         const { searchParams } = new URL(request.url);
-        const days = parseInt(searchParams.get('days') || '7');
+        const days = Math.min(Math.max(parseInt(searchParams.get('days') || '7', 10) || 7, 1), 90);
 
         // Calculate date range
         const startDate = new Date();
@@ -87,8 +87,8 @@ export async function GET(request: NextRequest) {
         }
 
         const topUsers = Object.entries(userStats)
-            .map(([userId, stats]) => ({
-                userId,
+            .map(([uid, stats]) => ({
+                userId: uid,
                 requests: stats.requests,
                 totalTokens: stats.tokens,
                 totalCostUsd: Number(stats.cost.toFixed(4))

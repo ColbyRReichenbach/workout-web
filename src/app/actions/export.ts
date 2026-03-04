@@ -1,12 +1,16 @@
 "use server";
 
 import { createClient } from "@/utils/supabase/server";
-import { DEMO_USER_ID } from "@/lib/userSettingsServer";
 
 export async function exportUserData() {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
-    const userId = user?.id || DEMO_USER_ID;
+
+    if (!user) {
+        throw new Error("Authentication required to export data");
+    }
+
+    const userId = user.id;
 
     // Fetch all relevant data in parallel
     const [logs, sessions, biometrics, prs] = await Promise.all([

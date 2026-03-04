@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
-import { DEMO_USER_ID } from '@/lib/constants';
+import { DEMO_USER_ID, RATE_LIMITS } from '@/lib/constants';
+import { checkRateLimit } from '@/lib/redis';
+import { getClientIp } from '@/lib/ip';
 
 /**
  * POST /api/ai/feedback
@@ -13,6 +15,14 @@ export async function POST(request: NextRequest) {
         // Check auth
         const { data: { user } } = await supabase.auth.getUser();
         const userId = user?.id || DEMO_USER_ID;
+
+        // Rate limit feedback submissions
+        const ip = await getClientIp();
+        const identifier = user?.id ?? ip;
+        const rateLimit = await checkRateLimit(identifier, RATE_LIMITS.AUTH, '@upstash/ratelimit/feedback');
+        if (!rateLimit.allowed) {
+            return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+        }
 
         const body = await request.json();
         const {
@@ -90,7 +100,7 @@ export async function GET(request: NextRequest) {
         const userId = user?.id || DEMO_USER_ID;
 
         const { searchParams } = new URL(request.url);
-        const limit = parseInt(searchParams.get('limit') || '20');
+        const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '20', 10) || 20, 1), 100);
 
         const { data, error } = await supabase
             .from('ai_feedback')

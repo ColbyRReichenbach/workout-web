@@ -10,8 +10,6 @@ import { DEFAULT_SETTINGS } from '@/lib/userSettings';
 import { logRequest, createRequestTimer, ApiErrors, logInteraction } from '@/lib/api/helpers';
 import { calculateCost } from '@/lib/ai/cost';
 import * as Sentry from '@sentry/nextjs';
-import * as fs from 'fs';
-import * as path from 'path';
 
 export const maxDuration = 30;
 
@@ -24,11 +22,6 @@ import { getClientIp } from '@/lib/ip';
 
 // Use centralized rate limit configuration
 const RATE_LIMIT = RATE_LIMITS.CHAT;
-
-// Helper wrapper to match expected signature if needed, or just use checkRateLimit directly
-async function checkRateLimitWrapper(identifier: string): Promise<{ allowed: boolean; remaining: number }> {
-    return checkRateLimit(identifier, RATE_LIMIT);
-}
 
 // ============================================
 // PROMPT INJECTION DETECTION
@@ -99,9 +92,9 @@ function levenshteinDistance(a: string, b: string): number {
  */
 function fuzzyMatch(word: string, keyword: string, maxDistance?: number): boolean {
     const distance = levenshteinDistance(word.toLowerCase(), keyword.toLowerCase());
-    // Allow 1 typo for words 6+ chars, 2 typos for 8+ chars
-    // Rigid matching for short keywords (4-5 chars) to avoid false positives like last/fast
-    const tolerance = maxDistance ?? (keyword.length >= 8 ? 2 : keyword.length >= 6 ? 1 : 0);
+    // Allow 1 typo for words 6+ chars, 2 typos for 7+ chars (catches transpositions like steriod/steroid)
+    // Rigid matching for short keywords (<6 chars) to avoid false positives like last/fast
+    const tolerance = maxDistance ?? (keyword.length >= 7 ? 2 : keyword.length >= 6 ? 1 : 0);
     return distance <= tolerance;
 }
 
@@ -1038,7 +1031,7 @@ export async function POST(req: Request) {
         // 2. RATE LIMITING - Protect against abuse
         // Use user ID if authenticated, otherwise use trusted IP for guests
         const identifier = user ? user.id : await getClientIp();
-        const rateLimit = await checkRateLimitWrapper(identifier);
+        const rateLimit = await checkRateLimit(identifier, RATE_LIMIT);
         if (!rateLimit.allowed) {
             return NextResponse.json(
                 {
@@ -1077,7 +1070,6 @@ export async function POST(req: Request) {
 
         const { messages, userDay, intentTag } = validation.data;
 
-        // 4. PRESERVE AND SANITIZE MESSAGE HISTORY
         // 4. SANITIZE AND CONVERT MESSAGES
         // We must pass tool calls and results back to the model for multi-turn context
         // We use convertToModelMessages to ensure the final array matches the ModelMessage[] schema
@@ -1451,22 +1443,7 @@ BEHAVIOR: Acknowledge effort. Use "We" statements. Push for consistency.
                 messages: sanitizedMessages as any,
                 maxSteps: 5,
                 tools: enabledTools,
-                onStepFinish: ({ text, toolCalls, toolResults, finishReason }: any) => {
-                    try {
-                        const resultStrs = toolResults?.map((r: any) => `Tool: ${r.toolName}, Success: ${!r.isError}, Len: ${(JSON.stringify(r.result) || '').length}`).join(', ') || 'NONE';
-                        const logData = `\n[Step Finish] Reason: ${finishReason}\nTextLen: ${text?.length || 0}\nResults: ${resultStrs}\n`;
-                        fs.appendFileSync('/tmp/ai_chat_debug.log', logData);
-                    } catch (e) { }
-                },
                 onFinish: ({ text, toolCalls, toolResults, finishReason, usage }: any) => {
-                    // Debug Logging to file
-                    try {
-                        const logData = `\n--- [${new Date().toISOString()}] ---\nFinishReason: ${finishReason}\nHasText: ${!!text}\nTextLength: ${text?.length || 0}\nToolCalls: ${toolCalls?.length || 0}\nToolResults: ${toolResults?.length || 0}\nText: ${text || 'EMPTY'}\n-------------------\n`;
-                        fs.appendFileSync('/tmp/ai_chat_debug.log', logData);
-                    } catch (e) {
-                        console.error('Failed to write to debug log:', e);
-                    }
-
                     // Server-Side Fallback for Empty Assistant Text
                     if (text === '' && toolResults && toolResults.length > 0) {
                         console.warn('[API/Chat] Assistant emitted empty text after tool calls.');

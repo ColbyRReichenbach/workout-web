@@ -1,31 +1,32 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
-import { DEMO_USER_ID } from '@/lib/constants';
+import { DEMO_USER_ID, RATE_LIMITS } from '@/lib/constants';
 import * as Sentry from '@sentry/nextjs';
+import { checkRateLimit } from '@/lib/redis';
+import { getClientIp } from '@/lib/ip';
 
 export async function POST(req: Request) {
     try {
+        // Rate limit to prevent flooding Sentry with reports
+        const ip = await getClientIp();
+        const supabase = await createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        const identifier = user?.id ?? ip;
+        const rateLimit = await checkRateLimit(identifier, RATE_LIMITS.AUTH, '@upstash/ratelimit/report');
+        if (!rateLimit.allowed) {
+            return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+        }
+
         const body = await req.json();
         const { messages, timestamp } = body;
 
-        // Auth check (optional but recommended)
-        const supabase = await createClient();
-        const { data: { user } } = await supabase.auth.getUser();
+        // Validate messages is an array (basic guard)
+        if (!Array.isArray(messages)) {
+            return NextResponse.json({ error: 'Invalid request: messages must be an array' }, { status: 400 });
+        }
 
         // Use user ID or falling back to demo/guest ID for reference
         const userId = user?.id || DEMO_USER_ID;
-
-        // Send to Sentry
-        const dsn = process.env.SENTRY_DSN || process.env.NEXT_PUBLIC_SENTRY_DSN;
-
-        // Ensure Sentry is initialized even if global config fails
-        if (!Sentry.isInitialized() && dsn) {
-            Sentry.init({
-                dsn,
-                tracesSampleRate: 0.1,
-                environment: 'development'
-            });
-        }
 
         // Helper to extract content safely (handles AI SDK parts)
         const getMessageContent = (message: any): string => {
@@ -54,7 +55,7 @@ export async function POST(req: Request) {
             scope.setExtra('conversation_raw', messages);
             scope.setTag('type', 'user_report');
             scope.setTag('user_id', userId);
-            scope.setTag('environment', 'development');
+            scope.setTag('environment', process.env.NODE_ENV || 'development');
 
             const reportError = new Error(`User Conversation Report (${userId})`);
             reportError.name = 'UserReport';
