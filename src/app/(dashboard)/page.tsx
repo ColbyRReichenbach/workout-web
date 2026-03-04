@@ -288,64 +288,62 @@ export default function Home() {
     const completion = Math.round((completedDays.size / 7) * 100);
 
     // Protocol-Based Streak (Chain Logic)
-    // Map logs to an absolute integer based on their diff from the start date.
-    // IMPORTANT: ISO date strings ("2026-02-25") parsed by new Date() are UTC midnight,
-    // which shifts to the previous local day in negative-offset timezones (e.g. EST -5).
-    // Parse as local dates by splitting the string to avoid streak resetting at midnight.
-    const loggedAbsIndices = new Set(allLogs.map(l => {
-      if (!l.date) return -1;
-      const [yr, mo, dy] = l.date.split('-').map(Number);
-      const logDate = new Date(yr, mo - 1, dy); // local midnight
-
-      // Start date was calculated above, but we memoize this block so we recalculate
-      const psRaw = userProfile?.program_start_date;
-      const pStartDate = psRaw
-        ? (() => { const [y, m, d] = psRaw.split('-').map(Number); return new Date(y, m - 1, d); })()
-        : new Date(new Date().setHours(0, 0, 0, 0));
-
-      const msPerDay = 1000 * 60 * 60 * 24;
-      const daysDiff = Math.floor((logDate.getTime() - pStartDate.getTime()) / msPerDay);
-      return daysDiff >= 0 ? daysDiff : -1;
-    }));
+    // Convert logs into local YYYY-MM-DD strings to avoid standardizing to UTC midnight
+    // and inadvertently shifting negative-offset timezones back one day.
+    const loggedDateStrings = new Set(allLogs.map(l => {
+      if (!l.date) return null;
+      // l.date is 'YYYY-MM-DD' from the DB. Use it directly.
+      return l.date;
+    }).filter(Boolean) as string[]);
 
     const now = new Date();
     now.setHours(0, 0, 0, 0);
-    const msPerDay = 1000 * 60 * 60 * 24;
 
-    // Parse program_start_date as LOCAL midnight (same pattern as loggedAbsIndices above)
-    // to avoid the UTC-shift bug that causes off-by-one errors in negative-offset timezones.
-    const pStartDate = userProfile?.program_start_date
-      ? (() => { const [y, m, d] = userProfile.program_start_date.split('-').map(Number); return new Date(y, m - 1, d); })()
-      : new Date(now);
+    // Get Local Today String (YYYY-MM-DD)
+    const todayYr = now.getFullYear();
+    const todayMo = String(now.getMonth() + 1).padStart(2, '0');
+    const todayDy = String(now.getDate()).padStart(2, '0');
+    const todayString = `${todayYr}-${todayMo}-${todayDy}`;
 
-    const currentAbsIndex = Math.max(0, Math.floor((now.getTime() - pStartDate.getTime()) / msPerDay));
+    // Get Local Yesterday String (YYYY-MM-DD)
+    const yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
+    const yestYr = yesterday.getFullYear();
+    const yestMo = String(yesterday.getMonth() + 1).padStart(2, '0');
+    const yestDy = String(yesterday.getDate()).padStart(2, '0');
+    const yesterdayString = `${yestYr}-${yestMo}-${yestDy}`;
 
     let currentStreakCount = 0;
-    let anchorIdx = -1;
 
-    // Check if Today or Yesterday is done to keep the streak alive
-    if (loggedAbsIndices.has(currentAbsIndex)) {
-      anchorIdx = currentAbsIndex;
-    } else if (loggedAbsIndices.has(currentAbsIndex - 1)) {
-      anchorIdx = currentAbsIndex - 1;
+    // Determine the anchor date for the streak (either today or yesterday)
+    let checkDate: Date | null = null;
+
+    if (loggedDateStrings.has(todayString)) {
+      checkDate = new Date(now);
+    } else if (loggedDateStrings.has(yesterdayString)) {
+      checkDate = new Date(yesterday);
     }
 
-    if (anchorIdx !== -1) {
-      currentStreakCount = 1;
-      let check = anchorIdx - 1;
-      // Walk back through days. Skip rest days (day 6 of each 7-day cycle = Sunday)
-      // so a user is never penalized for not logging an intentional rest day.
-      while (check >= 0) {
-        const isRestDay = check % 7 === 6; // Day 6 of every week cycle = Sunday/rest
-        if (isRestDay) {
-          check--;
-          continue;
-        }
-        if (loggedAbsIndices.has(check)) {
+    if (checkDate) {
+      // We found a starting point for the streak
+      currentStreakCount = 0;
+
+      // Keep going backwards day by day as long as the date string exists in the set
+      let keepChecking = true;
+      let iterDate = new Date(checkDate);
+
+      while (keepChecking) {
+        const iterYr = iterDate.getFullYear();
+        const iterMo = String(iterDate.getMonth() + 1).padStart(2, '0');
+        const iterDy = String(iterDate.getDate()).padStart(2, '0');
+        const iterString = `${iterYr}-${iterMo}-${iterDy}`;
+
+        if (loggedDateStrings.has(iterString)) {
           currentStreakCount++;
-          check--;
+          // Move back one day
+          iterDate.setDate(iterDate.getDate() - 1);
         } else {
-          break;
+          keepChecking = false;
         }
       }
     }

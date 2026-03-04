@@ -17,6 +17,21 @@ function stripTime(d: Date): Date {
     return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
+/**
+ * Parse a program_start_date string that may be either YYYY-MM-DD or a full
+ * ISO-8601 timestamp (e.g. 2026-03-04T00:00:00+00:00) as returned by
+ * Supabase TIMESTAMPTZ columns.  Always returns a local-midnight Date so
+ * week/day arithmetic is unaffected by timezone offsets.
+ */
+function parseProgramStartDate(s: string): Date {
+    // If it already contains a time component, parse as-is and strip to midnight.
+    if (s.includes('T')) {
+        return stripTime(new Date(s));
+    }
+    // Plain date string — append time to avoid UTC-midnight → local-day-shift.
+    return new Date(s + 'T00:00:00');
+}
+
 /** Whole days between two dates (a − b). */
 function daysBetween(a: Date, b: Date): number {
     return Math.round((stripTime(a).getTime() - stripTime(b).getTime()) / 86_400_000);
@@ -47,7 +62,7 @@ export function getMondayOfWeek(date: Date): Date {
  * Week 1 starts on `programStartDate` (which should be a Monday).
  */
 export function getWeekDates(weekNumber: number, programStartDate: Date | string) {
-    const start = typeof programStartDate === "string" ? new Date(programStartDate + "T00:00:00") : stripTime(programStartDate);
+    const start = typeof programStartDate === "string" ? parseProgramStartDate(programStartDate) : stripTime(programStartDate);
     const weekOffset = weekNumber - 1;
     const weekStart = addDays(start, weekOffset * 7);
 
@@ -77,7 +92,7 @@ export function getDateForWeekDay(weekNumber: number, dayName: string, programSt
  * Returns how many weeks to jump (0 = no change).
  */
 export function getWeeksToAdvance(currentWeekStartDate: Date | string): number {
-    const weekStart = typeof currentWeekStartDate === "string" ? new Date(currentWeekStartDate + "T00:00:00") : stripTime(currentWeekStartDate);
+    const weekStart = typeof currentWeekStartDate === "string" ? parseProgramStartDate(currentWeekStartDate) : stripTime(currentWeekStartDate);
     const today = stripTime(new Date());
     const diff = daysBetween(today, weekStart);
     return diff >= 7 ? Math.floor(diff / 7) : 0;
@@ -131,7 +146,7 @@ export function formatDateFull(d: Date): string {
  * and an optional reference date (defaults to now).
  */
 export function calculateAbsoluteWeek(programStartDate: Date | string, referenceDate?: Date): number {
-    const start = typeof programStartDate === "string" ? new Date(programStartDate + "T00:00:00") : stripTime(programStartDate);
+    const start = typeof programStartDate === "string" ? parseProgramStartDate(programStartDate) : stripTime(programStartDate);
     const now = stripTime(referenceDate ?? new Date());
 
     const diff = daysBetween(now, start);

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/utils/supabase/server';
+import { createClient, createServiceClient } from '@/utils/supabase/server';
 import { getAnalyticsSummary, getTypoPatterns } from '@/lib/ai/queryAnalytics';
 
 /**
@@ -34,14 +34,18 @@ export async function GET(request: NextRequest) {
         const startDate = new Date();
         startDate.setDate(startDate.getDate() - days);
 
+        // Use service-role client for global queries so RLS owner-only policy
+        // doesn't filter out other users' feedback/logs for the admin view.
+        const serviceClient = createServiceClient();
+
         // Get feedback stats (GLOBAL for admins)
-        const feedbackPromise = supabase
+        const feedbackPromise = serviceClient
             .from('ai_feedback')
             .select('rating, intent, tools_used, latency_ms, created_at, user_message, ai_response')
             .gte('created_at', startDate.toISOString());
 
         // Get engineering logs (GLOBAL for admins)
-        const logsPromise = supabase
+        const logsPromise = serviceClient
             .from('ai_logs')
             .select('*')
             .gte('created_at', startDate.toISOString());

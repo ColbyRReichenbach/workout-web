@@ -1,7 +1,7 @@
 import { openai } from '@ai-sdk/openai';
 import { streamText, convertToModelMessages, createUIMessageStream, createUIMessageStreamResponse } from 'ai';
 import { getRecentLogs, getBiometrics, findLastLog, getExercisePR, getRecoveryMetrics, getComplianceReport, getTrendAnalysis, getCardioSummary } from '@/lib/ai/tools';
-import { createClient } from '@/utils/supabase/server';
+import { createClient, createServiceClient } from '@/utils/supabase/server';
 import { chatRequestSchema, sanitizeString, BOUNDS, extractMessageContent } from '@/lib/validation';
 import { NextResponse } from 'next/server';
 import { detectIntent, buildDynamicContext } from '@/lib/ai/contextRouter';
@@ -19,6 +19,7 @@ export const maxDuration = 30;
 
 import { checkRateLimit } from '@/lib/redis';
 import { getClientIp } from '@/lib/ip';
+import { calculateAbsoluteWeek } from '@/lib/dateUtils';
 
 // Use centralized rate limit configuration
 const RATE_LIMIT = RATE_LIMITS.CHAT;
@@ -1297,8 +1298,10 @@ export async function POST(req: Request) {
             .slice(0, 50)                 // Hard-cap at schema max
             || 'ECHO-P1';                 // Fallback if all chars stripped
         const aiPersonality = profile?.ai_personality || 'Analytic';
+        const currentWeek = calculateAbsoluteWeek(profile?.program_start_date || new Date());
+
+        // current_phase will be recalculated correctly in ContextRouter based on exactly what currentWeek is
         const currentPhase = profile?.current_phase || 1;
-        const currentWeek = profile?.current_week || 1;
 
         // Detect Intent & Build Context
         let intent = detectIntent(sanitizedMessages as any[]);
@@ -1527,8 +1530,8 @@ BEHAVIOR: Acknowledge effort. Use "We" statements. Push for consistency.
                     const totalTokens = usage?.totalTokens || 0;
                     const cost = calculateCost(modelId, promptTokens, completionTokens);
 
-                    // Fire and forget database log
-                    supabase.from('ai_logs').insert({
+                    // Fire and forget database log — service role bypasses RLS on ai_logs
+                    createServiceClient().from('ai_logs').insert({
                         user_id: userId,
                         message_id: messageId || `msg_${Date.now()}`,
                         model_id: modelId,
