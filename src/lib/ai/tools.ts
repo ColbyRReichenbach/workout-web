@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { createClient } from '@/utils/supabase/server';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { tool } from 'ai';
 import * as Sentry from '@sentry/nextjs';
 import {
@@ -58,7 +58,8 @@ function sanitizeBiometricForAI(bio: Record<string, unknown>): Record<string, un
     };
 }
 
-export const getRecentLogs = tool({
+function makeGetRecentLogs(supabase: SupabaseClient, userId: string) {
+    return tool({
     description: 'Get workout logs from a specific time period (e.g., "this week", "last 30 days"). Use for compliance checks and period-based analysis. Do NOT use for "when was my last X?" questions.',
     inputSchema: z.object({
         days: z.number()
@@ -72,11 +73,6 @@ export const getRecentLogs = tool({
     execute: async ({ days = DEFAULT_DAYS, filter }) => {
         console.log('[AI Tool] getRecentLogs called with:', { days, filter });
         try {
-            const supabase = await createClient();
-
-            // Get current user
-            const { data: { user } } = await supabase.auth.getUser();
-            const userId = user?.id || DEMO_USER_ID;
 
             // Calculate date N days ago
             const date = new Date();
@@ -172,9 +168,11 @@ export const getRecentLogs = tool({
             return 'I had trouble accessing your workout data. This might be a temporary network issue. Please try asking again in a moment, or refresh the page if the problem persists.';
         }
     },
-});
+    });
+}
 
-export const getBiometrics = tool({
+function makeGetBiometrics(supabase: SupabaseClient, userId: string) {
+    return tool({
     description: 'Get sleep and heart rate data (HRV, Sleep hours, RHR) for recovery questions. Use ONLY for sleep/recovery/HRV questions. Do NOT use for workout/exercise questions.',
     inputSchema: z.object({
         days: z.number()
@@ -186,11 +184,6 @@ export const getBiometrics = tool({
     execute: async ({ days = DEFAULT_DAYS }) => {
         console.log('[AI Tool] getBiometrics called with:', { days });
         try {
-            const supabase = await createClient();
-
-            // Get current user
-            const { data: { user } } = await supabase.auth.getUser();
-            const userId = user?.id || DEMO_USER_ID;
 
             const date = new Date();
             date.setDate(date.getDate() - Math.min(Math.max(days, MIN_DAYS), MAX_DAYS));
@@ -240,14 +233,16 @@ export const getBiometrics = tool({
             return 'An error occurred while fetching biometric data.';
         }
     },
-});
+    });
+}
 
 /**
  * Find the most recent workout log(s) matching criteria.
  * Use for "when was my last X?" or "show my last N workouts" questions.
  * No time limit - searches entire history.
  */
-export const findLastLog = tool({
+function makeFindLastLog(supabase: SupabaseClient, userId: string) {
+    return tool({
     description: 'Find the most recent workout log(s) matching criteria, regardless of how old. Use when user asks "when was my last X?", "how long since I did Y?", or "show my last N workouts".',
     inputSchema: z.object({
         filter: z.string().optional().describe('Filter by exercise/segment name or type (e.g., "Run", "Squat", "Bench Press")'),
@@ -256,9 +251,6 @@ export const findLastLog = tool({
     execute: async ({ filter, limit = 1 }) => {
         console.log('[AI Tool] findLastLog called with filter:', filter, 'limit:', limit);
         try {
-            const supabase = await createClient();
-            const { data: { user } } = await supabase.auth.getUser();
-            const userId = user?.id || DEMO_USER_ID;
 
             // Fetch more logs if filtering to ensure we find matches
             const fetchLimit = filter ? 200 : limit;
@@ -376,7 +368,8 @@ export const findLastLog = tool({
             return 'An error occurred while searching workout logs. Please try again.';
         }
     }
-});
+    });
+}
 
 // ============================================
 // NEW SPECIALIZED TOOLS
@@ -444,7 +437,8 @@ function formatTime(seconds: number): string {
  * Get user's personal record for a specific exercise.
  * Use for "What's my max squat?" or "What's my PR for bench?" questions.
  */
-export const getExercisePR = tool({
+function makeGetExercisePR(supabase: SupabaseClient, userId: string) {
+    return tool({
     description: 'Get user\'s personal record (PR/max) for a specific exercise. Use for "what\'s my max X?" questions. Handles typos (e.g., "squirt" → "squat").',
     inputSchema: z.object({
         exercise: z.string().describe('Exercise name (e.g., "squat", "bench", "mile", "5k")'),
@@ -452,9 +446,6 @@ export const getExercisePR = tool({
     execute: async ({ exercise }) => {
         console.log('[AI Tool] getExercisePR called with:', exercise);
         try {
-            const supabase = await createClient();
-            const { data: { user } } = await supabase.auth.getUser();
-            const userId = user?.id || DEMO_USER_ID;
 
             // Normalize the exercise name (handles typos)
             const normResult = normalizeExercise(exercise);
@@ -476,13 +467,18 @@ export const getExercisePR = tool({
                 // format: exercise_name.ilike.%alias1%,exercise_name.ilike.%alias2%...
                 const filterString = aliases.map(a => `exercise_name.ilike.%${a}%`).join(',');
 
+                // Determine sort order: for time-based PRs lower is better; for all others higher is better.
+                // We detect time-based by checking if the exercise resolves to a time PR field.
+                const resolvedPrField = EXERCISE_TO_PR_FIELD[normalized];
+                const isTimeBased = resolvedPrField?.includes('sec') ?? false;
+
                 const { data: prHistory, error: prHistoryError } = await supabase
                     .from('pr_history')
-                    .select('date, value, exercise_name')
+                    .select('date, value, exercise_name, unit')
                     .eq('user_id', userId)
                     .or(filterString)
-                    .order('value', { ascending: false }) // Highest value first (true PR)
-                    .order('date', { ascending: false })  // Most recent if ties
+                    .order('value', { ascending: isTimeBased }) // Ascending = lowest (fastest) for time PRs; descending = heaviest for strength
+                    .order('date', { ascending: false })          // Most recent if values tie
                     .limit(1);
 
                 if (!prHistoryError && prHistory && prHistory.length > 0) {
@@ -507,9 +503,10 @@ export const getExercisePR = tool({
                             type = 'power';
                         }
 
-                        // Use existing helper to guess valid unit or type if needed, but pr_history usually stores 'lbs' for weight
-                        // If we needed unit, we could select it. Assuming lbs for now or from tool logic types.
-                        const { unit } = getPRType(type === 'weight' ? 'squat_max' : type === 'time' ? 'mile_time_sec' : 'bike_max_watts'); // Dummy field to get unit
+                        // Use the stored unit from pr_history if available; otherwise infer from type
+                        const storedUnit = record.unit as string | undefined;
+                        const { unit: inferredUnit } = getPRType(type === 'weight' ? 'squat_max' : type === 'time' ? 'mile_time_sec' : 'bike_max_watts');
+                        const unit = storedUnit || inferredUnit;
 
                         // Log analytics
                         logToolCall({
@@ -585,7 +582,8 @@ export const getExercisePR = tool({
                     .from('logs')
                     .select('date, segment_name, segment_type, performance_data')
                     .eq('user_id', userId)
-                    .order('date', { ascending: false }); // Newest first
+                    .order('date', { ascending: false }) // Newest first
+                    .limit(500);
 
                 if (candidateLogs && candidateLogs.length > 0) {
                     // Filter for logs that match the exercise AND the PR value
@@ -663,13 +661,15 @@ export const getExercisePR = tool({
             return 'An error occurred while fetching your PR. Please try again.';
         }
     }
-});
+    });
+}
 
 /**
  * Get comprehensive recovery metrics from sleep_logs and readiness_logs.
  * Use for "How's my recovery?", "Am I sleeping enough?", or "Should I rest today?"
  */
-export const getRecoveryMetrics = tool({
+function makeGetRecoveryMetrics(supabase: SupabaseClient, userId: string) {
+    return tool({
     description: 'Get sleep and recovery data from sleep_logs and readiness_logs. Use for recovery questions like "How\'s my HRV?", "Am I sleeping enough?", or "Should I rest today?".',
     inputSchema: z.object({
         days: z.number()
@@ -681,9 +681,6 @@ export const getRecoveryMetrics = tool({
     execute: async ({ days = 7 }) => {
         console.log('[AI Tool] getRecoveryMetrics called with days:', days);
         try {
-            const supabase = await createClient();
-            const { data: { user } } = await supabase.auth.getUser();
-            const userId = user?.id || DEMO_USER_ID;
 
             const date = new Date();
             date.setDate(date.getDate() - days);
@@ -794,13 +791,15 @@ export const getRecoveryMetrics = tool({
             return 'An error occurred while fetching recovery metrics. Please try again.';
         }
     }
-});
+    });
+}
 
 /**
  * Get total cardio distance and duration across ALL cardio activities.
  * Use for "How many miles have I done?", "Total distance this week?", or cardio volume questions.
  */
-export const getCardioSummary = tool({
+function makeGetCardioSummary(supabase: SupabaseClient, userId: string) {
+    return tool({
     description: 'REQUIRED for questions about total miles, total distance, or cardio volume. Aggregates distance across ALL activities: runs, bike erg, row erg, ski erg, multi-machine, etc. Use this instead of findLastLog when user asks "how many miles/kilometers" or "total distance".',
     inputSchema: z.object({
         days: z.number()
@@ -812,20 +811,17 @@ export const getCardioSummary = tool({
     execute: async ({ days = 7 }) => {
         console.log('[AI Tool] getCardioSummary called with days:', days);
         try {
-            const supabase = await createClient();
-            const { data: { user } } = await supabase.auth.getUser();
-            const userId = user?.id || DEMO_USER_ID;
 
             const date = new Date();
             date.setDate(date.getDate() - days);
             const dateStr = date.toISOString().split('T')[0];
 
-            // Fetch all CARDIO segment logs
+            // Fetch all CARDIO and ENDURANCE segment logs (long runs and rucks use ENDURANCE type)
             const { data: logs, error } = await supabase
                 .from('logs')
                 .select('date, segment_name, segment_type, performance_data')
                 .eq('user_id', userId)
-                .eq('segment_type', 'CARDIO')
+                .in('segment_type', ['CARDIO', 'ENDURANCE'])
                 .gte('date', dateStr)
                 .order('date', { ascending: false });
 
@@ -894,13 +890,15 @@ export const getCardioSummary = tool({
             return 'An error occurred while fetching cardio summary. Please try again.';
         }
     }
-});
+    });
+}
 
 /**
  * Get workout compliance report for a given time period.
  * Use for "Did I hit my workouts this week?" or "How consistent have I been?"
  */
-export const getComplianceReport = tool({
+function makeGetComplianceReport(supabase: SupabaseClient, userId: string) {
+    return tool({
     description: 'Get workout compliance/completion report. Use for "Did I hit my workouts this week?", "How consistent have I been?", or "How many workouts did I do?"',
     inputSchema: z.object({
         days: z.number()
@@ -912,9 +910,6 @@ export const getComplianceReport = tool({
     execute: async ({ days = 7 }) => {
         console.log('[AI Tool] getComplianceReport called with days:', days);
         try {
-            const supabase = await createClient();
-            const { data: { user } } = await supabase.auth.getUser();
-            const userId = user?.id || DEMO_USER_ID;
 
             const date = new Date();
             date.setDate(date.getDate() - days);
@@ -994,13 +989,15 @@ export const getComplianceReport = tool({
             return 'An error occurred while generating compliance report. Please try again.';
         }
     }
-});
+    });
+}
 
 /**
  * getTrendAnalysis - Analyze strength/endurance progression over time
  * Use for "Am I getting stronger?", "How's my squat progressing?", etc.
  */
-export const getTrendAnalysis = tool({
+function makeGetTrendAnalysis(supabase: SupabaseClient, userId: string) {
+    return tool({
     description: 'Analyze strength or endurance progression for an exercise. Use for "Am I getting stronger?", "How\'s my squat progressing?", or trend questions. Returns data points and calculated trend direction.',
     inputSchema: z.object({
         exercise: z.string().describe('Exercise name (e.g., "squat", "bench", "deadlift", "run")'),
@@ -1009,9 +1006,6 @@ export const getTrendAnalysis = tool({
     execute: async ({ exercise, days = 90 }) => {
         console.log('[AI Tool] getTrendAnalysis called with:', { exercise, days });
         try {
-            const supabase = await createClient();
-            const { data: { user } } = await supabase.auth.getUser();
-            const userId = user?.id || DEMO_USER_ID;
 
             // Normalize exercise name
             const normResult = normalizeExercise(exercise);
@@ -1189,4 +1183,23 @@ export const getTrendAnalysis = tool({
             return 'An error occurred while analyzing your progress. Please try again.';
         }
     }
-});
+    });
+}
+
+/**
+ * Factory function — call once per request with the already-created Supabase client
+ * and authenticated userId so that tool execute functions never need to call
+ * createClient() / cookies() themselves (which fails inside streamText async context).
+ */
+export function createTools(supabase: SupabaseClient, userId: string) {
+    return {
+        getRecentLogs: makeGetRecentLogs(supabase, userId),
+        getBiometrics: makeGetBiometrics(supabase, userId),
+        findLastLog: makeFindLastLog(supabase, userId),
+        getExercisePR: makeGetExercisePR(supabase, userId),
+        getRecoveryMetrics: makeGetRecoveryMetrics(supabase, userId),
+        getCardioSummary: makeGetCardioSummary(supabase, userId),
+        getComplianceReport: makeGetComplianceReport(supabase, userId),
+        getTrendAnalysis: makeGetTrendAnalysis(supabase, userId),
+    };
+}

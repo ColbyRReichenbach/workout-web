@@ -13,6 +13,7 @@ import { TiltCard } from "@/components/TiltCard";
 import { useSettings } from "@/context/SettingsContext";
 import { getUnitLabel, toDisplayWeight } from "@/lib/conversions";
 import { DEMO_USER_ID } from "@/lib/constants";
+import { updatePrMax } from "@/app/actions/user";
 
 
 import { calculateWorkingSet } from "@/lib/calculations/percentages";
@@ -298,8 +299,8 @@ export default function WorkoutPage() {
                 // Ideally we format time for celebration... but for now simple value
                 setPrCelebration({ show: true, value: displayVal, unit: unitLabel });
 
-                // 2. Update DB Profile
-                await supabase.from('profiles').update({ [type]: newValue }).eq('id', profile.id);
+                // 2. Update DB Profile (via server action — never direct client SDK)
+                await updatePrMax(type, newValue);
 
                 // 3. Update Local Profile State so calculation logic uses new max immediately
                 setProfile(prev => prev ? ({ ...prev, [type]: newValue }) : null);
@@ -350,7 +351,7 @@ export default function WorkoutPage() {
         const currentUserId = user?.id || DEMO_USER_ID;
 
         await supabase.from('logs').delete().eq('user_id', currentUserId).eq('segment_name', segment.name).eq('week_number', currentWeek).eq('day_name', actualDayName);
-        await supabase.from('logs').insert({ user_id: currentUserId, session_id: activeSessionId, segment_name: segment.name, segment_type: segment.type, tracking_mode: segment.tracking_mode, performance_data: data, phase_id: currentPhase, week_number: currentWeek, day_name: actualDayName });
+        await supabase.from('logs').insert({ user_id: currentUserId, session_id: activeSessionId, date: new Date().toISOString().split('T')[0], segment_name: segment.name, segment_type: segment.type, tracking_mode: segment.tracking_mode, performance_data: data, phase_id: currentPhase, week_number: currentWeek, day_name: actualDayName });
         setLoggedSegments(prev => new Set([...prev, idx]));
     };
 
@@ -464,6 +465,13 @@ export default function WorkoutPage() {
                                                 {segment.tracking_mode === 'STRENGTH_SETS' && <LogStrengthSets segment={segment} idx={idx} onLog={logSegment} calculatedWeight={segment.target?.percent_1rm ? calcWeight(segment.name, segment.target.percent_1rm).weight : undefined} />}
                                                 {segment.tracking_mode === 'METCON' && <LogMetcon segment={segment} idx={idx} onLog={logSegment} />}
                                                 {segment.tracking_mode === 'CARDIO_BASIC' && <LogCardioBasic segment={segment} idx={idx} onLog={logSegment} />}
+                                                {/* Fallback: any segment with an unrecognized or missing tracking_mode that has set/rep targets
+                                                    defaults to strength logging (e.g. supersets stored with a legacy or null tracking_mode) */}
+                                                {!['CHECKBOX', 'STRENGTH_SETS', 'METCON', 'CARDIO_BASIC'].includes(segment.tracking_mode) && (
+                                                    segment.target?.sets
+                                                        ? <LogStrengthSets segment={segment} idx={idx} onLog={logSegment} calculatedWeight={segment.target?.percent_1rm ? calcWeight(segment.name, segment.target.percent_1rm).weight : undefined} />
+                                                        : <button onClick={() => logSegment(segment, idx, { completed: true })} className="h-24 w-24 rounded-xl bg-primary/5 border border-primary/10 flex items-center justify-center hover:bg-primary hover:text-white transition-all"><CheckCircle size={36} /></button>
+                                                )}
                                             </>
                                         )}
                                     </div>

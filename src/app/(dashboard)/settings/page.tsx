@@ -9,6 +9,7 @@ import { normalizeUnit } from "@/lib/conversions";
 import { useSettings } from "@/context/SettingsContext";
 
 import { exportUserData } from "@/app/actions/export";
+import { updateUserPreferences } from "@/app/actions/user";
 import { DEMO_USER_ID } from "@/lib/userSettings";
 
 interface PreferenceState {
@@ -55,70 +56,23 @@ export default function SettingsPage() {
     }, []);
 
     const updateDB = async (newPrefs: PreferenceState) => {
-        try {
-            const { data: { user } } = await supabase.auth.getUser();
-
-            const userId = user?.id || DEMO_USER_ID;
-
-            const { error } = await supabase.from('profiles').update({
-                ai_name: newPrefs.aiName,
-                ai_personality: newPrefs.aiPersonality,
-                notifications_enabled: newPrefs.notifications,
-                data_privacy: newPrefs.dataPrivacy
-            }).eq('id', userId);
-
-            if (error) {
-                console.error("Error updating preferences:", error);
-            }
-        } catch (err) {
-            console.error("Unexpected update error:", err);
-        }
+        const result = await updateUserPreferences({
+            ai_name: newPrefs.aiName,
+            ai_personality: newPrefs.aiPersonality,
+            notifications_enabled: newPrefs.notifications,
+            data_privacy: newPrefs.dataPrivacy,
+        });
+        if (result.error) console.error("Error updating preferences:", result.error);
     };
 
-    // Direct DB update for units (same pattern that works for AI settings)
     const updateUnitsDB = async (newUnits: string) => {
-        try {
-            const { data: { user } } = await supabase.auth.getUser();
-
-            const userId = user?.id || DEMO_USER_ID;
-
-            console.log('[Settings] Updating units to:', newUnits, 'for user:', userId);
-
-            const { error } = await supabase.from('profiles').update({
-                units: newUnits
-            }).eq('id', userId);
-
-            if (error) {
-                console.error("Error updating units:", error);
-            } else {
-                console.log('[Settings] Units saved successfully');
-            }
-        } catch (err) {
-            console.error("Unexpected units update error:", err);
-        }
+        const result = await updateUserPreferences({ units: newUnits });
+        if (result.error) console.error("Error updating units:", result.error);
     };
 
-    // Direct DB update for theme (same pattern that works for AI settings)
     const updateThemeDB = async (newTheme: string) => {
-        try {
-            const { data: { user } } = await supabase.auth.getUser();
-
-            const userId = user?.id || DEMO_USER_ID;
-
-            console.log('[Settings] Updating theme to:', newTheme, 'for user:', userId);
-
-            const { error } = await supabase.from('profiles').update({
-                theme: newTheme
-            }).eq('id', userId);
-
-            if (error) {
-                console.error("Error updating theme:", error);
-            } else {
-                console.log('[Settings] Theme saved successfully');
-            }
-        } catch (err) {
-            console.error("Unexpected theme update error:", err);
-        }
+        const result = await updateUserPreferences({ theme: newTheme });
+        if (result.error) console.error("Error updating theme:", result.error);
     };
 
     const handleSelect = async (key: keyof PreferenceState, value: string | boolean) => {

@@ -11,7 +11,9 @@ export async function GET(request: Request) {
     const authErrorDescription = searchParams.get('error_description')
 
     // if "next" is in param, use it as the redirect URL
-    let next = searchParams.get('next') ?? '/'
+    // Validate it's a relative path to prevent open redirect attacks
+    const rawNext = searchParams.get('next') ?? '/'
+    let next = rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : '/'
 
     if (authError) {
         console.error('[Auth Callback] Supabase Auth Error from URL:', authError, authErrorDescription)

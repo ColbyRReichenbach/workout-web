@@ -57,6 +57,8 @@ interface AnalyticsLog {
         time_min?: number;
     };
     segment_name: string;
+    segment_type?: string;
+    phase_id?: number;
 }
 
 interface ReadinessMetric {
@@ -156,18 +158,16 @@ export default function AnalyticsPage() {
             let ANCHOR_DATE = new Date();
 
             if (raw.profile.program_start_date) {
-                // Determine week 1 from the program start date
-                const start = new Date(raw.profile.program_start_date);
-                start.setHours(0, 0, 0, 0);
-                ANCHOR_DATE = start;
-                // If we also want it to display the whole past year since that start, we minus weeks:
-                // ANCHOR_DATE.setDate(ANCHOR_DATE.getDate() - (51 * 7));
-                // But typically for tracking progress we track *from* that date forward.
+                // Parse as LOCAL midnight using split-string method to avoid UTC-shift
+                // bug where new Date('YYYY-MM-DD') parses as UTC and lands on the previous
+                // local day in negative-offset timezones (EST etc.), shifting the entire
+                // heatmap and all week-bucket calculations by one day.
+                const [sy, sm, sd] = raw.profile.program_start_date.split('-').map(Number);
+                ANCHOR_DATE = new Date(sy, sm - 1, sd);
             } else if (raw.volumeData.length > 0) {
-                // Fallback 1: Earliest log
-                const earliestLog = raw.volumeData[0];
-                ANCHOR_DATE = new Date(earliestLog.date);
-                ANCHOR_DATE.setHours(0, 0, 0, 0);
+                // Fallback 1: Earliest log — also parse as local midnight
+                const [ly, lm, ld] = raw.volumeData[0].date.split('-').map(Number);
+                ANCHOR_DATE = new Date(ly, lm - 1, ld);
             } else {
                 // Fallback 2: Today
                 ANCHOR_DATE = new Date();
@@ -270,7 +270,10 @@ export default function AnalyticsPage() {
                     // Heatmap (Phase 1 focus - days 1-56)
                     const dateParts = log.date.split('-');
                     const d = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]));
-                    const diffDays = Math.floor(Math.abs(d.getTime() - ANCHOR_DATE.getTime()) / (24 * 60 * 60 * 1000));
+                    const diffMs = d.getTime() - ANCHOR_DATE.getTime();
+                    const diffDays = Math.floor(diffMs / (24 * 60 * 60 * 1000));
+                    // Only light up days on/after the program start — Math.abs was causing
+                    // pre-program logs to mirror into the heatmap at the wrong offsets.
                     if (diffDays >= 0 && diffDays < 56) {
                         activeDays[diffDays] = true;
                     }
@@ -324,15 +327,20 @@ export default function AnalyticsPage() {
                                 }
 
                                 // Historical PR Detection (Weight) - ONLY Main Lifts in Profile
+                                // Use maxWeight (peak set), not avgWeight, so a session of
+                                // 225/245/275 correctly records 275, not the 248 average.
                                 const baselineMapping = mapExerciseToBaseline(log.segment_name);
                                 const isMainLift = baselineMapping !== "Other";
+                                const peakWeight = perf.sets && Array.isArray(perf.sets)
+                                    ? Math.max(...(perf.sets as AnalyticsSet[]).map((s: AnalyticsSet) => s.weight || 0))
+                                    : avgWeight;
 
-                                if (isMainLift && avgWeight > (runningMaxes[baselineMapping] || 0)) {
-                                    runningMaxes[baselineMapping] = avgWeight;
+                                if (isMainLift && peakWeight > (runningMaxes[baselineMapping] || 0)) {
+                                    runningMaxes[baselineMapping] = peakWeight;
                                     historicalPRs.push({
                                         id: `${log.date}-${baselineMapping}`,
                                         exercise_name: baselineMapping,
-                                        value: avgWeight,
+                                        value: peakWeight,
                                         unit: 'lbs',
                                         pr_type: 'Weight',
                                         created_at: log.date
@@ -487,7 +495,15 @@ export default function AnalyticsPage() {
                             }
 
                             // Weekly cardio minutes (Phase 4 taper compliance)
-                            if ((log.tracking_mode === 'CARDIO_BASIC' || log.tracking_mode === 'METCON') && dur > 0) {
+                            // Include ENDURANCE segment_type (e.g. long runs) even when
+                            // tracking_mode is null/legacy, since the actions query now
+                            // returns segment_type for every log.
+                            const isCardioLog =
+                                log.tracking_mode === 'CARDIO_BASIC' ||
+                                log.tracking_mode === 'METCON' ||
+                                log.segment_type === 'CARDIO' ||
+                                log.segment_type === 'ENDURANCE';
+                            if (isCardioLog && dur > 0) {
                                 cardioMinMap[weekIdx] = (cardioMinMap[weekIdx] || 0) + dur;
                             }
                         }
@@ -595,9 +611,9 @@ export default function AnalyticsPage() {
             const fullArcSquatPeak = Array.from({ length: CHART_WEEKS }, (_, i) => arcSquatMap[i] || 0);
             const fullArcBenchPeak = Array.from({ length: CHART_WEEKS }, (_, i) => arcBenchMap[i] || 0);
 
-            // Season totals (still use full distMap across all real data)
-            const totalCardioDist = zone2DistWeekly.reduce((a, b) => a + b, 0) +
-                Array.from({ length: CHART_WEEKS }, (_, i) => distMap[i] || 0).reduce((a, b) => a + b, 0);
+            // Season totals: distMap already contains ALL logged distance (including Zone 2),
+            // so use it exclusively — adding zone2DistWeekly would double-count Zone 2 miles.
+            const totalCardioDist = Array.from({ length: CHART_WEEKS }, (_, i) => distMap[i] || 0).reduce((a, b) => a + b, 0);
             const totalPRsSet = raw.prHistoryData?.length || 0;
 
             // 1RM scoreboard: logs where segment name contains '1RM'

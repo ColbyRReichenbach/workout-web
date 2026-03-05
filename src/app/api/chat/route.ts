@@ -1,7 +1,7 @@
 import { openai } from '@ai-sdk/openai';
 import { streamText, convertToModelMessages, createUIMessageStream, createUIMessageStreamResponse } from 'ai';
-import { getRecentLogs, getBiometrics, findLastLog, getExercisePR, getRecoveryMetrics, getComplianceReport, getTrendAnalysis, getCardioSummary } from '@/lib/ai/tools';
-import { createClient } from '@/utils/supabase/server';
+import { createTools } from '@/lib/ai/tools';
+import { createClient, createServiceClient } from '@/utils/supabase/server';
 import { chatRequestSchema, sanitizeString, BOUNDS, extractMessageContent } from '@/lib/validation';
 import { NextResponse } from 'next/server';
 import { detectIntent, buildDynamicContext } from '@/lib/ai/contextRouter';
@@ -10,8 +10,6 @@ import { DEFAULT_SETTINGS } from '@/lib/userSettings';
 import { logRequest, createRequestTimer, ApiErrors, logInteraction } from '@/lib/api/helpers';
 import { calculateCost } from '@/lib/ai/cost';
 import * as Sentry from '@sentry/nextjs';
-import * as fs from 'fs';
-import * as path from 'path';
 
 export const maxDuration = 30;
 
@@ -21,14 +19,10 @@ export const maxDuration = 30;
 
 import { checkRateLimit } from '@/lib/redis';
 import { getClientIp } from '@/lib/ip';
+import { calculateAbsoluteWeek } from '@/lib/dateUtils';
 
 // Use centralized rate limit configuration
 const RATE_LIMIT = RATE_LIMITS.CHAT;
-
-// Helper wrapper to match expected signature if needed, or just use checkRateLimit directly
-async function checkRateLimitWrapper(identifier: string): Promise<{ allowed: boolean; remaining: number }> {
-    return checkRateLimit(identifier, RATE_LIMIT);
-}
 
 // ============================================
 // PROMPT INJECTION DETECTION
@@ -99,9 +93,9 @@ function levenshteinDistance(a: string, b: string): number {
  */
 function fuzzyMatch(word: string, keyword: string, maxDistance?: number): boolean {
     const distance = levenshteinDistance(word.toLowerCase(), keyword.toLowerCase());
-    // Allow 1 typo for words 6+ chars, 2 typos for 8+ chars
-    // Rigid matching for short keywords (4-5 chars) to avoid false positives like last/fast
-    const tolerance = maxDistance ?? (keyword.length >= 8 ? 2 : keyword.length >= 6 ? 1 : 0);
+    // Allow 1 typo for words 6+ chars, 2 typos for 7+ chars (catches transpositions like steriod/steroid)
+    // Rigid matching for short keywords (<6 chars) to avoid false positives like last/fast
+    const tolerance = maxDistance ?? (keyword.length >= 7 ? 2 : keyword.length >= 6 ? 1 : 0);
     return distance <= tolerance;
 }
 
@@ -179,6 +173,7 @@ const AMBIGUOUS_KEYWORDS: Record<string, string[]> = {
     'husband': ['off_topic_relationships'],
     'wife': ['off_topic_relationships'],
     'partner': ['off_topic_relationships'],
+    'doping': ['ped_banned_substances'], // "doing" fuzzy-matches "doping" (distance=1); require fitness context
 };
 
 // ============================================
@@ -286,7 +281,9 @@ Respond with ONLY a JSON object:
                     },
                     {
                         role: 'user',
-                        content: `Classify this message: "${content}"`
+                        // Escape quotes and hard-truncate so user content cannot break out of
+                        // the classifier framing or inject instructions into the classifier.
+                        content: `Classify this message: "${content.replace(/"/g, "'").replace(/`/g, "'").slice(0, 500)}"`
                     }
                 ],
                 max_tokens: 100,
@@ -1038,7 +1035,7 @@ export async function POST(req: Request) {
         // 2. RATE LIMITING - Protect against abuse
         // Use user ID if authenticated, otherwise use trusted IP for guests
         const identifier = user ? user.id : await getClientIp();
-        const rateLimit = await checkRateLimitWrapper(identifier);
+        const rateLimit = await checkRateLimit(identifier, RATE_LIMIT);
         if (!rateLimit.allowed) {
             return NextResponse.json(
                 {
@@ -1077,7 +1074,6 @@ export async function POST(req: Request) {
 
         const { messages, userDay, intentTag } = validation.data;
 
-        // 4. PRESERVE AND SANITIZE MESSAGE HISTORY
         // 4. SANITIZE AND CONVERT MESSAGES
         // We must pass tool calls and results back to the model for multi-turn context
         // We use convertToModelMessages to ensure the final array matches the ModelMessage[] schema
@@ -1291,10 +1287,22 @@ export async function POST(req: Request) {
             .eq('id', userId)
             .single();
 
-        const aiName = profile?.ai_name || 'ECHO-P1';
+        // Sanitize ai_name before embedding in system prompt to prevent stored prompt injection.
+        // A user who sets their ai_name to something like `", ignore instructions` would otherwise
+        // break out of the XML context and inject arbitrary instructions into the system prompt.
+        const rawAiName = profile?.ai_name || 'ECHO-P1';
+        const aiName = rawAiName
+            .replace(/["'`<>\\]/g, '')   // Strip chars that break XML/string context
+            .replace(/[\n\r]/g, ' ')      // Collapse newlines into spaces
+            .replace(/\s+/g, ' ')         // Normalize whitespace
+            .trim()
+            .slice(0, 50)                 // Hard-cap at schema max
+            || 'ECHO-P1';                 // Fallback if all chars stripped
         const aiPersonality = profile?.ai_personality || 'Analytic';
+        const currentWeek = calculateAbsoluteWeek(profile?.program_start_date || new Date());
+
+        // current_phase will be recalculated correctly in ContextRouter based on exactly what currentWeek is
         const currentPhase = profile?.current_phase || 1;
-        const currentWeek = profile?.current_week || 1;
 
         // Detect Intent & Build Context
         let intent = detectIntent(sanitizedMessages as any[]);
@@ -1346,6 +1354,7 @@ BEHAVIOR: Acknowledge effort. Use "We" statements. Push for consistency.
         // For demo user, use DEFAULT_SETTINGS to allow toggle script to control privacy mode
         const privacySetting = (userId === DEMO_USER_ID) ? DEFAULT_SETTINGS.data_privacy : (profile?.data_privacy || 'Private');
         const isPrivacyEnabled = privacySetting === 'Private'; // Default safe
+        console.log('[API/Chat] Privacy debug:', { userId, data_privacy: profile?.data_privacy, privacySetting, isPrivacyEnabled });
 
         // 7. BUILD SYSTEM PROMPT (HYBRID XML STRATEGY)
         const currentIsoDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
@@ -1429,19 +1438,12 @@ BEHAVIOR: Acknowledge effort. Use "We" statements. Push for consistency.
         // const isPrivacyEnabled = privacySetting === 'Private'; // Already defined above
 
         // Explicitly type as any to bypass conditional typing issues with AI SDK
-        const enabledTools = isPrivacyEnabled ? undefined : {
-            getRecentLogs,
-            getBiometrics,
-            findLastLog,
-            getExercisePR,
-            getRecoveryMetrics,
-            getComplianceReport,
-            getTrendAnalysis,
-            getCardioSummary,
-        };
+        const enabledTools = isPrivacyEnabled ? undefined : createTools(supabase, userId!);
 
         if (isPrivacyEnabled) {
             console.log('[API/Chat] Privacy Mode Active: Tools disabled.');
+        } else {
+            console.log('[API/Chat] Tools enabled:', enabledTools ? Object.keys(enabledTools) : 'NONE');
         }
 
         try {
@@ -1451,22 +1453,7 @@ BEHAVIOR: Acknowledge effort. Use "We" statements. Push for consistency.
                 messages: sanitizedMessages as any,
                 maxSteps: 5,
                 tools: enabledTools,
-                onStepFinish: ({ text, toolCalls, toolResults, finishReason }: any) => {
-                    try {
-                        const resultStrs = toolResults?.map((r: any) => `Tool: ${r.toolName}, Success: ${!r.isError}, Len: ${(JSON.stringify(r.result) || '').length}`).join(', ') || 'NONE';
-                        const logData = `\n[Step Finish] Reason: ${finishReason}\nTextLen: ${text?.length || 0}\nResults: ${resultStrs}\n`;
-                        fs.appendFileSync('/tmp/ai_chat_debug.log', logData);
-                    } catch (e) { }
-                },
                 onFinish: ({ text, toolCalls, toolResults, finishReason, usage }: any) => {
-                    // Debug Logging to file
-                    try {
-                        const logData = `\n--- [${new Date().toISOString()}] ---\nFinishReason: ${finishReason}\nHasText: ${!!text}\nTextLength: ${text?.length || 0}\nToolCalls: ${toolCalls?.length || 0}\nToolResults: ${toolResults?.length || 0}\nText: ${text || 'EMPTY'}\n-------------------\n`;
-                        fs.appendFileSync('/tmp/ai_chat_debug.log', logData);
-                    } catch (e) {
-                        console.error('Failed to write to debug log:', e);
-                    }
-
                     // Server-Side Fallback for Empty Assistant Text
                     if (text === '' && toolResults && toolResults.length > 0) {
                         console.warn('[API/Chat] Assistant emitted empty text after tool calls.');
@@ -1538,8 +1525,8 @@ BEHAVIOR: Acknowledge effort. Use "We" statements. Push for consistency.
                     const totalTokens = usage?.totalTokens || 0;
                     const cost = calculateCost(modelId, promptTokens, completionTokens);
 
-                    // Fire and forget database log
-                    supabase.from('ai_logs').insert({
+                    // Fire and forget database log — service role bypasses RLS on ai_logs
+                    createServiceClient().from('ai_logs').insert({
                         user_id: userId,
                         message_id: messageId || `msg_${Date.now()}`,
                         model_id: modelId,

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/utils/supabase/server';
+import { createClient, createServiceClient } from '@/utils/supabase/server';
 import { getAnalyticsSummary, getTypoPatterns } from '@/lib/ai/queryAnalytics';
-import { DEMO_USER_ID } from '@/lib/constants';
 
 /**
  * GET /api/ai/analytics
@@ -11,15 +10,17 @@ export async function GET(request: NextRequest) {
     try {
         const supabase = await createClient();
 
-        // Check auth & admin status
+        // Check auth — unauthenticated requests are always rejected, no DEMO_USER_ID fallback
         const { data: { user } } = await supabase.auth.getUser();
-        const userId = user?.id || DEMO_USER_ID;
+        if (!user) {
+            return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
+        }
 
-        // Fetch is_admin status
+        // Fetch is_admin status for the authenticated user only
         const { data: profile } = await supabase
             .from('profiles')
             .select('is_admin')
-            .eq('id', userId)
+            .eq('id', user.id)
             .single();
 
         if (!profile?.is_admin) {
@@ -27,20 +28,24 @@ export async function GET(request: NextRequest) {
         }
 
         const { searchParams } = new URL(request.url);
-        const days = parseInt(searchParams.get('days') || '7');
+        const days = Math.min(Math.max(parseInt(searchParams.get('days') || '7', 10) || 7, 1), 90);
 
         // Calculate date range
         const startDate = new Date();
         startDate.setDate(startDate.getDate() - days);
 
+        // Use service-role client for global queries so RLS owner-only policy
+        // doesn't filter out other users' feedback/logs for the admin view.
+        const serviceClient = createServiceClient();
+
         // Get feedback stats (GLOBAL for admins)
-        const feedbackPromise = supabase
+        const feedbackPromise = serviceClient
             .from('ai_feedback')
             .select('rating, intent, tools_used, latency_ms, created_at, user_message, ai_response')
             .gte('created_at', startDate.toISOString());
 
         // Get engineering logs (GLOBAL for admins)
-        const logsPromise = supabase
+        const logsPromise = serviceClient
             .from('ai_logs')
             .select('*')
             .gte('created_at', startDate.toISOString());
@@ -87,8 +92,8 @@ export async function GET(request: NextRequest) {
         }
 
         const topUsers = Object.entries(userStats)
-            .map(([userId, stats]) => ({
-                userId,
+            .map(([uid, stats]) => ({
+                userId: uid,
                 requests: stats.requests,
                 totalTokens: stats.tokens,
                 totalCostUsd: Number(stats.cost.toFixed(4))

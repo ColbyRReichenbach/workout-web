@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { Check, Scale, Activity, Zap, User, Target, TrendingUp, HeartPulse } from "lucide-react";
 import { TiltCard } from "@/components/TiltCard";
 import { logout } from "@/app/actions/auth";
+import { updateProfileMetrics } from "@/app/actions/user";
 import { useSettings } from "@/context/SettingsContext";
 
 import { UserProfile } from "@/lib/types";
@@ -174,7 +175,7 @@ export default function ProfilePage() {
 
         setLoading(true);
 
-        const updateData = {
+        const result = await updateProfileMetrics({
             weight_lbs: toStorageWeight(form.weight_lbs, units) || null,
             squat_max: toStorageWeight(form.squat_max, units) || null,
             bench_max: toStorageWeight(form.bench_max, units) || null,
@@ -192,22 +193,17 @@ export default function ProfilePage() {
             bike_max_watts: form.bike_max_watts ? parseFloat(form.bike_max_watts) : null,
             current_week: form.current_week,
             current_phase: form.current_phase,
-            program_start_date: form.program_start_date ? new Date(form.program_start_date).toISOString() : null,
+            program_start_date: form.program_start_date || null,
             height: formValuesToInches(units, {
                 feet: form.height_ft,
                 inches: form.height_in,
                 cm: form.height_cm
             }),
-        };
+        });
 
-        const { error } = await supabase
-            .from("profiles")
-            .update(updateData)
-            .eq("id", profile.id);
-
-        if (error) {
-            console.error("Profile update failed:", error);
-            alert(`Save failed: ${error.message}`);
+        if (result.error) {
+            console.error("Profile update failed:", result.error);
+            alert(`Save failed: ${result.error}`);
         } else {
             alert("Synchronization complete.");
             // Re-fetch to confirm consistency

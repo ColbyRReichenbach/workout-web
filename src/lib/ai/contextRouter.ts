@@ -200,7 +200,31 @@ export async function buildDynamicContext(
                 const today = (providedUserDay || new Date().toLocaleDateString('en-US', { weekday: 'long' })).toUpperCase();
 
                 let targetPhase = currentPhase;
-                if (currentPhase === 5) {
+
+                // --- DYNAMIC PHASE DERIVATION ---
+                // Override the static currentPhase passed from the database profile
+                // by manually calculating which phase holds the given absolute `currentWeek`
+                if (programData.phases) {
+                    let weekAccumulator = 0;
+                    let foundPhase = false;
+                    for (let i = 0; i < programData.phases.length; i++) {
+                        const phase = programData.phases[i];
+                        const weeksInPhase = phase.weeks?.length || 4; // fallback to 4
+                        if (currentWeek <= weekAccumulator + weeksInPhase) {
+                            targetPhase = phase.id || (i + 1);
+                            foundPhase = true;
+                            break;
+                        }
+                        weekAccumulator += weeksInPhase;
+                    }
+
+                    // If week is beyond all defined phases, clamp to the last phase
+                    if (!foundPhase && programData.phases.length > 0) {
+                        targetPhase = programData.phases[programData.phases.length - 1].id || programData.phases.length;
+                    }
+                }
+
+                if (targetPhase === 5) {
                     const TESTING_WEEKS = [37, 44, 51];
                     if (!TESTING_WEEKS.includes(currentWeek)) {
                         targetPhase = 1;
@@ -246,15 +270,40 @@ export async function buildDynamicContext(
     }
 
     // EXTRACT RECENTLY DISCUSSED EXERCISES
+    // Security: Lines extracted from AI responses are sanitized before being inserted into the
+    // system prompt to prevent indirect prompt injection attacks.
     const lastAssistantMessages = messages
         .filter(m => m.role === 'assistant')
         .slice(-2)
         .map(m => extractMessageContent(m))
         .join('\n');
 
+    // Patterns that indicate an injection attempt in an extracted line
+    const INJECTION_IN_EXERCISE = [
+        /system\s*:/i,
+        /instruction\s*:/i,
+        /override\s*:/i,
+        /admin\s*:/i,
+        /ignore\s+(previous|all|your)/i,
+        /disregard\s+(your|all)/i,
+        /forget\s+(everything|all)/i,
+        /you\s+are\s+now/i,
+        /reveal\s+(your|the)\s+(system|prompt)/i,
+        /print\s+(your|the)\s+(system|prompt)/i,
+    ];
+
     const recentExercises = lastAssistantMessages.split('\n')
         .filter(line => line.trim().startsWith('-') || line.trim().match(/^\d+\./))
+        // Strip the leading bullet/number to get the raw exercise text
+        .map(line => line.replace(/^[\s\-*]+/, '').replace(/^\d+\.\s*/, '').trim())
+        // Reject lines that are too long to be an exercise name (>100 chars)
+        .filter(text => text.length > 0 && text.length <= 100)
+        // Reject lines that look like injected instructions
+        .filter(text => !INJECTION_IN_EXERCISE.some(p => p.test(text)))
+        // Only keep lines that look like exercise names: letters, digits, spaces, hyphens, parens
+        .filter(text => /^[A-Za-z0-9 \-\/\(\),\.]+$/.test(text))
         .slice(-5)
+        .map(text => `- ${text}`)
         .join('\n');
 
     const contextBuffer = recentExercises
