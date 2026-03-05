@@ -173,6 +173,7 @@ const AMBIGUOUS_KEYWORDS: Record<string, string[]> = {
     'husband': ['off_topic_relationships'],
     'wife': ['off_topic_relationships'],
     'partner': ['off_topic_relationships'],
+    'doping': ['ped_banned_substances'], // "doing" fuzzy-matches "doping" (distance=1); require fitness context
 };
 
 // ============================================
