@@ -1,6 +1,6 @@
 import { openai } from '@ai-sdk/openai';
 import { streamText, convertToModelMessages, createUIMessageStream, createUIMessageStreamResponse } from 'ai';
-import { getRecentLogs, getBiometrics, findLastLog, getExercisePR, getRecoveryMetrics, getComplianceReport, getTrendAnalysis, getCardioSummary } from '@/lib/ai/tools';
+import { createTools } from '@/lib/ai/tools';
 import { createClient, createServiceClient } from '@/utils/supabase/server';
 import { chatRequestSchema, sanitizeString, BOUNDS, extractMessageContent } from '@/lib/validation';
 import { NextResponse } from 'next/server';
@@ -1354,6 +1354,7 @@ BEHAVIOR: Acknowledge effort. Use "We" statements. Push for consistency.
         // For demo user, use DEFAULT_SETTINGS to allow toggle script to control privacy mode
         const privacySetting = (userId === DEMO_USER_ID) ? DEFAULT_SETTINGS.data_privacy : (profile?.data_privacy || 'Private');
         const isPrivacyEnabled = privacySetting === 'Private'; // Default safe
+        console.log('[API/Chat] Privacy debug:', { userId, data_privacy: profile?.data_privacy, privacySetting, isPrivacyEnabled });
 
         // 7. BUILD SYSTEM PROMPT (HYBRID XML STRATEGY)
         const currentIsoDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
@@ -1437,19 +1438,12 @@ BEHAVIOR: Acknowledge effort. Use "We" statements. Push for consistency.
         // const isPrivacyEnabled = privacySetting === 'Private'; // Already defined above
 
         // Explicitly type as any to bypass conditional typing issues with AI SDK
-        const enabledTools = isPrivacyEnabled ? undefined : {
-            getRecentLogs,
-            getBiometrics,
-            findLastLog,
-            getExercisePR,
-            getRecoveryMetrics,
-            getComplianceReport,
-            getTrendAnalysis,
-            getCardioSummary,
-        };
+        const enabledTools = isPrivacyEnabled ? undefined : createTools(supabase, userId!);
 
         if (isPrivacyEnabled) {
             console.log('[API/Chat] Privacy Mode Active: Tools disabled.');
+        } else {
+            console.log('[API/Chat] Tools enabled:', enabledTools ? Object.keys(enabledTools) : 'NONE');
         }
 
         try {
